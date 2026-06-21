@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
@@ -38,13 +38,7 @@ class BenchmarkSubmit(BaseModel):
     thermal_setting: Optional[str] = Field(None, max_length=32)
     ambient_temp_c: Optional[Decimal] = None
 
-    @field_validator("prompt_tokens", "completion_tokens")
-    @classmethod
-    def check_token_minimums(cls, v, info):
-        return v
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
 class BenchmarkResponse(BaseModel):
@@ -84,8 +78,7 @@ class BenchmarkResponse(BaseModel):
     ambient_temp_c: Optional[Decimal] = None
     hei: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
 class HardwareSpecResponse(BaseModel):
@@ -104,8 +97,7 @@ class HardwareSpecResponse(BaseModel):
     release_year: Optional[int] = None
     form_factor: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
 class ModelQualityResponse(BaseModel):
@@ -118,8 +110,7 @@ class ModelQualityResponse(BaseModel):
     source_url: Optional[str] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
 class LeaderboardEntry(BaseModel):
@@ -138,8 +129,7 @@ class LeaderboardEntry(BaseModel):
     hardware_price_usd: Optional[Decimal] = None
     hei: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
 class CompareResponse(BaseModel):

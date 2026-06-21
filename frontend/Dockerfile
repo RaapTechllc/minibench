@@ -4,7 +4,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-ENV VITE_API_URL=http://localhost:3070
+# Build with an empty API base so the SPA uses relative URLs (/api, /health),
+# which nginx (see nginx.conf) reverse-proxies to the api service. Hardcoding
+# http://localhost:3070 here would break any non-localhost deployment.
 RUN npm run build
 
 FROM nginx:alpine

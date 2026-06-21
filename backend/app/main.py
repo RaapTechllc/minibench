@@ -1,4 +1,5 @@
 import hashlib
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
@@ -7,7 +8,6 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import select, func, distinct, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,8 +26,29 @@ from app.schemas import (
 )
 from app.seed import run_seed
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create tables (async engine), then seed reference + sample data (sync).
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    try:
+        run_seed()
+    except Exception as e:  # pragma: no cover - seeding is best-effort
+        print(f"Seed warning: {e}")
+    yield
+    # Release pooled connections on shutdown (also lets the test suite rebind
+    # the engine to a fresh event loop between cases).
+    await engine.dispose()
+
+
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="MiniBench API", version="1.0.0", description="Crowdsourced LLM benchmarks for Mini PCs")
+app = FastAPI(
+    title="MiniBench API",
+    version="1.0.0",
+    description="Crowdsourced LLM benchmarks for Mini PCs",
+    lifespan=lifespan,
+)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
@@ -38,17 +59,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    # Seed data synchronously
-    try:
-        run_seed()
-    except Exception as e:
-        print(f"Seed warning: {e}")
 
 
 def compute_hei(tokens_per_second: Decimal, model_quality_score: Optional[Decimal], hardware_price_usd: Optional[Decimal]) -> Optional[float]:
@@ -116,8 +126,7 @@ async def submit_benchmark(data: BenchmarkSubmit, request: Request, db: AsyncSes
     if result.scalars().first():
         raise HTTPException(429, "Duplicate submission — same hardware/model combo submitted within the last hour")
 
-    # Auto-lookup model quality
-    model_quality_score = data.model_name  # will be replaced
+    # Auto-lookup model quality from the reference table (substring match).
     mq_result = await db.execute(
         select(ModelQuality).where(ModelQuality.model_variant.ilike(f"%{data.model_name}%"))
     )
@@ -172,8 +181,8 @@ async def list_benchmarks(
     quantization: Optional[str] = None,
     system_type: Optional[str] = None,
     engine: Optional[str] = None,
-    sort_by: str = Query("tokens_per_second", regex="^(tokens_per_second|time_to_first_token|submitted_at|memory_bandwidth_gbs)$"),
-    order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("tokens_per_second", pattern="^(tokens_per_second|time_to_first_token|submitted_at|memory_bandwidth_gbs)$"),
+    order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
@@ -214,27 +223,42 @@ async def get_benchmark(benchmark_id: int, db: AsyncSession = Depends(get_db)):
 async def leaderboard(
     model: Optional[str] = None,
     quantization: Optional[str] = None,
-    sort_by: str = Query("hei", regex="^(hei|tokens_per_second|memory_bandwidth_gbs)$"),
+    sort_by: str = Query("hei", pattern="^(hei|tokens_per_second|memory_bandwidth_gbs)$"),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
+    # Express HEI as a SQL expression so ordering AND limiting happen in the
+    # database. Sorting after a LIMIT (the previous approach) returned the wrong
+    # top-N once the table held more rows than `limit`. NULLIF guards price=0,
+    # and NULLS LAST pushes rows without price/quality (HEI is NULL) to the end.
+    hei_expr = (
+        Benchmark.tokens_per_second
+        * Benchmark.model_quality_score
+        / func.nullif(Benchmark.hardware_price_usd, 0)
+    )
+    sort_columns = {
+        "hei": hei_expr,
+        "tokens_per_second": Benchmark.tokens_per_second,
+        "memory_bandwidth_gbs": Benchmark.memory_bandwidth_gbs,
+    }
+    order_col = sort_columns[sort_by]
+
     q = select(Benchmark)
     if model:
         q = q.where(Benchmark.model_name.ilike(f"%{model}%"))
     if quantization:
         q = q.where(Benchmark.quantization == quantization)
 
-    q = q.order_by(Benchmark.tokens_per_second.desc())
-    q = q.limit(limit)
+    q = q.order_by(order_col.desc().nullslast()).limit(limit)
 
     result = await db.execute(q)
     benchmarks = result.scalars().all()
 
     entries = []
-    for b in benchmarks:
+    for rank, b in enumerate(benchmarks, start=1):
         hei = compute_hei(b.tokens_per_second, b.model_quality_score, b.hardware_price_usd)
         entries.append(LeaderboardEntry(
-            rank=0, id=b.id, system_type=b.system_type, cpu_model=b.cpu_model,
+            rank=rank, id=b.id, system_type=b.system_type, cpu_model=b.cpu_model,
             total_ram_gb=b.total_ram_gb, vram_gb=b.vram_gb,
             memory_bandwidth_gbs=b.memory_bandwidth_gbs,
             model_name=b.model_name, quantization=b.quantization,
@@ -242,15 +266,6 @@ async def leaderboard(
             model_quality_score=b.model_quality_score, hardware_price_usd=b.hardware_price_usd,
             hei=hei,
         ))
-
-    # Sort by requested field
-    if sort_by == "hei":
-        entries.sort(key=lambda e: e.hei or 0, reverse=True)
-    elif sort_by == "memory_bandwidth_gbs":
-        entries.sort(key=lambda e: float(e.memory_bandwidth_gbs or 0), reverse=True)
-
-    for i, entry in enumerate(entries):
-        entry.rank = i + 1
 
     return entries
 

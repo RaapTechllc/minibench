@@ -49,6 +49,9 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Show the spinner while we refetch on a sort/filter change. This intentional
+    // setState-in-effect drives the refetch loading state and is safe here.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const params: Record<string, string> = { sort_by: sortBy };
     if (modelFilter) params.model = modelFilter;

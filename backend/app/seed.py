@@ -440,6 +440,7 @@ def run_seed():
         print("Seed data loaded successfully.")
     finally:
         session.close()
+        engine.dispose()
 
 
 if __name__ == "__main__":
