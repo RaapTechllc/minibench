@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (FastAPI + Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: minibench
+          POSTGRES_PASSWORD: minibench
+          POSTGRES_DB: minibench
+        ports:
+          - 5438:5432
+        options: >-
+          --health-cmd "pg_isready -U minibench"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+      - name: Run tests
+        working-directory: backend
+        env:
+          MINIBENCH_TEST_PG_HOST: 127.0.0.1
+          MINIBENCH_TEST_PG_PORT: "5438"
+        run: pytest
+
+  cli:
+    name: CLI (Python package)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install CLI + pytest
+        working-directory: cli
+        run: |
+          pip install -e .
+          pip install pytest
+      - name: Run tests
+        working-directory: cli
+        run: pytest
+
+  frontend:
+    name: Frontend (Vite build + lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+      - name: Build
+        working-directory: frontend
+        run: npm run build

@@ -6,7 +6,8 @@ import {
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { Benchmark, Stats } from '../api';
-import BandwidthBadge, { bandwidthColor } from '../components/BandwidthBadge';
+import BandwidthBadge from '../components/BandwidthBadge';
+import { bandwidthColor } from '../lib/bandwidth';
 
 const SYSTEM_COLORS: Record<string, string> = {
   'Mac Mini M4': '#06b6d4',
@@ -55,8 +56,23 @@ function linearRegression(data: { x: number; y: number }[]) {
   return { slope, intercept, r2 };
 }
 
-function CustomDot(props: any) {
+type AxisMap = Record<string, { scale?: (v: number) => number }>;
+
+interface ScatterPoint {
+  x: number;
+  y: number;
+  system: string;
+}
+
+interface CustomDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: { ram: number; fill?: string };
+}
+
+function CustomDot(props: CustomDotProps) {
   const { cx, cy, payload } = props;
+  if (!payload) return null;
   const r = Math.max(4, Math.min(16, 3 + Math.sqrt(payload.ram) * 0.8));
   return (
     <circle
@@ -69,13 +85,20 @@ function CustomDot(props: any) {
   );
 }
 
-function ParetoOverlay(props: any) {
+interface ParetoOverlayProps {
+  xAxisMap?: AxisMap;
+  yAxisMap?: AxisMap;
+  pareto: ScatterPoint[];
+  top2: ScatterPoint[];
+}
+
+function ParetoOverlay(props: ParetoOverlayProps) {
   const { xAxisMap, yAxisMap, pareto, top2 } = props;
-  const xScale = (Object.values(xAxisMap || {}) as any[])[0]?.scale;
-  const yScale = (Object.values(yAxisMap || {}) as any[])[0]?.scale;
+  const xScale = Object.values(xAxisMap || {})[0]?.scale;
+  const yScale = Object.values(yAxisMap || {})[0]?.scale;
   if (!xScale || !yScale || pareto.length < 2) return null;
 
-  const pts = pareto.map((p: any) => `${xScale(p.x)},${yScale(p.y)}`).join(' ');
+  const pts = pareto.map(p => `${xScale(p.x)},${yScale(p.y)}`).join(' ');
 
   return (
     <g>
@@ -87,7 +110,7 @@ function ParetoOverlay(props: any) {
         fill="none"
         opacity={0.9}
       />
-      {top2.map((pt: any, i: number) => {
+      {top2.map((pt, i) => {
         const cx = xScale(pt.x);
         const cy = yScale(pt.y);
         const label = truncate(pt.system, 20);
@@ -114,10 +137,24 @@ function ParetoOverlay(props: any) {
   );
 }
 
-function BwTrendOverlay(props: any) {
+interface Regression {
+  slope: number;
+  intercept: number;
+  r2: number;
+}
+
+interface BwTrendOverlayProps {
+  xAxisMap?: AxisMap;
+  yAxisMap?: AxisMap;
+  reg: Regression | null;
+  xMin: number;
+  xMax: number;
+}
+
+function BwTrendOverlay(props: BwTrendOverlayProps) {
   const { xAxisMap, yAxisMap, reg, xMin, xMax } = props;
-  const xScale = (Object.values(xAxisMap || {}) as any[])[0]?.scale;
-  const yScale = (Object.values(yAxisMap || {}) as any[])[0]?.scale;
+  const xScale = Object.values(xAxisMap || {})[0]?.scale;
+  const yScale = Object.values(yAxisMap || {})[0]?.scale;
   if (!xScale || !yScale || !reg) return null;
 
   const x1 = xScale(xMin);
@@ -297,7 +334,7 @@ export default function Dashboard() {
                 shape={CustomDot}
               />
             ))}
-            <Customized component={(chartProps: any) => (
+            <Customized component={(chartProps: { xAxisMap?: AxisMap; yAxisMap?: AxisMap }) => (
               <ParetoOverlay {...chartProps} pareto={pareto} top2={paretoTop2} />
             )} />
           </ScatterChart>
@@ -352,7 +389,7 @@ export default function Dashboard() {
               }}
             />
             <Scatter name="Benchmarks" data={bwData} fill="#22d3ee" opacity={0.85} />
-            <Customized component={(chartProps: any) => (
+            <Customized component={(chartProps: { xAxisMap?: AxisMap; yAxisMap?: AxisMap }) => (
               <BwTrendOverlay {...chartProps} reg={reg} xMin={bwXMin} xMax={bwXMax} />
             )} />
           </ScatterChart>

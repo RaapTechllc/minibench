@@ -12,6 +12,7 @@ from rich import box
 
 from minibench import __version__
 from minibench.detect import detect_all
+from minibench.specs import lookup_specs
 from minibench.benchmark import (
     run_benchmark,
     check_ollama,
@@ -53,7 +54,8 @@ def main():
 @click.option("--system-type", default=None, help="System name (e.g. 'Mac Mini M4 Pro')")
 @click.option("--price", default=None, type=float, help="Hardware price USD")
 @click.option("--bandwidth", default=None, type=float, help="Memory bandwidth GB/s")
-def run(model, engine, quantization, no_warmup, system_type, price, bandwidth):
+@click.option("--no-lookup", is_flag=True, help="Skip the curated hardware-spec lookup")
+def run(model, engine, quantization, no_warmup, system_type, price, bandwidth, no_lookup):
     """Run the standard benchmark suite."""
     console.print(Panel.fit(
         "[bold cyan]MiniBench[/bold cyan] v{}\n[dim]Benchmarking your hardware for local LLM inference[/dim]".format(__version__),
@@ -78,6 +80,15 @@ def run(model, engine, quantization, no_warmup, system_type, price, bandwidth):
     console.print("\n[bold]Detecting hardware...[/bold]")
     hw = detect_all()
 
+    # Resolve curated specs (bandwidth/price/system type) the runtime can't
+    # detect. Explicit flags always win over the lookup table.
+    specs = None if no_lookup else lookup_specs(hw.get("cpu_model", ""), system_type)
+    resolved_system_type = system_type or (specs.get("system_type") if specs else None)
+    resolved_bandwidth = bandwidth if bandwidth is not None else (specs.get("memory_bandwidth_gbs") if specs else None)
+    resolved_price = price if price is not None else (specs.get("hardware_price_usd") if specs else None)
+    resolved_mem_type = hw.get("memory_type") or (specs.get("memory_type") if specs else None)
+    bw_from_lookup = bandwidth is None and specs is not None and specs.get("memory_bandwidth_gbs") is not None
+
     table = Table(title="Hardware Detected", box=box.ROUNDED)
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="white")
@@ -90,9 +101,12 @@ def run(model, engine, quantization, no_warmup, system_type, price, bandwidth):
         table.add_row("VRAM", f"{hw['vram_gb']} GB")
     if hw.get("igpu_model"):
         table.add_row("iGPU", hw["igpu_model"])
-    table.add_row("Memory Type", hw.get("memory_type") or "Unknown")
-    if bandwidth:
-        table.add_row("Memory Bandwidth", f"[bold yellow]{bandwidth} GB/s[/bold yellow]")
+    if resolved_system_type:
+        table.add_row("System", resolved_system_type + ("  [dim](lookup)[/dim]" if specs and not system_type else ""))
+    table.add_row("Memory Type", resolved_mem_type or "Unknown")
+    if resolved_bandwidth:
+        suffix = "  [dim](lookup)[/dim]" if bw_from_lookup else ""
+        table.add_row("Memory Bandwidth", f"[bold yellow]{resolved_bandwidth} GB/s[/bold yellow]{suffix}")
     table.add_row("OS", hw.get("os", "Unknown"))
     console.print(table)
 
@@ -116,9 +130,9 @@ def run(model, engine, quantization, no_warmup, system_type, price, bandwidth):
     res_table.add_row("Total Duration", f"{result['test_duration_secs']}s")
     res_table.add_row("Prompt Tokens", str(result["prompt_tokens"]))
     res_table.add_row("Completion Tokens", str(result["completion_tokens"]))
-    if bandwidth:
-        # Show bandwidth efficiency
-        bw_eff = round(result["tokens_per_second"] / bandwidth, 2) if bandwidth else None
+    if resolved_bandwidth:
+        # Show bandwidth efficiency (t/s normalized by memory bandwidth).
+        bw_eff = round(result["tokens_per_second"] / resolved_bandwidth, 2)
         res_table.add_row("Bandwidth Efficiency", f"{bw_eff} t/s per GB/s")
     console.print(res_table)
 
@@ -132,10 +146,10 @@ def run(model, engine, quantization, no_warmup, system_type, price, bandwidth):
         "igpu_model": hw.get("igpu_model"),
         "total_ram_gb": hw.get("total_ram_gb", 0),
         "vram_gb": hw.get("vram_gb"),
-        "memory_type": hw.get("memory_type"),
-        "memory_bandwidth_gbs": bandwidth,
-        "system_type": system_type,
-        "hardware_price_usd": price,
+        "memory_type": resolved_mem_type,
+        "memory_bandwidth_gbs": resolved_bandwidth,
+        "system_type": resolved_system_type,
+        "hardware_price_usd": resolved_price,
         "os": hw.get("os", "Unknown"),
         "inference_engine": engine,
         "model_name": model,
@@ -222,6 +236,7 @@ def upload(api_url):
 def detect():
     """Show auto-detected hardware info."""
     hw = detect_all()
+    specs = lookup_specs(hw.get("cpu_model", ""))
     table = Table(title="Hardware Detection", box=box.ROUNDED)
     table.add_column("Property", style="cyan")
     table.add_column("Value", style="white")
@@ -233,8 +248,13 @@ def detect():
     table.add_row("GPU (Discrete)", hw.get("gpu_model") or "None")
     table.add_row("VRAM", f"{hw.get('vram_gb', 'N/A')} GB" if hw.get("vram_gb") else "N/A (System RAM only)")
     table.add_row("iGPU", hw.get("igpu_model") or "None")
-    table.add_row("Memory Type", hw.get("memory_type") or "Unknown")
+    table.add_row("Memory Type", hw.get("memory_type") or (specs.get("memory_type") if specs else None) or "Unknown")
     table.add_row("OS", hw.get("os", "Unknown"))
+    if specs:
+        table.add_row("Matched System", f"[green]{specs['system_type']}[/green] [dim](lookup)[/dim]")
+        table.add_row("Memory Bandwidth", f"[bold yellow]{specs['memory_bandwidth_gbs']} GB/s[/bold yellow] [dim](lookup)[/dim]")
+    else:
+        table.add_row("Memory Bandwidth", "[dim]Unknown — pass --bandwidth when running[/dim]")
     console.print(table)
 
 

@@ -33,30 +33,6 @@ export default function Compare() {
     { metric: 'MMLU', A: Number(compare.a.model_quality_score ?? 0), B: Number(compare.b.model_quality_score ?? 0) },
   ] : [];
 
-  function Card({ b, label }: { b: Benchmark; label: string }) {
-    return (
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex-1">
-        <div className="text-xs text-gray-500 mb-1">{label}</div>
-        <div className="text-xl font-bold text-white mb-3">{b.system_type || 'Unknown'}</div>
-        <div className="space-y-2 text-sm">
-          <Row label="CPU" value={b.cpu_model} />
-          <Row label="System RAM" value={`${Number(b.total_ram_gb)} GB ${b.memory_type || ''}`} />
-          <Row label="VRAM" value={b.vram_gb ? `${Number(b.vram_gb)} GB` : 'None (System RAM only)'} highlight={!!b.vram_gb} />
-          <div className="flex justify-between">
-            <span className="text-gray-400">Bandwidth</span>
-            <BandwidthBadge gbs={b.memory_bandwidth_gbs ? Number(b.memory_bandwidth_gbs) : null} />
-          </div>
-          <Row label="Model" value={`${b.model_name} (${b.quantization})`} />
-          <Row label="Engine" value={b.inference_engine} />
-          <Row label="t/s" value={Number(b.tokens_per_second).toFixed(1)} highlight />
-          <Row label="TTFT" value={b.time_to_first_token ? `${Number(b.time_to_first_token).toFixed(2)}s` : '—'} />
-          <Row label="HEI" value={b.hei?.toFixed(2) ?? '—'} highlight />
-          <Row label="Price" value={b.hardware_price_usd ? `$${Number(b.hardware_price_usd).toLocaleString()}` : '—'} />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -109,6 +85,30 @@ export default function Compare() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function Card({ b, label }: { b: Benchmark; label: string }) {
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex-1">
+      <div className="text-xs text-gray-500 mb-1">{label}</div>
+      <div className="text-xl font-bold text-white mb-3">{b.system_type || 'Unknown'}</div>
+      <div className="space-y-2 text-sm">
+        <Row label="CPU" value={b.cpu_model} />
+        <Row label="System RAM" value={`${Number(b.total_ram_gb)} GB ${b.memory_type || ''}`} />
+        <Row label="VRAM" value={b.vram_gb ? `${Number(b.vram_gb)} GB` : 'None (System RAM only)'} highlight={!!b.vram_gb} />
+        <div className="flex justify-between">
+          <span className="text-gray-400">Bandwidth</span>
+          <BandwidthBadge gbs={b.memory_bandwidth_gbs ? Number(b.memory_bandwidth_gbs) : null} />
+        </div>
+        <Row label="Model" value={`${b.model_name} (${b.quantization})`} />
+        <Row label="Engine" value={b.inference_engine} />
+        <Row label="t/s" value={Number(b.tokens_per_second).toFixed(1)} highlight />
+        <Row label="TTFT" value={b.time_to_first_token ? `${Number(b.time_to_first_token).toFixed(2)}s` : '—'} />
+        <Row label="HEI" value={b.hei?.toFixed(2) ?? '—'} highlight />
+        <Row label="Price" value={b.hardware_price_usd ? `$${Number(b.hardware_price_usd).toLocaleString()}` : '—'} />
+      </div>
     </div>
   );
 }
