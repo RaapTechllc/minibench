@@ -5,6 +5,7 @@ import Leaderboard from './pages/Leaderboard';
 import Compare from './pages/Compare';
 import Submit from './pages/Submit';
 import Hardware from './pages/Hardware';
+import BenchmarkDetail from './pages/BenchmarkDetail';
 
 const NAV = [
   { path: '/', label: 'Dashboard', icon: BarChart3 },
@@ -48,6 +49,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/benchmarks/:id" element={<BenchmarkDetail />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/hardware" element={<Hardware />} />
           <Route path="/submit" element={<Submit />} />

@@ -77,6 +77,17 @@ Set the API target with `MINIBENCH_API_URL` (default `http://localhost:3070`).
 - **Memory Bandwidth** — color-coded everywhere: `<50` red, `50–100` amber, `100–200` green, `200+` gold.
 - **System RAM vs VRAM** — distinguished in the data model and every view.
 
+## Frontend routes
+
+| Route | Page |
+|-------|------|
+| `/` | Dashboard — efficiency frontier, bandwidth vs throughput, recent submissions |
+| `/leaderboard` | Ranked table (HEI / t/s / bandwidth); rows link to detail |
+| `/benchmarks/:id` | Single-benchmark detail (full hardware/software/performance breakdown) |
+| `/compare` | Side-by-side comparison of two benchmarks |
+| `/hardware` | Hardware specs database |
+| `/submit` | CLI instructions for submitting results |
+
 ## API endpoints
 
 | Method | Path | Description |

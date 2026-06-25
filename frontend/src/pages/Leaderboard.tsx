@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { LeaderboardEntry } from '../api';
 import BandwidthBadge from '../components/BandwidthBadge';
@@ -130,7 +131,12 @@ export default function Leaderboard() {
                     </td>
                     <td className="p-3">
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-white font-medium whitespace-nowrap">{e.system_type || '—'}</span>
+                        <Link
+                          to={`/benchmarks/${e.id}`}
+                          className="text-white font-medium whitespace-nowrap hover:text-cyan-400 transition-colors"
+                        >
+                          {e.system_type || `#${e.id}`}
+                        </Link>
                         <span className={`inline-flex items-center self-start px-1.5 py-0.5 rounded text-xs font-semibold ${badge.cls}`}>
                           {badge.label}
                         </span>
