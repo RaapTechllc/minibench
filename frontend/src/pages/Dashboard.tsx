@@ -443,7 +443,7 @@ export default function Dashboard() {
                   </td>
                   <td className="py-2.5">
                     <Link
-                      to="/leaderboard"
+                      to={`/benchmarks/${b.id}`}
                       className="text-xs text-gray-500 hover:text-cyan-400 transition-colors whitespace-nowrap"
                     >
                       View →

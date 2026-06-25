@@ -23,6 +23,10 @@ export interface Benchmark {
   quantization: string;
   tokens_per_second: number;
   time_to_first_token: number | null;
+  total_power_watts: number | null;
+  watts_per_token: number | null;
+  thermal_setting: string | null;
+  ambient_temp_c: number | null;
   model_quality_score: number | null;
   quality_source: string | null;
   hei: number | null;
