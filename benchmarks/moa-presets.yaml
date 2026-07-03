@@ -1,23 +1,24 @@
-# Hermes MoA Benchmark Presets — v2 (Real Data)
+# Hermes MoA Benchmark Presets — v3 (Real Provider Config)
 # Copy to ~/.hermes/config.yaml (merge moa: section) or use hermes moa configure
 #
 # All model IDs and pricing verified from published sources (Jul 3, 2026):
 # - BFCL V4, llm-stats.com, VentureBeat, GLM-5.2 scorecard, Kimi K2.7 Code, MiniMax M3
+# - Providers: ollama-cloud (Ollama Pro $20/mo), xai (Grok API key), xai-oauth (Grok OAuth $40/mo)
 
 moa:
   default_preset: glm-tool-moa
   presets:
     glm-tool-moa:
       enabled: true
-      description: "Primary — GLM-5.2 aggregator. Beats Opus 4.8 on Terminal-Bench (81.0 vs 74.6). 40% cost."
+      description: "Primary — GLM-5.2 aggregator via Ollama. Beats Opus 4.8 on Terminal-Bench (81.0 vs 74.6). 40% cost."
       reference_models:
-        - provider: openrouter
-          model: deepseek/deepseek-v4-pro
-        - provider: openrouter
-          model: x-ai/grok-4.3
+        - provider: xai
+          model: grok-build-0.1
+        - provider: ollama-cloud
+          model: deepseek-v4-pro
       aggregator:
-        provider: openrouter
-        model: z-ai/glm-5.2
+        provider: ollama-cloud
+        model: glm-5.2
       reference_temperature: 0.7
       aggregator_temperature: 0.4
       reference_max_tokens: 600
@@ -25,31 +26,46 @@ moa:
 
     kimi-tool-moa:
       enabled: true
-      description: "Secondary — Kimi K2.7 Code. MCP Mark 81.1 > Opus 4.8 (76.4). 22% cost."
+      description: "Secondary — Kimi K2.7 Code via Ollama. MCP Mark 81.1 > Opus 4.8 (76.4). 22% cost."
       reference_models:
-        - provider: openrouter
-          model: deepseek/deepseek-v4-pro
-        - provider: openrouter
-          model: x-ai/grok-4.3
+        - provider: xai
+          model: grok-build-0.1
+        - provider: ollama-cloud
+          model: deepseek-v4-pro
       aggregator:
-        provider: openrouter
-        model: kimi/kimi-k2.7-code
+        provider: ollama-cloud
+        model: kimi-k2.7-code
       reference_temperature: 0.7
       aggregator_temperature: 0.4
       reference_max_tokens: 600
       max_tokens: 4096
 
+    grok-moa:
+      enabled: true
+      description: "Grok-native — Composer 2.5 Fast aggregator + Grok Build 0.1 proposer. Zero additional cost via OAuth."
+      reference_models:
+        - provider: xai
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-4.3
+      aggregator:
+        provider: xai-oauth
+        model: grok-composer-2.5-fast
+      reference_temperature: 0.4
+      aggregator_temperature: 0.2
+      max_tokens: 4096
+
     glm-flash-moa:
       enabled: true
-      description: "Budget — GLM-5.2 + MiMo Flash. 22% cost."
+      description: "Budget — GLM-5.2 + DeepSeek Flash via Ollama. 22% cost."
       reference_models:
-        - provider: openrouter
-          model: xiaomi/mimo-v2.5-flash
-        - provider: openrouter
-          model: deepseek/deepseek-v4-flash
+        - provider: ollama-cloud
+          model: deepseek-v4-flash
+        - provider: ollama-cloud
+          model: minimax-m3
       aggregator:
-        provider: openrouter
-        model: z-ai/glm-5.2
+        provider: ollama-cloud
+        model: glm-5.2
       reference_temperature: 0.7
       aggregator_temperature: 0.4
       reference_max_tokens: 600
@@ -57,15 +73,15 @@ moa:
 
     m3-experimental:
       enabled: true
-      description: "Experimental — MiniMax M3. 10% cost. 1M context."
+      description: "Experimental — MiniMax M3 aggregator via Ollama. 10% cost. 1M context."
       reference_models:
-        - provider: openrouter
-          model: deepseek/deepseek-v4-pro
-        - provider: openrouter
-          model: x-ai/grok-4.3
+        - provider: xai
+          model: grok-build-0.1
+        - provider: ollama-cloud
+          model: deepseek-v4-pro
       aggregator:
-        provider: openrouter
-        model: minimax/minimax-m3
+        provider: ollama-cloud
+        model: minimax-m3
       reference_temperature: 0.7
       aggregator_temperature: 0.4
       reference_max_tokens: 600

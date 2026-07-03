@@ -255,7 +255,35 @@ Cost:        10% of Opus 4.8
 
 ---
 
-## 6. Preset Configuration
+## 6. Subscription Analysis (Real Stack)
+
+### 6.1 Current Subscriptions
+
+| Sub | Cost | What You Get | MoA Role |
+|-----|:----:|--------------|:--------:|
+| **Grok OAuth** | **$40/mo** | Grok 4.3, Grok Build 0.1, Composer 2.5 Fast | Proposer + Aggregator |
+| **OpenAI Business** | **$0** (work) | GPT-5, Codex OAuth | Coding Aggregator |
+| **Ollama Pro Cloud** | **$20/mo** | GLM-5.2, Kimi K2.7 Code, DeepSeek V4 Pro, MiniMax M3 | All models via GPU-time |
+| **OpenCode Go** | **$10/mo** | Same + MiMo-V2.5, Qwen3.7 Max ($60/mo token cap) | Overflow/backup |
+| **Total** | **$70/mo** | Budget room: $30-130/mo headroom | |
+
+### 6.2 MoA Role Mapping
+
+| Role | Model | Via | Cost |
+|:----:|-------|:---:|:----:|
+| **Proposer** (cheap) | Grok Build 0.1 | Grok OAuth $40 | $0 |
+| **Proposer** (quality) | Grok 4.3 | Grok OAuth $40 | $0 |
+| **Proposer** (open) | DeepSeek V4 Pro | Ollama Pro $20 | $0 |
+| **Proposer** (budget) | DeepSeek V4 Flash | Ollama Pro $20 | $0 |
+| **Aggregator** (primary) | Composer 2.5 Fast | Grok OAuth $40 | $0 |
+| **Aggregator** (tool-use) | GLM-5.2 | Ollama Pro $20 | $0 |
+| **Aggregator** (coding) | Codex | OpenAI Biz $0 | **$0** |
+| **Aggregator** (secondary) | Kimi K2.7 Code | Ollama Pro $20 | $0 |
+| **Aggregator** (experimental) | MiniMax M3 | Ollama Pro $20 | $0 |
+
+**All models are included in existing subscriptions — no per-token API costs.**
+
+### 6.3 Preset Configuration (Real Hermes Config)
 
 ```yaml
 moa:
@@ -263,15 +291,15 @@ moa:
   presets:
     glm-tool-moa:
       enabled: true
-      description: "Primary — GLM-5.2 aggregator. Beats Opus 4.8 on Terminal-Bench (81.0 vs 74.6). 40% cost."
+      description: "Primary — GLM-5.2 aggregator via Ollama. Beats Opus 4.8 on Terminal-Bench (81.0 vs 74.6). 40% cost."
       reference_models:
-        - provider: openrouter
-          model: deepseek/deepseek-v4-pro
-        - provider: openrouter
-          model: x-ai/grok-4.3
+        - provider: xai
+          model: grok-build-0.1
+        - provider: ollama-cloud
+          model: deepseek-v4-pro
       aggregator:
-        provider: openrouter
-        model: z-ai/glm-5.2
+        provider: ollama-cloud
+        model: glm-5.2
       reference_temperature: 0.7
       aggregator_temperature: 0.4
       reference_max_tokens: 600
@@ -279,31 +307,46 @@ moa:
 
     kimi-tool-moa:
       enabled: true
-      description: "Secondary — Kimi K2.7 Code. MCP Mark 81.1 > Opus 4.8 (76.4). 22% cost."
+      description: "Secondary — Kimi K2.7 Code via Ollama. MCP Mark 81.1 > Opus 4.8 (76.4). 22% cost."
       reference_models:
-        - provider: openrouter
-          model: deepseek/deepseek-v4-pro
-        - provider: openrouter
-          model: x-ai/grok-4.3
+        - provider: xai
+          model: grok-build-0.1
+        - provider: ollama-cloud
+          model: deepseek-v4-pro
       aggregator:
-        provider: openrouter
-        model: kimi/kimi-k2.7-code
+        provider: ollama-cloud
+        model: kimi-k2.7-code
       reference_temperature: 0.7
       aggregator_temperature: 0.4
       reference_max_tokens: 600
       max_tokens: 4096
 
+    grok-moa:
+      enabled: true
+      description: "Grok-native — Composer 2.5 Fast aggregator + Grok Build 0.1 proposer. Zero additional cost via OAuth."
+      reference_models:
+        - provider: xai
+          model: grok-build-0.1
+        - provider: xai-oauth
+          model: grok-4.3
+      aggregator:
+        provider: xai-oauth
+        model: grok-composer-2.5-fast
+      reference_temperature: 0.4
+      aggregator_temperature: 0.2
+      max_tokens: 4096
+
     glm-flash-moa:
       enabled: true
-      description: "Budget — GLM-5.2 + MiMo Flash. 22% cost."
+      description: "Budget — GLM-5.2 + DeepSeek Flash via Ollama. 22% cost."
       reference_models:
-        - provider: openrouter
-          model: xiaomi/mimo-v2.5-flash
-        - provider: openrouter
-          model: deepseek/deepseek-v4-flash
+        - provider: ollama-cloud
+          model: deepseek-v4-flash
+        - provider: ollama-cloud
+          model: minimax-m3
       aggregator:
-        provider: openrouter
-        model: z-ai/glm-5.2
+        provider: ollama-cloud
+        model: glm-5.2
       reference_temperature: 0.7
       aggregator_temperature: 0.4
       reference_max_tokens: 600
@@ -311,15 +354,15 @@ moa:
 
     m3-experimental:
       enabled: true
-      description: "Experimental — MiniMax M3. 10% cost. 1M context."
+      description: "Experimental — MiniMax M3 aggregator via Ollama. 10% cost. 1M context."
       reference_models:
-        - provider: openrouter
-          model: deepseek/deepseek-v4-pro
-        - provider: openrouter
-          model: x-ai/grok-4.3
+        - provider: xai
+          model: grok-build-0.1
+        - provider: ollama-cloud
+          model: deepseek-v4-pro
       aggregator:
-        provider: openrouter
-        model: minimax/minimax-m3
+        provider: ollama-cloud
+        model: minimax-m3
       reference_temperature: 0.7
       aggregator_temperature: 0.4
       reference_max_tokens: 600
