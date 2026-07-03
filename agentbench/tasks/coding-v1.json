@@ -1,0 +1,43 @@
+{
+  "suite": "our-coding-v1",
+  "notes": "Contamination-resistant seed set. Every task has an EXECUTABLE oracle (unit tests / exact numeric), never keyword presence. Grow via post-cutoff GitHub issues + procedurally-generated instances; keep the real test split private and publish only a dev slice.",
+  "canary": "AGENTBENCH-CANARY-8f3a1c2e-DO-NOT-TRAIN",
+  "tasks": [
+    {
+      "id": "code-two-sum",
+      "category": "coding",
+      "prompt": "Write a Python function `two_sum(nums, target)` that returns the indices (as a list of two ints) of the two numbers in `nums` that add up to `target`. Assume exactly one solution. Return the code in a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import two_sum\n\ndef test_basic():\n    assert sorted(two_sum([2, 7, 11, 15], 9)) == [0, 1]\n\ndef test_middle():\n    assert sorted(two_sum([3, 2, 4], 6)) == [1, 2]\n\ndef test_negatives():\n    assert sorted(two_sum([-3, 4, 3, 90], 0)) == [0, 2]\n"
+      }
+    },
+    {
+      "id": "code-parse-durations",
+      "category": "coding",
+      "prompt": "Write a Python function `total_seconds(spec)` that parses a duration string like '1h30m15s' (any subset/order of h, m, s components, each optional) and returns the total number of seconds as an int. Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import total_seconds\n\ndef test_full():\n    assert total_seconds('1h30m15s') == 5415\n\ndef test_partial():\n    assert total_seconds('45m') == 2700\n\ndef test_seconds_only():\n    assert total_seconds('90s') == 90\n"
+      }
+    },
+    {
+      "id": "reason-word-problem",
+      "category": "reasoning",
+      "prompt": "A train leaves at 14:20 and arrives at 17:05 the same day. How many minutes was the journey? Give the final answer as a number.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 165
+      }
+    },
+    {
+      "id": "tooluse-classify-json",
+      "category": "tool-use",
+      "prompt": "Classify this support ticket and respond with ONLY a JSON object with keys `priority` (one of URGENT/NORMAL/LOW) and `is_production` (boolean). Ticket: 'The production checkout API is returning 500s for all customers.'",
+      "verification": {
+        "type": "json_fields",
+        "required": {"priority": "URGENT", "is_production": true}
+      }
+    }
+  ]
+}
