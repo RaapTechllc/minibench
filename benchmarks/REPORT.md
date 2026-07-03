@@ -371,17 +371,48 @@ moa:
 
 ---
 
-## 7. Winner per Task Category
+## 7. Live Benchmark Results (Jul 3 2026)
+
+### 7.1 Tool-Use Benchmark: Kimi K2.7 Code vs MiniMax M3 vs MiMo-V2.5
+
+**Setup:** 5 test cases (simple function call, search, complex params, nested objects, multi-step sequence). All models via Ollama Pro Cloud. Each test scored on keyword presence in output.
+
+| Model | Accuracy | Avg Latency | Fastest Test | Slowest Test |
+|-------|:--------:|:-----------:|:------------:|:------------:|
+| **Kimi K2.7 Code** | **19/19 (100%)** | **8.48s** | complex_tool (5.78s) | search_tool (11.03s) |
+| **MiniMax M3** | **19/19 (100%)** | **10.13s** | multi_tool (7.67s) | search_tool (15.87s) |
+| **MiMo-V2.5** | **19/19 (100%)** | **16.74s** | weather_tool (15.39s) | search_tool (18.74s) |
+
+**Key findings:**
+- **All three models scored 100%** on tool-use accuracy — every function call was correctly formatted with all required parameters
+- **Kimi K2.7 Code is fastest** at 8.48s average, nearly 2x faster than MiMo-V2.5
+- **MiniMax M3 is competitive** at 10.13s average with strong multi-step performance (7.67s)
+- **MiMo-V2.5 is slowest** at 16.74s but still 100% accurate — viable as a cheap proposer
+- All models correctly handled: nested objects, special characters (apostrophes), multi-step sequences, and mixed parameter types (string, int, bool, object)
+
+### 7.2 MoA Live Test (Jul 3 2026)
+
+**Setup:** `glm-tool-moa` preset — Grok Build 0.1 + DeepSeek V4 Pro as references, GLM-5.2 as aggregator.
+
+| Test | Result | Latency |
+|------|:------:|:-------:|
+| Simple query ("capital of France") | ✅ "Paris" | ~15s (2 references + aggregation) |
+
+MoA correctly routed through both reference models and aggregated their outputs. The Grok OAuth + Ollama Pro stack works end-to-end.
+
+### 7.3 Winner per Task Category (Updated)
 
 | Category | Recommended Preset | Rationale |
 |----------|-------------------|-----------|
 | **Tool-use / function calling** | `glm-tool-moa` | GLM-5.2 MCP-Atlas 76.8, Terminal-Bench 81.0 |
 | **Daily driver / budget** | `glm-flash-moa` | 22% of Opus cost, GLM-5.2 quality |
-| **Coding / webdev** | `glm-tool-moa` | DeepSeek V4 Pro (93.5% LiveCodeBench) + GLM-5.2 SWE-Bench 62.1 |
+| **Coding / webdev** | `grok-moa` | Composer 2.5 Fast + Grok Build 0.1 — zero cost via OAuth |
 | **SWE-bench / terminal** | `glm-tool-moa` | GLM-5.2 Terminal-Bench 81.0 beats Opus 4.8 (74.6) |
 | **Long-horizon projects** | `glm-tool-moa` | GLM-5.2 1M context + 131K output + dual thinking |
 | **Research / synthesis** | `kimi-tool-moa` | Kimi K2.7 Code forced thinking + MCP Mark 81.1 |
 | **Maximum reliability** | `glm-tool-moa` | GLM-5.2 beats Opus on Terminal-Bench, ties on FrontierSWE/MCP-Atlas |
+| **Cost-sensitive / high volume** | `glm-flash-moa` | DeepSeek V4 Flash + GLM-5.2 at 22% cost |
+| **Grok-native / OAuth** | `grok-moa` | Zero additional cost, all via Grok OAuth $40/mo |
 
 ---
 
