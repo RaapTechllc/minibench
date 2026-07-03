@@ -1,5 +1,18 @@
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import (
+    Column,
+    Integer,
+    BigInteger,
+    String,
+    Numeric,
+    DateTime,
+    Date,
+    Text,
+    Boolean,
+    ForeignKey,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 import uuid
 
 from app.database import Base
@@ -86,3 +99,77 @@ class ModelQuality(Base):
     lmsys_elo = Column(Integer)
     source_url = Column(Text)
     updated_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+# ─── Agent-benchmark product (additive; separate from the hardware tables) ─────
+
+
+class AgentRun(Base):
+    """One MoA/agent config scored over a task suite with N trials.
+
+    Mirrors the summary that ``agentbench.run`` emits so a run can be published
+    straight to the leaderboard.
+    """
+
+    __tablename__ = "agent_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    # UNIQUE so agent_task_results.run_id can foreign-key it (a FK target must be
+    # unique). This was the schema bug flagged in the brief's DDL sketch.
+    run_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True)
+    submitted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    harness = Column(String(64))          # inspect-native, OpenClaw, Hermes-agent
+    harness_version = Column(String(32))
+    moa_config = Column(JSONB)            # {name, self_moa, models[], ...}
+    benchmark_suite = Column(String(64), nullable=False)  # our-coding-v1, swe-live
+    provider = Column(String(32))         # openrouter, ollama
+    model_snapshot_date = Column(Date)
+
+    n_tasks = Column(Integer, nullable=False)
+    n_trials = Column(Integer, nullable=False)
+    pass_rate = Column(Numeric(5, 2), nullable=False)     # 0–100 (%)
+    pass_hat_k = Column(Numeric(5, 2))                    # consistency across trials
+    ci95_low = Column(Numeric(5, 2))
+    ci95_high = Column(Numeric(5, 2))
+    cost_usd_per_task = Column(Numeric(10, 4))
+    latency_p50_ms = Column(Integer)
+    latency_p95_ms = Column(Integer)
+    tokens_in = Column(BigInteger)
+    tokens_out = Column(BigInteger)
+
+
+class AgentTaskResult(Base):
+    """Per-task (optionally per-trial) result for an :class:`AgentRun`."""
+
+    __tablename__ = "agent_task_results"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    run_id = Column(UUID(as_uuid=True), ForeignKey("agent_runs.run_id"), nullable=False)
+    task_id = Column(String(128), nullable=False)
+    category = Column(String(64))
+    trial = Column(Integer)
+    passed = Column(Boolean, nullable=False)
+    score = Column(Numeric(6, 3))
+    cost_usd = Column(Numeric(10, 5))
+    latency_ms = Column(Integer)
+    tokens_in = Column(Integer)
+    tokens_out = Column(Integer)
+    raw_output_ref = Column(Text)  # object-store key, not an inline blob
+
+
+class KnownModel(Base):
+    """Catalog of models seen on a provider, for the new-model tracker."""
+
+    __tablename__ = "known_models"
+    __table_args__ = (UniqueConstraint("provider", "model_id", name="uq_known_model"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    provider = Column(String(32), nullable=False)   # openrouter, ollama
+    model_id = Column(String(160), nullable=False)  # namespaced id
+    display_name = Column(String(160))
+    first_seen = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    context_length = Column(Integer)
+    prompt_price = Column(Numeric(12, 8))
+    completion_price = Column(Numeric(12, 8))
+    benchmarked = Column(Boolean, nullable=False, default=False)
