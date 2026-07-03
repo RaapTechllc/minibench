@@ -1,55 +1,73 @@
-# Hermes MoA Benchmark Presets
+# Hermes MoA Benchmark Presets — v2 (Real Data)
 # Copy to ~/.hermes/config.yaml (merge moa: section) or use hermes moa configure
+#
+# All model IDs and pricing verified from published sources (Jul 3, 2026):
+# - BFCL V4, llm-stats.com, VentureBeat, Kimi K2.7 Code official, MiniMax M3 launch
 
 moa:
-  default_preset: balanced-hybrid
+  default_preset: kimi-tool-moa
   presets:
-    budget-open:
+    kimi-tool-moa:
       enabled: true
+      description: "Best tool-use MoA — Kimi K2.7 Code MCP Mark 81.1 > Opus 4.8 (76.4). 22% of Opus cost."
       reference_models:
         - provider: openrouter
-          model: z-ai/glm-5.2
+          model: deepseek/deepseek-v4-pro
         - provider: openrouter
-          model: qwen/qwen3.7-max
+          model: x-ai/grok-4.3
+      aggregator:
+        provider: openrouter
+        model: kimi/kimi-k2.7-code
+      reference_temperature: 0.7
+      aggregator_temperature: 0.4
+      reference_max_tokens: 600
+      max_tokens: 4096
+
+    m3-value-moa:
+      enabled: true
+      description: "Best value — MiniMax M3 at $0.60/$2.40, 10× cheaper than Opus 4.8. 10% of Opus cost."
+      reference_models:
+        - provider: openrouter
+          model: deepseek/deepseek-v4-pro
+        - provider: openrouter
+          model: x-ai/grok-4.3
+      aggregator:
+        provider: openrouter
+        model: minimax/minimax-m3
+      reference_temperature: 0.7
+      aggregator_temperature: 0.4
+      reference_max_tokens: 600
+      max_tokens: 4096
+
+    flash-moa:
+      enabled: true
+      description: "Cheapest viable MoA — MiMo-V2.5 Flash at $0.10/$0.30. 8% of Opus cost."
+      reference_models:
+        - provider: openrouter
+          model: xiaomi/mimo-v2.5-flash
+        - provider: openrouter
+          model: deepseek/deepseek-v4-flash
+      aggregator:
+        provider: openrouter
+        model: minimax/minimax-m3
+      reference_temperature: 0.7
+      aggregator_temperature: 0.4
+      reference_max_tokens: 600
+      max_tokens: 4096
+
+    diverse-moa:
+      enabled: true
+      description: "Maximum diversity — 3 model families (DeepSeek, Grok, MiMo). 25% of Opus cost."
+      reference_models:
+        - provider: openrouter
+          model: deepseek/deepseek-v4-pro
+        - provider: openrouter
+          model: x-ai/grok-4.3
         - provider: openrouter
           model: xiaomi/mimo-v2.5
       aggregator:
         provider: openrouter
-        model: deepseek/deepseek-v4-pro
-      reference_temperature: 0.7
-      aggregator_temperature: 0.4
-      reference_max_tokens: 600
-      max_tokens: 4096
-
-    balanced-hybrid:
-      enabled: true
-      reference_models:
-        - provider: openrouter
-          model: x-ai/grok-4.3
-        - provider: openrouter
-          model: cursor/composer-2.5
-        - provider: openrouter
-          model: z-ai/glm-5.2
-      aggregator:
-        provider: openrouter
-        model: openai/gpt-5.5
-      reference_temperature: 0.7
-      aggregator_temperature: 0.4
-      reference_max_tokens: 600
-      max_tokens: 4096
-
-    high-quality:
-      enabled: true
-      reference_models:
-        - provider: openrouter
-          model: x-ai/grok-4.3
-        - provider: openrouter
-          model: qwen/qwen3.7-max
-        - provider: openrouter
-          model: nvidia/nemotron-3-ultra-550b-a55b
-      aggregator:
-        provider: openrouter
-        model: anthropic/claude-opus-4.8
+        model: minimax/minimax-m3
       reference_temperature: 0.7
       aggregator_temperature: 0.4
       reference_max_tokens: 600
