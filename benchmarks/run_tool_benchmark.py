@@ -5,6 +5,11 @@ Uses ollama-cloud provider via Hermes CLI.
 """
 import json, subprocess, time, sys, os
 from datetime import datetime
+from pathlib import Path
+
+# Commit results into the repo, not /tmp — otherwise the report's numbers have no
+# auditable artifact (a result you can't re-audit isn't a result).
+RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 MODELS = [
     {"name": "Kimi K2.7 Code", "provider": "ollama-cloud", "model": "kimi-k2.7-code"},
@@ -180,8 +185,8 @@ def main():
         "results": results
     }
     
-    out_path = f"/tmp/minibench/benchmarks/results/tool-use-benchmark-{datetime.utcnow().strftime('%Y%m%dT%H%M%S')}.json"
-    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = RESULTS_DIR / f"tool-use-benchmark-{datetime.utcnow().strftime('%Y%m%dT%H%M%S')}.json"
     with open(out_path, 'w') as f:
         json.dump(output, f, indent=2)
     print(f"\nResults saved to: {out_path}")

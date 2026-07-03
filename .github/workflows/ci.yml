@@ -44,6 +44,33 @@ jobs:
           MINIBENCH_TEST_PG_PORT: "5438"
         run: pytest
 
+  agentbench:
+    name: agentbench (module + drift smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: agentbench/requirements-dev.txt
+      - name: Install deps
+        working-directory: agentbench
+        run: pip install -r requirements-dev.txt
+      - name: Unit tests (offline, no keys)
+        working-directory: agentbench
+        run: pytest -q
+      - name: Dry-run smoke (catches config/task drift)
+        run: |
+          python -m agentbench.run \
+            --config agentbench/presets/moa-v1.yaml \
+            --tasks agentbench/tasks/coding-v1.json \
+            --trials 2 --dry-run --out /tmp/dryrun.json
+      - name: benchmarks/ preset-drift guard
+        run: |
+          pip install pyyaml pytest
+          pytest -q benchmarks/tests
+
   cli:
     name: CLI (Python package)
     runs-on: ubuntu-latest
