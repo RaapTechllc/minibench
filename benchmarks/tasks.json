@@ -1,0 +1,139 @@
+{
+  "version": "1.0.0",
+  "description": "Representative Hermes MoA benchmark tasks across OpenClaw-style, webdev, SWE, and agentic categories",
+  "presets": ["budget-open", "balanced-hybrid", "high-quality"],
+  "categories": {
+    "openclaw_productivity": {
+      "description": "PinchBench/OpenClaw-style scheduling and productivity",
+      "tasks": [
+        {
+          "id": "sched-01",
+          "name": "Calendar event creation",
+          "prompt": "Create a calendar event for 'Team standup' tomorrow at 9:30 AM for 30 minutes. Output the event as JSON with fields: title, start, end, duration_minutes.",
+          "verification": {
+            "type": "json_fields",
+            "required_fields": ["title", "start", "end", "duration_minutes"],
+            "contains": ["standup", "9:30"]
+          }
+        },
+        {
+          "id": "email-01",
+          "name": "Email triage classification",
+          "prompt": "Classify these 3 emails into URGENT, NORMAL, or LOW priority and explain each in one sentence:\n1. 'Server down in production - need immediate fix'\n2. 'Weekly newsletter from HR'\n3. 'Meeting notes from yesterday'",
+          "verification": {
+            "type": "contains_all",
+            "terms": ["URGENT", "NORMAL", "LOW", "production"]
+          }
+        }
+      ]
+    },
+    "openclaw_research": {
+      "description": "Research and synthesis tasks",
+      "tasks": [
+        {
+          "id": "research-01",
+          "name": "Structured research summary",
+          "prompt": "Summarize the key differences between TCP and UDP in exactly 5 bullet points. Each bullet must be under 20 words.",
+          "verification": {
+            "type": "bullet_count",
+            "min_bullets": 5,
+            "contains": ["TCP", "UDP"]
+          }
+        }
+      ]
+    },
+    "webdev_coding": {
+      "description": "Arena.ai-style webdev and frontend tasks",
+      "tasks": [
+        {
+          "id": "web-01",
+          "name": "React component generation",
+          "prompt": "Write a React TypeScript component `Counter` with: useState for count, increment/decrement buttons, display showing 'Count: N'. Output only the component code in a single code block.",
+          "verification": {
+            "type": "code_block",
+            "contains": ["useState", "Counter", "increment", "decrement"]
+          }
+        },
+        {
+          "id": "web-02",
+          "name": "CSS flexbox layout",
+          "prompt": "Write CSS for a 3-column responsive grid that collapses to 1 column below 768px. Use flexbox or grid. Output only CSS.",
+          "verification": {
+            "type": "code_block",
+            "contains": ["768", "grid", "flex"]
+          }
+        }
+      ]
+    },
+    "swe_terminal": {
+      "description": "SWE-bench / Terminal-Bench style bug fixing and terminal workflows",
+      "tasks": [
+        {
+          "id": "swe-01",
+          "name": "Python bug fix",
+          "prompt": "Fix this Python function that should return the sum of even numbers in a list but has a bug:\n```python\ndef sum_evens(nums):\n    total = 0\n    for n in nums:\n        if n % 2 == 1:\n            total += n\n    return total\n```\nOutput the corrected function only.",
+          "verification": {
+            "type": "code_block",
+            "contains": ["n % 2 == 0", "sum_evens"]
+          }
+        },
+        {
+          "id": "term-01",
+          "name": "Shell pipeline design",
+          "prompt": "Write a bash one-liner that finds all .log files modified in the last 7 days, counts lines containing 'ERROR', and outputs the total count.",
+          "verification": {
+            "type": "contains_all",
+            "terms": ["find", "ERROR", ".log"]
+          }
+        }
+      ]
+    },
+    "agentic_tooling": {
+      "description": "Multi-tool chaining, error recovery, long-horizon reasoning",
+      "tasks": [
+        {
+          "id": "agent-01",
+          "name": "Multi-step planning",
+          "prompt": "Plan a 4-step workflow to migrate a SQLite database to PostgreSQL. Each step must include: action, tool/command, and verification check. Format as numbered list.",
+          "verification": {
+            "type": "numbered_steps",
+            "min_steps": 4,
+            "contains": ["PostgreSQL", "SQLite", "verify"]
+          }
+        },
+        {
+          "id": "agent-02",
+          "name": "Error recovery reasoning",
+          "prompt": "A deployment failed with 'exit code 137' (OOM killed). List 3 likely causes and 3 remediation steps in a structured format.",
+          "verification": {
+            "type": "contains_all",
+            "terms": ["137", "memory", "OOM"]
+          }
+        },
+        {
+          "id": "agent-03",
+          "name": "Long-context synthesis",
+          "prompt": "Given these requirements: (1) auth via JWT, (2) rate limit 100 req/min, (3) PostgreSQL storage, (4) Redis cache, (5) horizontal scaling — produce an architecture diagram description in 6 sentences covering all 5 requirements.",
+          "verification": {
+            "type": "contains_all",
+            "terms": ["JWT", "rate limit", "PostgreSQL", "Redis", "scaling"]
+          }
+        }
+      ]
+    },
+    "file_management": {
+      "description": "OpenClaw file management tasks",
+      "tasks": [
+        {
+          "id": "file-01",
+          "name": "Directory structure design",
+          "prompt": "Design a project directory structure for a Python FastAPI app with tests, migrations, and Docker. Output as a tree with at least 8 paths.",
+          "verification": {
+            "type": "contains_all",
+            "terms": ["tests", "Docker", "FastAPI", "migrations"]
+          }
+        }
+      ]
+    }
+  }
+}

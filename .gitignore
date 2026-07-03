@@ -11,3 +11,4 @@ build/
 .eggs/
 *.db
 .DS_Store
+benchmarks/results/
