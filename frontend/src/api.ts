@@ -88,6 +88,37 @@ export interface Stats {
   total_hardware_specs: number;
 }
 
+export interface AgentLeaderboardEntry {
+  rank: number;
+  run_id: string;
+  config_name: string | null;
+  self_moa: boolean;
+  benchmark_suite: string;
+  provider: string | null;
+  n_tasks: number;
+  n_trials: number;
+  pass_rate: number;
+  pass_hat_k: number | null;
+  ci95_low: number | null;
+  ci95_high: number | null;
+  cost_usd_per_task: number | null;
+  latency_p50_ms: number | null;
+  latency_p95_ms: number | null;
+  on_pareto_frontier: boolean;
+}
+
+export interface KnownModel {
+  id: number;
+  provider: string;
+  model_id: string;
+  display_name: string | null;
+  first_seen: string;
+  context_length: number | null;
+  prompt_price: number | null;
+  completion_price: number | null;
+  benchmarked: boolean;
+}
+
 async function fetchJSON<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -109,4 +140,9 @@ export const api = {
     fetchJSON<{ a: Benchmark; b: Benchmark }>(`/api/v1/compare?a=${a}&b=${b}`),
   getStats: () => fetchJSON<Stats>('/api/v1/stats'),
   getModels: () => fetchJSON<ModelQuality[]>('/api/v1/models'),
+  getAgentLeaderboard: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return fetchJSON<AgentLeaderboardEntry[]>(`/api/v1/agents/leaderboard${qs}`);
+  },
+  getNewModels: () => fetchJSON<KnownModel[]>('/api/v1/agents/models/new'),
 };

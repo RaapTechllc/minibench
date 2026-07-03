@@ -1,15 +1,17 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Cpu, BarChart3, GitCompare, Terminal, Database } from 'lucide-react';
+import { Cpu, BarChart3, GitCompare, Terminal, Database, Bot } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
 import Compare from './pages/Compare';
 import Submit from './pages/Submit';
 import Hardware from './pages/Hardware';
 import BenchmarkDetail from './pages/BenchmarkDetail';
+import Agents from './pages/Agents';
 
 const NAV = [
   { path: '/', label: 'Dashboard', icon: BarChart3 },
   { path: '/leaderboard', label: 'Leaderboard', icon: Cpu },
+  { path: '/agents', label: 'Agents', icon: Bot },
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/hardware', label: 'Hardware', icon: Database },
   { path: '/submit', label: 'Submit', icon: Terminal },
@@ -49,6 +51,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/agents" element={<Agents />} />
           <Route path="/benchmarks/:id" element={<BenchmarkDetail />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/hardware" element={<Hardware />} />
