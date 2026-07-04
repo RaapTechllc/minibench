@@ -56,3 +56,24 @@ def client(_ensure_test_database):
     app.state.limiter.enabled = False
     with TestClient(app) as test_client:  # context manager runs lifespan -> create + seed
         yield test_client
+
+
+@pytest.fixture()
+def seed_known_models(client):
+    """Insert a benchmarked + an un-benchmarked model into ``known_models``.
+
+    Depends on ``client`` so the schema exists (tables are created in lifespan).
+    """
+    conn = _connect(TEST_DB)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO known_models (provider, model_id, display_name, benchmarked) "
+            "VALUES (%s, %s, %s, %s), (%s, %s, %s, %s)",
+            (
+                "openrouter", "openrouter/new/model-a", "Model A", False,
+                "openrouter", "openrouter/old/benchmarked", "Old", True,
+            ),
+        )
+    conn.close()
+    yield

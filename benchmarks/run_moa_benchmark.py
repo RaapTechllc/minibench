@@ -7,7 +7,10 @@ and produces a comparison report.
 
 Usage:
   export OPENROUTER_API_KEY=sk-or-...
-  python benchmarks/run_moa_benchmark.py [--preset budget-open] [--trials 1] [--dry-run]
+  python benchmarks/run_moa_benchmark.py [--preset glm-tool-moa] [--trials 1] [--dry-run]
+
+  Preset names are read from moa-presets.yaml (never hardcoded). Run with
+  --list-tasks to see tasks; omit --preset to run every enabled preset.
 
 Requires: hermes CLI on PATH, OpenRouter API key in ~/.hermes/.env or OPENROUTER_API_KEY
 """
@@ -29,7 +32,27 @@ from typing import Any
 BENCHMARK_DIR = Path(__file__).resolve().parent
 TASKS_FILE = BENCHMARK_DIR / "tasks.json"
 RESULTS_DIR = BENCHMARK_DIR / "results"
-PRESETS = ["budget-open", "balanced-hybrid", "high-quality"]
+PRESETS_FILE = BENCHMARK_DIR / "moa-presets.yaml"
+
+
+def load_presets(path: Path = PRESETS_FILE) -> list[str]:
+    """Read the enabled preset names straight from moa-presets.yaml.
+
+    The runner used to hardcode ``["budget-open", "balanced-hybrid",
+    "high-quality"]`` while the YAML was rewritten to entirely different names —
+    so a live run called a --model that no longer existed. Deriving the list from
+    the config is the single source of truth; the CI smoke test (tests/) asserts
+    this never drifts again.
+    """
+    import yaml  # local import so importing this module never hard-requires pyyaml
+
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    presets = (data.get("moa") or {}).get("presets") or {}
+    return [name for name, cfg in presets.items() if (cfg or {}).get("enabled", True)]
+
+
+# Derived at import from the YAML — never hardcoded (that was the drift bug).
+PRESETS = load_presets()
 
 
 @dataclass
@@ -292,6 +315,13 @@ def main() -> int:
         return 0
 
     presets = args.presets or PRESETS
+    valid = set(load_presets())
+    unknown = [p for p in presets if p not in valid]
+    if unknown:
+        print(f"ERROR: unknown preset(s) {unknown}. Defined in moa-presets.yaml: {sorted(valid)}",
+              file=sys.stderr)
+        return 2
+
     issues = check_prerequisites()
     if issues and not args.dry_run:
         print("Prerequisites check:", file=sys.stderr)

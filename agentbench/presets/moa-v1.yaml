@@ -1,0 +1,19 @@
+# Example swappable MoA config — the whole pipeline as data.
+# Load with: agentbench.load_moa_config("agentbench/presets/moa-v1.yaml")
+#
+# Pin DATED model snapshots (not floating aliases) for reproducibility, and on
+# OpenRouter also pin provider.order + allow_fallbacks:false at request time so
+# the same id doesn't silently fan out to a different price/quantization.
+moa:
+  name: moa-v1
+  layers: 1                       # 1 standard round; a 3rd layer rarely helps
+  parallel: true
+  proposers:                      # swap models by editing this list
+    - {model: openrouter/qwen/qwen-2.5-72b-instruct, temperature: 0.7, max_tokens: 2048}
+    - {model: openrouter/meta-llama/llama-3.3-70b-instruct, temperature: 0.7, max_tokens: 2048}
+    - {model: openrouter/mistralai/mixtral-8x22b-instruct, temperature: 0.7, max_tokens: 2048}
+  aggregator:
+    model: openrouter/anthropic/claude-sonnet-4
+    temperature: 0.3
+    max_tokens: 2048
+    system_prompt: aggregate_and_synthesize   # canonical Wang et al. 2024 prompt

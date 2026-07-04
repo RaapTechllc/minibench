@@ -1,8 +1,8 @@
 from pydantic import BaseModel, ConfigDict, Field
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from uuid import UUID
-from typing import Optional
+from typing import Optional, Any
 
 
 class BenchmarkSubmit(BaseModel):
@@ -144,3 +144,116 @@ class StatsResponse(BaseModel):
     avg_tokens_per_second: Optional[float] = None
     max_tokens_per_second: Optional[float] = None
     total_hardware_specs: int
+
+
+# ─── Agent-benchmark schemas ───────────────────────────────────────────────────
+
+
+class AgentTaskResultSubmit(BaseModel):
+    task_id: str = Field(..., max_length=128)
+    category: Optional[str] = Field(None, max_length=64)
+    trial: Optional[int] = None
+    passed: bool
+    score: Optional[Decimal] = None
+    cost_usd: Optional[Decimal] = None
+    latency_ms: Optional[int] = None
+    tokens_in: Optional[int] = None
+    tokens_out: Optional[int] = None
+    raw_output_ref: Optional[str] = None
+
+
+class AgentRunSubmit(BaseModel):
+    harness: Optional[str] = Field(None, max_length=64)
+    harness_version: Optional[str] = Field(None, max_length=32)
+    moa_config: Optional[dict[str, Any]] = None
+    benchmark_suite: str = Field(..., max_length=64)
+    provider: Optional[str] = Field(None, max_length=32)
+    model_snapshot_date: Optional[date] = None
+    n_tasks: int = Field(..., ge=1)
+    n_trials: int = Field(..., ge=1)
+    pass_rate: Decimal = Field(..., ge=0, le=100)
+    pass_hat_k: Optional[Decimal] = Field(None, ge=0, le=100)
+    ci95_low: Optional[Decimal] = None
+    ci95_high: Optional[Decimal] = None
+    cost_usd_per_task: Optional[Decimal] = None
+    latency_p50_ms: Optional[int] = None
+    latency_p95_ms: Optional[int] = None
+    tokens_in: Optional[int] = None
+    tokens_out: Optional[int] = None
+    results: list[AgentTaskResultSubmit] = Field(default_factory=list)
+
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class AgentRunResponse(BaseModel):
+    id: int
+    run_id: UUID
+    submitted_at: datetime
+    harness: Optional[str] = None
+    harness_version: Optional[str] = None
+    moa_config: Optional[dict[str, Any]] = None
+    benchmark_suite: str
+    provider: Optional[str] = None
+    model_snapshot_date: Optional[date] = None
+    n_tasks: int
+    n_trials: int
+    pass_rate: Decimal
+    pass_hat_k: Optional[Decimal] = None
+    ci95_low: Optional[Decimal] = None
+    ci95_high: Optional[Decimal] = None
+    cost_usd_per_task: Optional[Decimal] = None
+    latency_p50_ms: Optional[int] = None
+    latency_p95_ms: Optional[int] = None
+    tokens_in: Optional[int] = None
+    tokens_out: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class AgentLeaderboardEntry(BaseModel):
+    rank: int
+    run_id: UUID
+    config_name: Optional[str] = None
+    self_moa: bool = False
+    benchmark_suite: str
+    provider: Optional[str] = None
+    n_tasks: int
+    n_trials: int
+    pass_rate: Decimal
+    pass_hat_k: Optional[Decimal] = None
+    ci95_low: Optional[Decimal] = None
+    ci95_high: Optional[Decimal] = None
+    cost_usd_per_task: Optional[Decimal] = None
+    latency_p50_ms: Optional[int] = None
+    latency_p95_ms: Optional[int] = None
+    on_pareto_frontier: bool = False
+
+
+class AgentTaskResultResponse(BaseModel):
+    task_id: str
+    category: Optional[str] = None
+    trial: Optional[int] = None
+    passed: bool
+    score: Optional[Decimal] = None
+    cost_usd: Optional[Decimal] = None
+    latency_ms: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class AgentRunDetailResponse(AgentRunResponse):
+    results: list[AgentTaskResultResponse] = Field(default_factory=list)
+
+
+class KnownModelResponse(BaseModel):
+    id: int
+    provider: str
+    model_id: str
+    display_name: Optional[str] = None
+    first_seen: datetime
+    context_length: Optional[int] = None
+    prompt_price: Optional[Decimal] = None
+    completion_price: Optional[Decimal] = None
+    benchmarked: bool
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())

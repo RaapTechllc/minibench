@@ -1,0 +1,15 @@
+# Self-MoA baseline (arXiv 2502.00674): sample the single best model N times
+# instead of mixing heterogeneous proposers. ALWAYS run this at matched cost
+# next to a mixed MoA — weak proposers often drag the aggregate down, so a mixed
+# config that doesn't beat this baseline isn't buying anything.
+moa:
+  name: self-moa-qwen
+  self_moa: true
+  self_moa_samples: 3
+  proposers:
+    - {model: openrouter/qwen/qwen-2.5-72b-instruct, temperature: 0.7, max_tokens: 2048}
+  aggregator:
+    model: openrouter/qwen/qwen-2.5-72b-instruct
+    temperature: 0.3
+    max_tokens: 2048
+    system_prompt: aggregate_and_synthesize
