@@ -23,6 +23,8 @@ This report evaluates Mixture-of-Agents (MoA) setups for tool-use and agentic wo
 
 **Key finding:** All recommended MoA setups beat the 60% cost target. **GLM-5.2** is the primary aggregator — it beats Opus 4.8 on Terminal-Bench (81.0 vs 74.6), ties on FrontierSWE (74.4 vs 75.1), and costs 40% of Opus. **Kimi K2.7 Code** is the secondary — MCP Mark 81.1 > Opus 4.8's 76.4 at 22% cost.
 
+**Interactive artifact:** The frontend now includes `/moa-calculator`, a scaling calculator for the assumptions in this report. It lets you adjust input/output tokens, tasks/day, days/month, quality floor, and cost cap, then recommends the highest-quality preset that fits the constraint and projects monthly savings against Opus 4.8.
+
 ---
 
 ## 1. Model Data (Verified Sources)
@@ -475,9 +477,10 @@ MoA correctly routed through both reference models and aggregated their outputs.
 
 ## 11. Next Steps
 
-1. **Verify OpenRouter model IDs** for `z-ai/glm-5.2`, `kimi/kimi-k2.7-code`, and `minimax/minimax-m3`
-2. **Run live benchmarks** with `python benchmarks/run_moa_benchmark.py --trials 2` once API keys are configured
-3. **Update this report** with live `benchmarks/results/run_*.json` data
-4. **Add Kimi K2.7 Code pricing** once officially published (currently estimated from K2.6)
-5. **Test GLM-5.2** with lower vs higher thinking-effort for latency/cost comparison
-6. **Test MiniMax M3** with thinking mode enabled vs disabled for latency comparison
+1. **Use `/moa-calculator`** to size the preset choice against real RaapTech workload volume before changing defaults
+2. **Verify OpenRouter model IDs** for `z-ai/glm-5.2`, `kimi/kimi-k2.7-code`, and `minimax/minimax-m3`
+3. **Run live benchmarks** with `python benchmarks/run_moa_benchmark.py --trials 2` once API keys are configured
+4. **Update this report** with live `benchmarks/results/run_*.json` data
+5. **Add Kimi K2.7 Code pricing** once officially published (currently estimated from K2.6)
+6. **Test GLM-5.2** with lower vs higher thinking-effort for latency/cost comparison
+7. **Test MiniMax M3** with thinking mode enabled vs disabled for latency comparison
