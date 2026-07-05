@@ -28,14 +28,16 @@ from agentbench.moa import MoAModel, MoAResult
 from agentbench.stats import pass_rate, pass_hat_k, wilson_ci, percentile
 from agentbench.resources import RESULTS_DIR
 
-# Load repo-root .env so OPENROUTER_API_KEY is available without manual export.
-try:
-    from dotenv import load_dotenv
 
-    _repo_root = Path(__file__).resolve().parents[1]
-    load_dotenv(_repo_root / ".env")
-except ImportError:
-    pass
+def _load_env_files() -> None:
+    """Load .env from repo root and agentbench/ (first wins for duplicate keys)."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    repo_root = Path(__file__).resolve().parents[1]
+    load_dotenv(repo_root / ".env", override=False)
+    load_dotenv(repo_root / "agentbench" / ".env", override=False)
 
 
 @dataclass
@@ -145,6 +147,7 @@ def summarize(config: MoAConfig, suite: str, trials: int, results: list[TrialRes
 
 
 def main(argv: list[str] | None = None) -> int:
+    _load_env_files()
     ap = argparse.ArgumentParser(description="Run a MoA config against a task suite.")
     ap.add_argument("--config", required=True)
     ap.add_argument("--tasks", required=True)

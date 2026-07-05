@@ -12,3 +12,4 @@ build/
 *.db
 .DS_Store
 benchmarks/results/
+agentbench/results/*.json
