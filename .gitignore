@@ -13,3 +13,4 @@ build/
 .DS_Store
 benchmarks/results/
 agentbench/results/*.json
+!agentbench/results/moa-dev-our-coding-v2-live.json

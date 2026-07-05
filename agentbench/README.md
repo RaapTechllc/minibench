@@ -73,6 +73,14 @@ cd agentbench && pip install -r requirements-dev.txt && pytest
 
 ## Publishing to the leaderboard
 
-`run.py`'s summary maps directly onto the backend `agent_runs` / `agent_task_results`
-tables and the `/api/v1/agents/*` endpoints; the React **Agents** page renders the
+After a live run, publish to the backend Agents API:
+
+```bash
+python -m agentbench.run --config agentbench/presets/moa-dev.yaml \
+    --tasks agentbench/tasks/coding-v2.json --trials 3 --provider openrouter \
+    --publish http://localhost:3070
+```
+
+`--publish` transforms the summary (pass rates as 0–100, `ci95_low`/`ci95_high`, per-task
+`results`) and POSTs to `/api/v1/agents/runs`. The React **Agents** page renders the
 pass-rate table plus the cost-vs-accuracy Pareto frontier.
