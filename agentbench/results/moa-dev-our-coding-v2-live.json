@@ -1,0 +1,222 @@
+{
+  "generated_at": "2026-07-04T21:51:29.961975+00:00",
+  "dry_run": false,
+  "summary": {
+    "suite": "our-coding-v2",
+    "moa_config": {
+      "name": "moa-dev",
+      "self_moa": false,
+      "models": [
+        "openrouter/qwen/qwen-2.5-7b-instruct",
+        "openrouter/meta-llama/llama-3.2-3b-instruct",
+        "openrouter/meta-llama/llama-3.1-8b-instruct"
+      ]
+    },
+    "n_tasks": 8,
+    "n_trials": 2,
+    "pass_rate": 0.625,
+    "pass_rate_ci95": [
+      0.3864,
+      0.8152
+    ],
+    "pass_hat_k": 0.5,
+    "cost_usd_total": 0.003519,
+    "cost_usd_per_task": 0.00044,
+    "latency_p50_ms": 10546.0,
+    "latency_p95_ms": 75979.2
+  },
+  "trials": [
+    {
+      "task_id": "code-topo-sort",
+      "category": "coding",
+      "trial": 1,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 0.00041812,
+      "latency_ms": 28718,
+      "tokens_in": 903,
+      "tokens_out": 696,
+      "detail": "tests passed"
+    },
+    {
+      "task_id": "code-topo-sort",
+      "category": "coding",
+      "trial": 2,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 0.00048461999999999995,
+      "latency_ms": 90125,
+      "tokens_in": 1035,
+      "tokens_out": 929,
+      "detail": "tests passed"
+    },
+    {
+      "task_id": "code-sliding-window-max",
+      "category": "coding",
+      "trial": 1,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 0.0005908658,
+      "latency_ms": 42394,
+      "tokens_in": 1247,
+      "tokens_out": 1068,
+      "detail": "tests passed"
+    },
+    {
+      "task_id": "code-sliding-window-max",
+      "category": "coding",
+      "trial": 2,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 0.0002327558,
+      "latency_ms": 31484,
+      "tokens_in": 1380,
+      "tokens_out": 1213,
+      "detail": "tests passed"
+    },
+    {
+      "task_id": "code-min-stack",
+      "category": "coding",
+      "trial": 1,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 0.0003844763,
+      "latency_ms": 9460,
+      "tokens_in": 898,
+      "tokens_out": 671,
+      "detail": "tests passed"
+    },
+    {
+      "task_id": "code-min-stack",
+      "category": "coding",
+      "trial": 2,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 0.0003483463,
+      "latency_ms": 6391,
+      "tokens_in": 939,
+      "tokens_out": 669,
+      "detail": "tests passed"
+    },
+    {
+      "task_id": "code-rpn-eval",
+      "category": "coding",
+      "trial": 1,
+      "passed": false,
+      "score": 0.0,
+      "cost_usd": 0.0003555735,
+      "latency_ms": 14709,
+      "tokens_in": 1527,
+      "tokens_out": 1450,
+      "detail": "est_division_truncates():\n>       assert eval_rpn(['7', '-3', '/']) == -2\nE       AssertionError: assert -3 == -2\nE        +  where -3 = eval_rpn(['7', '-3', '/'])\n\n/var/folders/zy/b_jb45d93xx4xkr06fs4x13r0000gn/T/tmpldd1op3l/test_solution.py:8: AssertionError\n=========================== short test summary info ============================\nFAILED ../../../../../../../var/folders/zy/b_jb45d93xx4xkr06fs4x13r0000gn/T/tmpldd1op3l/test_solution.py::test_division_truncates\n1 failed, 3 passed in 0.02s"
+    },
+    {
+      "task_id": "code-rpn-eval",
+      "category": "coding",
+      "trial": 2,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 0.0002845285,
+      "latency_ms": 11632,
+      "tokens_in": 1748,
+      "tokens_out": 1489,
+      "detail": "tests passed"
+    },
+    {
+      "task_id": "reason-clock-angle",
+      "category": "reasoning",
+      "trial": 1,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 4.7239999999999995e-05,
+      "latency_ms": 71264,
+      "tokens_in": 702,
+      "tokens_out": 394,
+      "detail": "got 7.5, expected 7.5"
+    },
+    {
+      "task_id": "reason-clock-angle",
+      "category": "reasoning",
+      "trial": 2,
+      "passed": false,
+      "score": 0.0,
+      "cost_usd": 4.1410000000000005e-05,
+      "latency_ms": 4017,
+      "tokens_in": 613,
+      "tokens_out": 326,
+      "detail": "got 5.0, expected 7.5"
+    },
+    {
+      "task_id": "reason-average-speed-trap",
+      "category": "reasoning",
+      "trial": 1,
+      "passed": false,
+      "score": 0.0,
+      "cost_usd": 3.5300000000000004e-05,
+      "latency_ms": 6990,
+      "tokens_in": 630,
+      "tokens_out": 318,
+      "detail": "got 45.0, expected 40.0"
+    },
+    {
+      "task_id": "reason-average-speed-trap",
+      "category": "reasoning",
+      "trial": 2,
+      "passed": false,
+      "score": 0.0,
+      "cost_usd": 0.00012978,
+      "latency_ms": 3817,
+      "tokens_in": 508,
+      "tokens_out": 184,
+      "detail": "got 45.0, expected 40.0"
+    },
+    {
+      "task_id": "tooluse-incident-triage",
+      "category": "tool-use",
+      "trial": 1,
+      "passed": false,
+      "score": 0.5,
+      "cost_usd": 4.97066e-05,
+      "latency_ms": 2278,
+      "tokens_in": 662,
+      "tokens_out": 146,
+      "detail": "customer_facing=True != False; needs_page=True != False"
+    },
+    {
+      "task_id": "tooluse-incident-triage",
+      "category": "tool-use",
+      "trial": 2,
+      "passed": false,
+      "score": 0.5,
+      "cost_usd": 4.97066e-05,
+      "latency_ms": 2167,
+      "tokens_in": 662,
+      "tokens_out": 146,
+      "detail": "customer_facing=True != False; needs_page=True != False"
+    },
+    {
+      "task_id": "tooluse-regex-classify",
+      "category": "tool-use",
+      "trial": 1,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 3.37052e-05,
+      "latency_ms": 12041,
+      "tokens_in": 457,
+      "tokens_out": 129,
+      "detail": "ok"
+    },
+    {
+      "task_id": "tooluse-regex-classify",
+      "category": "tool-use",
+      "trial": 2,
+      "passed": true,
+      "score": 1.0,
+      "cost_usd": 3.3275199999999996e-05,
+      "latency_ms": 3187,
+      "tokens_in": 453,
+      "tokens_out": 124,
+      "detail": "ok"
+    }
+  ]
+}

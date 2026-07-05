@@ -6,7 +6,14 @@ from agentbench.config import (
     MoAConfig,
     load_moa_config,
 )
-from agentbench.resources import MOA_V1, SELF_MOA
+from agentbench.resources import MOA_V1, MOA_DEV, SELF_MOA, CODING_V1, CODING_V2
+
+
+def test_load_dev_preset():
+    cfg = load_moa_config(MOA_DEV)
+    assert cfg.name == "moa-dev"
+    assert len(cfg.proposers) == 3
+    assert all("7b" in m or "3b" in m or "8b" in m for m in cfg.models)
 
 
 def test_load_example_preset():

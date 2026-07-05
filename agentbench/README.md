@@ -25,8 +25,8 @@ result artifacts**.
 | `stats.py` | `pass_rate`, `pass_hat_k`, Wilson CI, percentiles — the trials-and-CIs guardrail. |
 | `tracker.py` | Poll OpenRouter `/models`, diff against known ids → detect new launches. |
 | `run.py` | CLI: run a config against a task suite with N trials, grade, summarize, write a committable artifact. |
-| `presets/` | Example MoA configs (`moa-v1`, `self-moa-baseline`). |
-| `tasks/` | Task suites with executable oracles (`coding-v1`). |
+| `presets/` | MoA configs: `moa-v1` (production), `moa-dev` (cheap testing), Self-MoA baselines. |
+| `tasks/` | `coding-v1` (smoke/CI), `coding-v2` (harder eval). |
 
 ## Running
 
@@ -37,12 +37,19 @@ python -m agentbench.run --config agentbench/presets/moa-v1.yaml \
     --tasks agentbench/tasks/coding-v1.json --trials 3 --dry-run
 ```
 
-Live run (requires a provider key):
+Cheap live testing (7B-class models, harder tasks — expect <100% pass rate):
+
+```bash
+python -m agentbench.run --config agentbench/presets/moa-dev.yaml \
+    --tasks agentbench/tasks/coding-v2.json --trials 2 --provider openrouter
+```
+
+Production eval (expensive 70B+ MoA, easy smoke tasks — use only when comparing top configs):
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 python -m agentbench.run --config agentbench/presets/moa-v1.yaml \
-    --tasks agentbench/tasks/coding-v1.json --trials 5 --provider openrouter
+    --tasks agentbench/tasks/coding-v2.json --trials 5 --provider openrouter
 ```
 
 Tests:

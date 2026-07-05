@@ -1,0 +1,91 @@
+{
+  "suite": "our-coding-v2",
+  "notes": "Harder dev/eval slice. Classic easy problems (two-sum, duration parsing) live in coding-v1 for smoke tests only. Every task has executable oracles with edge cases that catch naive or partially-correct solutions.",
+  "canary": "AGENTBENCH-CANARY-v2-9c4e7b1a-DO-NOT-TRAIN",
+  "tasks": [
+    {
+      "id": "code-topo-sort",
+      "category": "coding",
+      "prompt": "Write a Python function `topo_sort(n, edges)` where `n` is the number of nodes labeled 0..n-1 and `edges` is a list of directed edges `(u, v)`. Return a list of all nodes in a valid topological order. If a cycle exists, return an empty list `[]`. Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import topo_sort\n\ndef _valid(n, order, edges):\n    if order == []:\n        return edges != [] and _has_cycle(n, edges)\n    if len(order) != n or set(order) != set(range(n)):\n        return False\n    pos = {v: i for i, v in enumerate(order)}\n    return all(pos[u] < pos[v] for u, v in edges)\n\ndef _has_cycle(n, edges):\n    from collections import deque\n    indeg = [0] * n\n    adj = [[] for _ in range(n)]\n    for u, v in edges:\n        adj[u].append(v)\n        indeg[v] += 1\n    q = deque(i for i in range(n) if indeg[i] == 0)\n    seen = 0\n    while q:\n        u = q.popleft()\n        seen += 1\n        for v in adj[u]:\n            indeg[v] -= 1\n            if indeg[v] == 0:\n                q.append(v)\n    return seen != n\n\ndef test_diamond():\n    order = topo_sort(4, [(0, 1), (0, 2), (1, 3), (2, 3)])\n    assert _valid(4, order, [(0, 1), (0, 2), (1, 3), (2, 3)])\n\ndef test_cycle():\n    assert topo_sort(2, [(0, 1), (1, 0)]) == []\n\ndef test_disconnected_ok():\n    order = topo_sort(4, [(0, 1)])\n    assert _valid(4, order, [(0, 1)])\n\ndef test_self_loop():\n    assert topo_sort(1, [(0, 0)]) == []\n"
+      }
+    },
+    {
+      "id": "code-sliding-window-max",
+      "category": "coding",
+      "prompt": "Write a Python function `max_sliding_window(nums, k)` that returns a list of the maximum value in each contiguous window of size `k`. Assume `len(nums) >= k >= 1`. Must run in O(n) time (a naive O(n*k) re-scan per window is too slow — hidden tests include large inputs). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "timeout_s": 10,
+        "test_source": "from solution import max_sliding_window\n\ndef test_basic():\n    assert max_sliding_window([1, 3, -1, -3, 5, 3, 6, 7], 3) == [3, 3, 5, 5, 6, 7]\n\ndef test_single_window():\n    assert max_sliding_window([9, 8, 7], 3) == [9]\n\ndef test_k_one():\n    assert max_sliding_window([4, -2, 0, 3], 1) == [4, -2, 0, 3]\n\ndef test_large_input():\n    n = 20000\n    nums = list(range(n))\n    out = max_sliding_window(nums, 500)\n    assert len(out) == n - 500 + 1\n    assert out[0] == 499\n    assert out[-1] == n - 1\n"
+      }
+    },
+    {
+      "id": "code-min-stack",
+      "category": "coding",
+      "prompt": "Implement a `MinStack` class with methods `push(x)`, `pop()`, `top()`, and `getMin()`. All four operations must be O(1) amortized. `pop` and `top` operate on the main stack; `getMin` returns the current minimum. Return only a fenced python block defining the class.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import MinStack\n\ndef test_interleaved():\n    s = MinStack()\n    s.push(2)\n    s.push(1)\n    assert s.getMin() == 1\n    s.push(3)\n    assert s.top() == 3\n    s.pop()\n    assert s.getMin() == 1\n    s.pop()\n    assert s.getMin() == 2\n\ndef test_duplicate_mins():\n    s = MinStack()\n    s.push(5)\n    s.push(5)\n    s.push(3)\n    assert s.getMin() == 3\n    s.pop()\n    assert s.getMin() == 5\n    s.pop()\n    assert s.getMin() == 5\n\ndef test_pop_all():\n    s = MinStack()\n    s.push(7)\n    s.pop()\n    s.push(4)\n    assert s.getMin() == 4\n"
+      }
+    },
+    {
+      "id": "code-rpn-eval",
+      "category": "coding",
+      "prompt": "Write a Python function `eval_rpn(tokens)` that evaluates an expression in Reverse Polish Notation. `tokens` is a list of strings: each token is a signed integer or one of `+`, `-`, `*`, `/`. Division truncates toward zero (like Python `int(a/b)` for ints). Raise `ValueError` on invalid input. Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "import pytest\nfrom solution import eval_rpn\n\ndef test_basic():\n    assert eval_rpn(['2', '1', '+', '3', '*']) == 9\n\ndef test_division_truncates():\n    assert eval_rpn(['7', '-3', '/']) == -2\n    assert eval_rpn(['8', '3', '/']) == 2\n\ndef test_single():\n    assert eval_rpn(['42']) == 42\n\ndef test_invalid():\n    with pytest.raises(ValueError):\n        eval_rpn(['1', '+'])\n"
+      }
+    },
+    {
+      "id": "reason-clock-angle",
+      "category": "reasoning",
+      "prompt": "At exactly 3:15 (not 3:16), what is the smaller angle in degrees between the hour and minute hands on an analog clock? Give only the numeric answer.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 7.5,
+        "tol": 0.01
+      }
+    },
+    {
+      "id": "reason-average-speed-trap",
+      "category": "reasoning",
+      "prompt": "A car drives 60 miles at 60 mph, then 30 miles at 30 mph. What is the average speed for the entire trip, in mph? Give only the numeric answer.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 40,
+        "tol": 0.01
+      }
+    },
+    {
+      "id": "tooluse-incident-triage",
+      "category": "tool-use",
+      "prompt": "Triage this incident. Respond with ONLY a JSON object with keys: `severity` (CRITICAL/HIGH/MEDIUM/LOW), `customer_facing` (boolean), `needs_page` (boolean), `root_cause_hint` (one of: quota, deploy, dependency, unknown). Incident: 'Post-deploy, the billing webhook consumer is 6 hours behind; payments are still processing but finance dashboards show stale totals.'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "severity": "HIGH",
+          "customer_facing": false,
+          "needs_page": false,
+          "root_cause_hint": "deploy"
+        }
+      }
+    },
+    {
+      "id": "tooluse-regex-classify",
+      "category": "tool-use",
+      "prompt": "Extract structured data from this log line and respond with ONLY JSON keys `level`, `service`, `status_code` (integer). Log: '[ERROR] checkout-api status=503 upstream=payments retry=2'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "level": "ERROR",
+          "service": "checkout-api",
+          "status_code": 503
+        }
+      }
+    }
+  ]
+}
