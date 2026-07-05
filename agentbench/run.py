@@ -181,7 +181,9 @@ def main(argv: list[str] | None = None) -> int:
 
     # Commit results to the repo (not /tmp) so numbers are auditable.
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = Path(args.out) if args.out else RESULTS_DIR / f"{config.name}-{suite}-dryrun.json"
+    out_path = Path(args.out) if args.out else RESULTS_DIR / (
+        f"{config.name}-{suite}-{'dryrun' if args.dry_run else 'live'}.json"
+    )
     out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     print(json.dumps(summary, indent=2))

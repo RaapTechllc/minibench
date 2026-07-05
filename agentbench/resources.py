@@ -12,5 +12,8 @@ TASK_DIR = PKG_ROOT / "tasks"
 RESULTS_DIR = PKG_ROOT / "results"
 
 MOA_V1 = str(PRESET_DIR / "moa-v1.yaml")
+MOA_DEV = str(PRESET_DIR / "moa-dev.yaml")
 SELF_MOA = str(PRESET_DIR / "self-moa-baseline.yaml")
+SELF_MOA_DEV = str(PRESET_DIR / "self-moa-dev.yaml")
 CODING_V1 = str(TASK_DIR / "coding-v1.json")
+CODING_V2 = str(TASK_DIR / "coding-v2.json")

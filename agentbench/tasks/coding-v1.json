@@ -1,6 +1,6 @@
 {
   "suite": "our-coding-v1",
-  "notes": "Contamination-resistant seed set. Every task has an EXECUTABLE oracle (unit tests / exact numeric), never keyword presence. Grow via post-cutoff GitHub issues + procedurally-generated instances; keep the real test split private and publish only a dev slice.",
+  "notes": "Smoke / CI suite only — intentionally easy. Use coding-v2.json for eval runs that should discriminate between models.",
   "canary": "AGENTBENCH-CANARY-8f3a1c2e-DO-NOT-TRAIN",
   "tasks": [
     {

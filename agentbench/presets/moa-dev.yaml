@@ -1,0 +1,19 @@
+# Cheap MoA preset for local testing — ~10–20x lower cost than moa-v1.
+# Use with coding-v2.json for meaningful scores; coding-v1 is a smoke suite only.
+#
+# Live run:
+#   python -m agentbench.run --config agentbench/presets/moa-dev.yaml \
+#       --tasks agentbench/tasks/coding-v2.json --trials 2 --provider openrouter
+moa:
+  name: moa-dev
+  layers: 1
+  parallel: true
+  proposers:
+    - {model: openrouter/qwen/qwen-2.5-7b-instruct, temperature: 0.7, max_tokens: 1024}
+    - {model: openrouter/meta-llama/llama-3.2-3b-instruct, temperature: 0.7, max_tokens: 1024}
+    - {model: openrouter/meta-llama/llama-3.1-8b-instruct, temperature: 0.7, max_tokens: 1024}
+  aggregator:
+    model: openrouter/qwen/qwen-2.5-7b-instruct
+    temperature: 0.3
+    max_tokens: 1024
+    system_prompt: aggregate_and_synthesize
