@@ -19,7 +19,7 @@
       "verification": {
         "type": "unit_test",
         "timeout_s": 10,
-        "test_source": "from solution import max_sliding_window\n\ndef test_basic():\n    assert max_sliding_window([1, 3, -1, -3, 5, 3, 6, 7], 3) == [3, 3, 5, 5, 6, 7]\n\ndef test_single_window():\n    assert max_sliding_window([9, 8, 7], 3) == [9]\n\ndef test_k_one():\n    assert max_sliding_window([4, -2, 0, 3], 1) == [4, -2, 0, 3]\n\ndef test_large_input():\n    n = 20000\n    nums = list(range(n))\n    out = max_sliding_window(nums, 500)\n    assert len(out) == n - 500 + 1\n    assert out[0] == 499\n    assert out[-1] == n - 1\n"
+        "test_source": "from solution import max_sliding_window\n\ndef test_basic():\n    assert max_sliding_window([1, 3, -1, -3, 5, 3, 6, 7], 3) == [3, 3, 5, 5, 6, 7]\n\ndef test_single_window():\n    assert max_sliding_window([9, 8, 7], 3) == [9]\n\ndef test_k_one():\n    assert max_sliding_window([4, -2, 0, 3], 1) == [4, -2, 0, 3]\n\ndef test_large_input_enforces_linear():\n    # n=200000, k=100000: an O(n) solution finishes in well under a second, a\n    # naive O(n*k) re-scan takes ~150s and hits the 10s timeout (marked failed).\n    n = 200000\n    k = 100000\n    nums = list(range(n))\n    out = max_sliding_window(nums, k)\n    assert len(out) == n - k + 1\n    assert out[0] == k - 1\n    assert out[-1] == n - 1\n"
       }
     },
     {
@@ -53,7 +53,7 @@
     {
       "id": "reason-average-speed-trap",
       "category": "reasoning",
-      "prompt": "A car drives 60 miles at 60 mph, then 30 miles at 30 mph. What is the average speed for the entire trip, in mph? Give only the numeric answer.",
+      "prompt": "A car drives 60 miles at 60 mph, then 60 miles at 30 mph. What is the average speed for the entire trip, in mph? Give only the numeric answer.",
       "verification": {
         "type": "numeric_match",
         "expected": 40,

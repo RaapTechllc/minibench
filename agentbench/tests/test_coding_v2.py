@@ -38,6 +38,8 @@ def test_coding_v2_clock_angle_trap():
 
 
 def test_coding_v2_average_speed_trap():
+    # Equal distances (60mi@60 + 60mi@30) → 1h+2h → 120mi/3h = 40 mph correct;
+    # the naive "average the two speeds" gives 45 (the trap).
     tasks = _load_v2_tasks()
     assert not grade(tasks["reason-average-speed-trap"]["verification"], "45").passed
     assert grade(tasks["reason-average-speed-trap"]["verification"], "40 mph").passed
