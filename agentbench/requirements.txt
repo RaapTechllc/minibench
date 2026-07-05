@@ -3,3 +3,7 @@
 httpx==0.27.2
 pyyaml==6.0.1
 python-dotenv==1.0.1
+# pytest is a RUNTIME dep, not just for our own tests: the unit_test grader
+# shells out to `python -m pytest` to score model-written code. Without it,
+# grading raises rather than emitting false scores.
+pytest==8.3.3

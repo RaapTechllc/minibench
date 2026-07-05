@@ -14,6 +14,7 @@ is designed so that a wrong/empty answer scores 0. Types:
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import subprocess
@@ -97,9 +98,22 @@ def unit_test(
     """Run a hidden test module against the model's extracted code.
 
     ``test_source`` imports from ``solution`` (the model's code) and asserts. It
-    runs in a throwaway temp dir via ``python -m pytest`` (falling back to plain
-    execution if pytest is unavailable). Pass iff the process exits 0.
+    runs in a throwaway temp dir via ``python -m pytest``; pass iff pytest exits 0.
+
+    pytest is a HARD requirement here, not optional. The test sources are
+    pytest-style (``def test_*(): assert ...``); running them any other way would
+    silently misgrade — plain ``python file.py`` never calls the ``test_*``
+    functions (exit 0 → everything "passes"), and ``python -m pytest`` with pytest
+    absent exits non-zero for the wrong reason (→ correct code marked "failed").
+    So if pytest can't be imported we raise instead of returning a bogus score.
     """
+    if importlib.util.find_spec("pytest") is None:
+        raise RuntimeError(
+            "unit_test grading requires pytest, which is not importable. "
+            "Install it (it is in agentbench/requirements.txt) — refusing to "
+            "grade, because either fallback would produce false scores."
+        )
+
     code = extract_code(output)
     if not code:
         return GradeResult(False, 0.0, "no code in output")
@@ -113,15 +127,6 @@ def unit_test(
         try:
             proc = subprocess.run(
                 [sys.executable, "-m", "pytest", "-q", str(test_file)],
-                cwd=tmp,
-                capture_output=True,
-                text=True,
-                timeout=timeout_s,
-            )
-        except FileNotFoundError:
-            # pytest not importable as a module runner — run the file directly.
-            proc = subprocess.run(
-                [sys.executable, str(test_file)],
                 cwd=tmp,
                 capture_output=True,
                 text=True,

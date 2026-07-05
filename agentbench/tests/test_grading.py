@@ -1,3 +1,5 @@
+import pytest
+
 from agentbench.grading import (
     exact_match,
     numeric_match,
@@ -50,6 +52,17 @@ def test_unit_test_fails_deliberately_bad_code():
 
 def test_unit_test_fails_empty_output():
     assert not unit_test("no code here at all", UNIT_TEST_SRC).passed
+
+
+def test_unit_test_raises_when_pytest_missing(monkeypatch):
+    # If pytest can't be imported, grading must refuse (raise) rather than emit a
+    # bogus score — silently passing or failing would corrupt every unit_test run.
+    import agentbench.grading as g
+
+    monkeypatch.setattr(g.importlib.util, "find_spec", lambda name: None)
+    good = "```python\ndef add(a, b):\n    return a + b\n```"
+    with pytest.raises(RuntimeError, match="requires pytest"):
+        g.unit_test(good, UNIT_TEST_SRC)
 
 
 def test_grade_dispatch():
