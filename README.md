@@ -23,6 +23,24 @@ docker compose up -d --build
 # Health:    http://localhost:3070/health
 ```
 
+## Local dev setup (one command)
+
+```bash
+./scripts/setup-dev.sh
+```
+
+This creates Python virtualenvs for `backend/`, `cli/`, and `agentbench/`, installs
+frontend npm deps, and copies `.env.example` → `.env` if missing.
+
+**OpenRouter** (for agent/MoA benchmarks via `agentbench/`):
+
+1. Get an API key at [openrouter.ai/keys](https://openrouter.ai/keys)
+2. Add it to `.env`: `OPENROUTER_API_KEY=sk-or-v1-...`
+3. Dry-run offline (no key): `python -m agentbench.run --config agentbench/presets/moa-v1.yaml --tasks agentbench/tasks/coding-v1.json --trials 2 --dry-run`
+4. Live run: `export OPENROUTER_API_KEY=sk-or-... && python -m agentbench.run --config agentbench/presets/moa-v1.yaml --tasks agentbench/tasks/coding-v1.json --trials 3 --provider openrouter`
+
+See `agentbench/README.md` for MoA presets, grading, and publishing to `/api/v1/agents/*`.
+
 The frontend is served by nginx and reverse-proxies `/api` and `/health` to the
 API container, so it works unchanged whether you run it on localhost or deploy
 it elsewhere.
