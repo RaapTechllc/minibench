@@ -47,17 +47,24 @@ it elsewhere.
 
 ## Run locally without Docker
 
+**Postgres:** The Docker example below uses port **5438**. If you use Homebrew Postgres on the
+default **5432**, point both the app and tests at `localhost:5432` instead (see Testing).
+
+**Env files:** Put `OPENROUTER_API_KEY` in the repo-root `.env` (loaded by `agentbench/run.py`).
+Backend secrets live in `backend/.env` (copy from `backend/.env.example`).
+
 ```bash
 # 1. Postgres (any instance works; match the URL below)
-#    e.g. docker run -e POSTGRES_USER=minibench -e POSTGRES_PASSWORD=minibench \
+#    Homebrew default: localhost:5432  |  Docker example:
+#    docker run -e POSTGRES_USER=minibench -e POSTGRES_PASSWORD=minibench \
 #                    -e POSTGRES_DB=minibench -p 5438:5432 postgres:16
 
 # 2. Backend
 cd backend
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-export DATABASE_URL=postgresql+asyncpg://minibench:minibench@localhost:5438/minibench
-export DATABASE_URL_SYNC=postgresql+psycopg2://minibench:minibench@localhost:5438/minibench
+export DATABASE_URL=postgresql+asyncpg://minibench:minibench@localhost:5432/minibench
+export DATABASE_URL_SYNC=postgresql+psycopg2://minibench:minibench@localhost:5432/minibench
 uvicorn app.main:app --reload --port 3070   # creates tables + seeds on startup
 
 # 3. Frontend (separate terminal)
@@ -131,6 +138,11 @@ Set the API target with `MINIBENCH_API_URL` (default `http://localhost:3070`).
 ```bash
 # Backend (needs a reachable Postgres; defaults to localhost:5438)
 cd backend && pip install -r requirements-dev.txt && pytest
+
+# Homebrew Postgres on :5432:
+# MINIBENCH_TEST_PG_HOST=127.0.0.1 MINIBENCH_TEST_PG_PORT=5432 pytest
+# Create the test DB once if needed:
+#   createdb -h 127.0.0.1 -p 5432 -U $(whoami) minibench_test -O minibench
 
 # CLI
 cd cli && pip install -e . && pip install pytest && pytest

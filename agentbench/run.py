@@ -16,6 +16,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import urllib.error
+import urllib.request
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -146,6 +148,76 @@ def summarize(config: MoAConfig, suite: str, trials: int, results: list[TrialRes
     }
 
 
+def to_agent_run_submit(
+    summary: dict[str, Any],
+    trials: list[TrialResult],
+    *,
+    provider: str,
+    harness: str = "agentbench",
+    harness_version: str | None = None,
+) -> dict[str, Any]:
+    """Transform run.py output into the backend ``AgentRunSubmit`` shape."""
+    ci = summary.get("pass_rate_ci95") or [None, None]
+
+    def pct(x: float | None) -> float | None:
+        return round(x * 100, 4) if x is not None else None
+
+    tokens_in = sum(r.tokens_in for r in trials)
+    tokens_out = sum(r.tokens_out for r in trials)
+
+    return {
+        "harness": harness,
+        "harness_version": harness_version,
+        "moa_config": summary.get("moa_config"),
+        "benchmark_suite": summary["suite"],
+        "provider": provider,
+        "n_tasks": summary["n_tasks"],
+        "n_trials": summary["n_trials"],
+        "pass_rate": pct(summary["pass_rate"]),
+        "pass_hat_k": pct(summary.get("pass_hat_k")),
+        "ci95_low": pct(ci[0]),
+        "ci95_high": pct(ci[1]),
+        "cost_usd_per_task": summary.get("cost_usd_per_task"),
+        "latency_p50_ms": int(summary["latency_p50_ms"]) if summary.get("latency_p50_ms") is not None else None,
+        "latency_p95_ms": int(summary["latency_p95_ms"]) if summary.get("latency_p95_ms") is not None else None,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "results": [
+            {
+                "task_id": r.task_id,
+                "category": r.category,
+                "trial": r.trial,
+                "passed": r.passed,
+                "score": r.score,
+                "cost_usd": r.cost_usd,
+                "latency_ms": r.latency_ms,
+                "tokens_in": r.tokens_in,
+                "tokens_out": r.tokens_out,
+            }
+            for r in trials
+        ],
+    }
+
+
+def publish_run(api_url: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """POST an ``AgentRunSubmit`` payload to the agents API."""
+    base = api_url.rstrip("/")
+    url = f"{base}/api/v1/agents/runs"
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"publish failed ({e.code}): {detail}") from e
+
+
 def main(argv: list[str] | None = None) -> int:
     _load_env_files()
     ap = argparse.ArgumentParser(description="Run a MoA config against a task suite.")
@@ -155,6 +227,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--provider", default="openrouter")
     ap.add_argument("--dry-run", action="store_true", help="offline stub, no network/keys")
     ap.add_argument("--out", default=None, help="results JSON path (default: agentbench/results/<ts>.json)")
+    ap.add_argument(
+        "--publish",
+        default=None,
+        metavar="API_URL",
+        help="POST summary to backend (e.g. http://localhost:3070)",
+    )
     args = ap.parse_args(argv)
 
     config = load_moa_config(args.config)
@@ -188,6 +266,12 @@ def main(argv: list[str] | None = None) -> int:
 
     print(json.dumps(summary, indent=2))
     print(f"\nWrote {out_path}")
+
+    if args.publish:
+        submit = to_agent_run_submit(summary, results, provider=args.provider)
+        published = publish_run(args.publish, submit)
+        print(f"Published run_id={published.get('run_id')} to {args.publish}")
+
     return 0
 
 

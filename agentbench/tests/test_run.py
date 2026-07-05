@@ -1,7 +1,7 @@
 import json
 
 from agentbench.config import load_moa_config
-from agentbench.run import StubModel, run_suite, summarize, load_tasks, main
+from agentbench.run import StubModel, run_suite, summarize, load_tasks, main, to_agent_run_submit
 from agentbench.resources import MOA_V1, CODING_V1
 
 
@@ -39,8 +39,23 @@ def test_cli_dry_run_writes_artifact(tmp_path):
     assert len(payload["trials"]) == 8  # 4 tasks x 2 trials
 
 
+def test_to_agent_run_submit_scales_percentages():
+    config = load_moa_config(MOA_V1)
+    suite, tasks = load_tasks(CODING_V1)
+    results = run_suite(config, tasks, trials=2, model=None, stub=StubModel())
+    summary = summarize(config, suite, 2, results)
+    payload = to_agent_run_submit(summary, results, provider="openrouter")
+
+    assert payload["benchmark_suite"] == suite
+    assert payload["pass_rate"] == 100.0
+    assert payload["pass_hat_k"] == 100.0
+    assert payload["ci95_low"] is not None
+    assert len(payload["results"]) == len(results)
+
+
 def test_live_run_without_key_errors_cleanly(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.setattr("agentbench.run._load_env_files", lambda: None)
     rc = main([
         "--config", MOA_V1,
         "--tasks", CODING_V1,
