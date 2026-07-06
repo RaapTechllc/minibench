@@ -10,6 +10,23 @@ _Lightweight state for `/audit` and `/goal`. Source-backed; keep it small._
   frontend `vite build` (tsc) ✓
 
 ## Delivered this run (slice)
+**Manual submission form on `/submit`** (branch
+`cursor/manual-submit-form-4ffb`, 2026-07-06). TSD §6 — the page now offers
+CLI instructions *and* a form.
+- Pure validation/payload logic in `frontend/src/lib/submitForm.js` (+ `.d.ts`),
+  mirroring the server rules (required fields, t/s 0.1–500, duration ≥10,
+  prompt+completion ≥100); 8 node tests in `frontend/tests/submitForm.test.mjs`
+  (suite 12/12).
+- `api.ts`: new `postJSON` that surfaces FastAPI `detail` errors (string and
+  422-list forms) + `api.submitBenchmark`.
+- `Submit.tsx`: Hardware/Software/Performance field groups, inline errors,
+  server-error banner, success panel linking to `/benchmarks/{id}`.
+- Verified end-to-end: form-built payload → live `POST /api/v1/submit` 200,
+  duplicate-fingerprint 429 detail surfaced; browser walkthrough (empty submit
+  shows 10 inline errors; valid submit → success panel → detail page).
+- No backend changes.
+
+## Delivered previously (slice)
 **Pagination metadata for `GET /api/v1/benchmarks`** (branch
 `cursor/benchmarks-total-count-4ffb`, 2026-07-06).
 - `X-Total-Count` response header carries the filtered total (count query runs
@@ -42,14 +59,13 @@ _Lightweight state for `/audit` and `/goal`. Source-backed; keep it small._
 - Sign-off gate: none crossed; nothing halted.
 
 ## Open / deferred (from project spec, not yet built)
-- **Manual submission form** on `/submit` (TSD §6) — form → `POST
-  /api/v1/submit`.
 - **Optimized-inference tracking** (TSD §7): `effective_model_size_gb` vs raw,
   "optimized only" filter — larger, touches the data model.
-- **Frontend test runner** (Vitest + React Testing Library) — the FE currently
-  has no unit-test gate (only build + lint).
+- **Frontend test runner** (Vitest + React Testing Library) — the FE unit-test
+  gate is plain `node --test` over pure lib modules; no component tests.
+- **Frontend pagination UI** consuming the `X-Total-Count` header on the
+  Leaderboard/Dashboard tables.
 
 ## Next recommended step
-Manual submission form on the Submit page (TSD §6): bounded, high user value,
-contract = the existing `POST /api/v1/submit` endpoint + `BenchmarkSubmit`
-schema.
+Frontend pagination UI (consume `X-Total-Count`), or move to sprint-plan
+Theme C (model tracker sync) if hardware-side polish is deprioritized.
