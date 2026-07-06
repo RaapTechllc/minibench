@@ -153,6 +153,34 @@ export interface KnownModel {
   prompt_price: number | null;
   completion_price: number | null;
   benchmarked: boolean;
+  family: string | null;
+  license: string | null;
+  snapshot_date: string | null;
+}
+
+export interface ModelLeaderboardEntry {
+  rank: number;
+  model_string: string;
+  run_id: string;
+  benchmark_suite: string;
+  provider: string | null;
+  display_name: string | null;
+  family: string | null;
+  license: string | null;
+  prompt_price: number | null;
+  completion_price: number | null;
+  n_tasks: number;
+  n_trials: number;
+  pass_rate: number;
+  pass_hat_k: number | null;
+  ci95_low: number | null;
+  ci95_high: number | null;
+  cost_usd_per_task: number | null;
+  latency_p50_ms: number | null;
+  latency_p95_ms: number | null;
+  submitted_at: string;
+  category_pass_rates: Record<string, number>;
+  on_pareto_frontier: boolean;
 }
 
 export interface ReferenceProfile {
@@ -224,5 +252,9 @@ export const api = {
     return fetchJSON<AgentLeaderboardEntry[]>(`/api/v1/agents/leaderboard${qs}`);
   },
   getNewModels: () => fetchJSON<KnownModel[]>('/api/v1/agents/models/new'),
+  getModelLeaderboard: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return fetchJSON<ModelLeaderboardEntry[]>(`/api/v1/agents/models/leaderboard${qs}`);
+  },
   getAgentRun: (runId: string) => fetchJSON<AgentRunDetail>(`/api/v1/agents/runs/${runId}`),
 };

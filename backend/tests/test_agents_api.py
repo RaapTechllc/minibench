@@ -85,6 +85,42 @@ def test_leaderboard_filters_by_suite(client):
     assert board[0]["benchmark_suite"] == "our-tooluse-v1"
 
 
+def test_model_leaderboard_best_run_per_model_with_catalog_join(client):
+    kimi = "openrouter/moonshotai/kimi-k2.7-code"
+    # Two runs of the same model — the better one must win.
+    client.post("/api/v1/agents/runs", json=_run_payload(
+        benchmark_suite="minibench-core-v1",
+        moa_config={"name": "single-kimi", "self_moa": False, "models": [kimi]},
+        pass_rate=55.0, cost_usd_per_task=0.02,
+        results=[
+            {"task_id": "mb-reason-01", "category": "reasoning", "trial": 1, "passed": True, "score": 1.0},
+            {"task_id": "mb-code-01", "category": "coding", "trial": 1, "passed": False, "score": 0.0},
+        ]))
+    client.post("/api/v1/agents/runs", json=_run_payload(
+        benchmark_suite="minibench-core-v1",
+        moa_config={"name": "single-kimi", "self_moa": False, "models": [kimi]},
+        pass_rate=80.0, cost_usd_per_task=0.03,
+        results=[
+            {"task_id": "mb-reason-01", "category": "reasoning", "trial": 1, "passed": True, "score": 1.0},
+            {"task_id": "mb-code-01", "category": "coding", "trial": 1, "passed": True, "score": 1.0},
+        ]))
+    # A multi-model MoA run must NOT appear on the model-centric board.
+    client.post("/api/v1/agents/runs", json=_run_payload(
+        benchmark_suite="minibench-core-v1",
+        moa_config={"name": "moa-v1", "self_moa": False, "models": ["a", "b"]},
+        pass_rate=99.0))
+
+    board = client.get("/api/v1/agents/models/leaderboard?suite=minibench-core-v1").json()
+    assert len(board) == 1
+    entry = board[0]
+    assert entry["model_string"] == kimi
+    assert float(entry["pass_rate"]) == 80.0                      # best run won
+    assert entry["family"] == "Kimi"                              # catalog join
+    assert entry["license"] == "open"
+    assert entry["category_pass_rates"] == {"reasoning": 100.0, "coding": 100.0}
+    assert entry["on_pareto_frontier"] is True
+
+
 def test_master_catalog_seeded_unbenchmarked(client):
     rows = client.get("/api/v1/agents/models/new").json()
     by_id = {r["model_id"]: r for r in rows}

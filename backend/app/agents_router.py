@@ -9,7 +9,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, cast, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -20,6 +20,7 @@ from app.schemas import (
     AgentRunDetailResponse,
     AgentTaskResultResponse,
     AgentLeaderboardEntry,
+    ModelLeaderboardEntry,
     KnownModelResponse,
 )
 
@@ -156,6 +157,94 @@ async def agent_leaderboard(
                 latency_p50_ms=r.latency_p50_ms,
                 latency_p95_ms=r.latency_p95_ms,
                 on_pareto_frontier=idx in frontier,
+            )
+        )
+    return entries
+
+
+# ─── GET /api/v1/agents/models/leaderboard — model-centric view ────────────────
+
+@router.get("/models/leaderboard", response_model=list[ModelLeaderboardEntry])
+async def model_leaderboard(
+    suite: Optional[str] = None,
+    limit: int = Query(100, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    """Best published run per MODEL (not per config): only runs whose config
+    touches exactly one model string qualify, so a MoA pipeline never poses as
+    a model. Joined against the master catalog for family/license/prices."""
+    q = select(AgentRun)
+    if suite:
+        q = q.where(AgentRun.benchmark_suite == suite)
+    runs = list((await db.execute(q)).scalars().all())
+
+    # One model string == model-centric. (Self-MoA also qualifies: same model.)
+    single_runs = [r for r in runs if len((r.moa_config or {}).get("models", [])) == 1]
+
+    best: dict[str, AgentRun] = {}
+    for r in single_runs:
+        key = r.moa_config["models"][0]
+        cur = best.get(key)
+        if cur is None or (r.pass_rate, -(r.cost_usd_per_task or Decimal(0))) > (
+            cur.pass_rate, -(cur.cost_usd_per_task or Decimal(0))
+        ):
+            best[key] = r
+
+    # Catalog join: preset model strings are "openrouter/<catalog id>".
+    catalog_rows = list((await db.execute(select(KnownModel))).scalars().all())
+    catalog = {f"{m.provider}/{m.model_id}": m for m in catalog_rows}
+
+    # Per-category pass rates for the chosen runs.
+    run_ids = [r.run_id for r in best.values()]
+    cat_rates: dict[UUID, dict[str, float]] = {}
+    if run_ids:
+        rows = await db.execute(
+            select(
+                AgentTaskResult.run_id,
+                AgentTaskResult.category,
+                func.avg(cast(AgentTaskResult.passed, Integer)),
+            )
+            .where(AgentTaskResult.run_id.in_(run_ids))
+            .group_by(AgentTaskResult.run_id, AgentTaskResult.category)
+        )
+        for rid, category, rate in rows:
+            cat_rates.setdefault(rid, {})[category or "unknown"] = round(float(rate) * 100, 2)
+
+    ordered = sorted(
+        best.items(),
+        key=lambda kv: (kv[1].pass_rate, -(kv[1].cost_usd_per_task or Decimal(0))),
+        reverse=True,
+    )[:limit]
+    points = [(i, r.cost_usd_per_task, r.pass_rate) for i, (_, r) in enumerate(ordered)]
+    frontier = _pareto_frontier(points)
+
+    entries = []
+    for i, (model_string, r) in enumerate(ordered):
+        cm = catalog.get(model_string)
+        entries.append(
+            ModelLeaderboardEntry(
+                rank=i + 1,
+                model_string=model_string,
+                run_id=r.run_id,
+                benchmark_suite=r.benchmark_suite,
+                provider=r.provider,
+                display_name=cm.display_name if cm else None,
+                family=cm.family if cm else None,
+                license=cm.license if cm else None,
+                prompt_price=cm.prompt_price if cm else None,
+                completion_price=cm.completion_price if cm else None,
+                n_tasks=r.n_tasks,
+                n_trials=r.n_trials,
+                pass_rate=r.pass_rate,
+                pass_hat_k=r.pass_hat_k,
+                ci95_low=r.ci95_low,
+                ci95_high=r.ci95_high,
+                cost_usd_per_task=r.cost_usd_per_task,
+                latency_p50_ms=r.latency_p50_ms,
+                latency_p95_ms=r.latency_p95_ms,
+                submitted_at=r.submitted_at,
+                category_pass_rates=cat_rates.get(r.run_id, {}),
+                on_pareto_frontier=i in frontier,
             )
         )
     return entries
