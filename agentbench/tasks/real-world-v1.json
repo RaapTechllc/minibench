@@ -1,0 +1,151 @@
+{
+  "suite": "real-world-v1",
+  "notes": "Proprietary cross-domain real-world suite: the knowledge-work tasks people actually pay LLMs to do (data extraction, structured transforms, business routing, careful reading, practical code). Every task has an executable oracle that a plausible-but-wrong answer fails, so pass rates are objective and reproducible across iterations. Cheap by design: short prompts, small outputs, no LLM-as-judge cost.",
+  "canary": "MINIBENCH-CANARY-real-world-v1-7f31ac09-DO-NOT-TRAIN",
+  "tasks": [
+    {
+      "id": "extract-invoice-fields",
+      "category": "data-extraction",
+      "prompt": "Read this invoice and respond with ONLY a JSON object with keys `invoice_id` (string), `amount_due` (number, the total actually owed), `currency` (3-letter code), and `is_overdue` (boolean). Invoice: 'Invoice INV-2048 from Acme Corp. Subtotal: $1,200.00. Tax (8%): $96.00. Total due: $1,296.00. Issued 2026-03-01, payment due 2026-03-15. Today is 2026-04-01.'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "invoice_id": "INV-2048",
+          "amount_due": 1296.0,
+          "currency": "USD",
+          "is_overdue": true
+        }
+      },
+      "_gold": "{\"invoice_id\": \"INV-2048\", \"amount_due\": 1296.00, \"currency\": \"USD\", \"is_overdue\": true}",
+      "_wrong": "{\"invoice_id\": \"INV-2048\", \"amount_due\": 1200.00, \"currency\": \"USD\", \"is_overdue\": true}"
+    },
+    {
+      "id": "extract-shipping-fields",
+      "category": "data-extraction",
+      "prompt": "Extract shipment details and respond with ONLY a JSON object with keys `carrier` (string), `tracking_number` (string), and `num_items` (integer). Message: 'Your FedEx shipment FX771234891123 with 3 items (2 books, 1 mug) is on its way to 90210. Order #55821.'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "carrier": "FedEx",
+          "tracking_number": "FX771234891123",
+          "num_items": 3
+        }
+      },
+      "_gold": "{\"carrier\": \"FedEx\", \"tracking_number\": \"FX771234891123\", \"num_items\": 3}",
+      "_wrong": "{\"carrier\": \"FedEx\", \"tracking_number\": \"FX771234891123\", \"num_items\": 2}"
+    },
+    {
+      "id": "transform-csv-aggregate",
+      "category": "structured-transform",
+      "prompt": "Given this CSV, respond with ONLY a JSON object with keys `total_revenue` (number, the sum of the revenue column) and `top_region` (string, the region with the single highest revenue).\nregion,revenue\nNorth,1200\nSouth,900\nEast,1500\nWest,800",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "total_revenue": 4400,
+          "top_region": "East"
+        }
+      },
+      "_gold": "{\"total_revenue\": 4400, \"top_region\": \"East\"}",
+      "_wrong": "{\"total_revenue\": 4400, \"top_region\": \"West\"}"
+    },
+    {
+      "id": "reason-discount-stacking",
+      "category": "reasoning",
+      "prompt": "A $200 item has 20% off, and then an additional 10% off the already-discounted price. What is the final price in dollars? Give only the numeric answer.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 144,
+        "tol": 0.01
+      },
+      "_gold": "144",
+      "_wrong": "140"
+    },
+    {
+      "id": "reason-unit-rate",
+      "category": "reasoning",
+      "prompt": "A recipe for 4 servings needs 300 grams of flour. How many grams of flour are needed for 7 servings, keeping the same ratio? Round to the nearest gram and give only the numeric answer.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 525,
+        "tol": 0.5
+      },
+      "_gold": "525",
+      "_wrong": "600"
+    },
+    {
+      "id": "instruct-business-day-date",
+      "category": "instruction-following",
+      "prompt": "A task starts on Monday 2026-03-02 and takes 10 business days of work (Monday\u2013Friday only, weekends skipped), counting the start day as business day 1. On what calendar date is business day 10? Answer with ONLY the date in YYYY-MM-DD format and nothing else.",
+      "verification": {
+        "type": "exact_match",
+        "expected": "2026-03-13"
+      },
+      "_gold": "2026-03-13",
+      "_wrong": "2026-03-16"
+    },
+    {
+      "id": "tooluse-route-support",
+      "category": "tool-use",
+      "prompt": "Route this support message. Respond with ONLY a JSON object with keys `queue` (one of: billing, technical, account), `priority` (one of: high, normal), and `refund_requested` (boolean). Message: 'Hi, I was charged twice for my subscription this month and I want one of the charges refunded as soon as possible.'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "queue": "billing",
+          "priority": "high",
+          "refund_requested": true
+        }
+      },
+      "_gold": "{\"queue\": \"billing\", \"priority\": \"high\", \"refund_requested\": true}",
+      "_wrong": "{\"queue\": \"technical\", \"priority\": \"normal\", \"refund_requested\": true}"
+    },
+    {
+      "id": "tooluse-sql-safety",
+      "category": "tool-use",
+      "prompt": "Classify this SQL statement. Respond with ONLY a JSON object with keys `operation` (SELECT/INSERT/UPDATE/DELETE), `is_destructive` (boolean: does it modify or remove data), and `touches_all_rows` (boolean: true if it has no WHERE clause and therefore affects every row). SQL: 'DELETE FROM users;'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "operation": "DELETE",
+          "is_destructive": true,
+          "touches_all_rows": true
+        }
+      },
+      "_gold": "{\"operation\": \"DELETE\", \"is_destructive\": true, \"touches_all_rows\": true}",
+      "_wrong": "{\"operation\": \"DELETE\", \"is_destructive\": true, \"touches_all_rows\": false}"
+    },
+    {
+      "id": "reading-derive-profit",
+      "category": "careful-reading",
+      "prompt": "In Q3, Northwind reported revenue of $4.2M, up from $3.5M in Q2. Operating costs were $2.8M and the company had 120 employees. Q3 profit equals Q3 revenue minus Q3 operating costs. What was Q3 profit in millions of dollars? Give only the numeric answer.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 1.4,
+        "tol": 0.01
+      },
+      "_gold": "1.4",
+      "_wrong": "4.2"
+    },
+    {
+      "id": "code-slugify",
+      "category": "coding",
+      "prompt": "Write a Python function `slugify(text)` that returns a URL slug: lowercase the text, replace every maximal run of non-alphanumeric characters with a single hyphen, and strip any leading or trailing hyphens. Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import slugify\n\ndef test_basic():\n    assert slugify('Hello, World!') == 'hello-world'\n\ndef test_underscores_and_spaces():\n    assert slugify('  Foo__Bar  ') == 'foo-bar'\n\ndef test_alnum_kept():\n    assert slugify('2026 Report v2') == '2026-report-v2'\n\ndef test_all_punct():\n    assert slugify('!!!') == ''\n\ndef test_idempotent():\n    assert slugify('already-slug') == 'already-slug'\n"
+      },
+      "_gold": "```python\nimport re\ndef slugify(text):\n    s = re.sub(r'[^a-z0-9]+', '-', text.lower())\n    return s.strip('-')\n```",
+      "_wrong": "```python\ndef slugify(text):\n    return text\n```"
+    },
+    {
+      "id": "code-parse-money",
+      "category": "coding",
+      "prompt": "Write a Python function `parse_money(s)` that parses a US dollar string such as '$1,296.00' and returns the amount in whole cents as an integer (so '$1,296.00' returns 129600). Handle thousands separators and an optional missing cents part ('$1,000' returns 100000). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import parse_money\n\ndef test_full():\n    assert parse_money('$1,296.00') == 129600\n\ndef test_cents():\n    assert parse_money('$0.99') == 99\n\ndef test_thousands_no_cents():\n    assert parse_money('$1,000') == 100000\n\ndef test_bare():\n    assert parse_money('42') == 4200\n"
+      },
+      "_gold": "```python\ndef parse_money(s):\n    s = s.replace('$', '').replace(',', '').strip()\n    return round(float(s) * 100)\n```",
+      "_wrong": "```python\ndef parse_money(s):\n    s = s.replace('$', '').replace(',', '').strip()\n    return float(s)\n```"
+    }
+  ]
+}
