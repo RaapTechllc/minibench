@@ -100,6 +100,23 @@ class HardwareSpecResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
+class ReferenceProfileResponse(BaseModel):
+    id: int
+    profile_key: str
+    display_name: str
+    description: Optional[str] = None
+    engine: Optional[str] = None
+    engine_version_min: Optional[str] = None
+    quantization: Optional[str] = None
+    context_length: Optional[int] = None
+    temperature: Optional[Decimal] = None
+    top_p: Optional[Decimal] = None
+    max_tokens: Optional[int] = None
+    representative_system: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
 class ModelQualityResponse(BaseModel):
     id: int
     model_family: str

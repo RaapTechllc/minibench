@@ -88,6 +88,31 @@ class HardwareSpec(Base):
     form_factor = Column(String(32))
 
 
+class ReferenceProfile(Base):
+    """A canonical, pinned run configuration ("how we run models").
+
+    The pivot demotes hardware to a controlled variable: models are benchmarked
+    *on a profile*, so numbers are comparable. Each profile pins the engine,
+    quantization, context and decoding defaults; ``representative_system``
+    points at a ``hardware_specs.system_name`` row where applicable.
+    """
+
+    __tablename__ = "reference_profiles"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    profile_key = Column(String(64), nullable=False, unique=True)  # consumer-gpu-24gb
+    display_name = Column(String(128), nullable=False)
+    description = Column(Text)                    # why this is the official setting
+    engine = Column(String(64))                   # ollama, llama.cpp, MLX, vLLM; NULL = provider API
+    engine_version_min = Column(String(32))
+    quantization = Column(String(32))             # Q4_K_M default; NULL = provider-served
+    context_length = Column(Integer)
+    temperature = Column(Numeric(3, 2))
+    top_p = Column(Numeric(3, 2))
+    max_tokens = Column(Integer)
+    representative_system = Column(String(128))   # hardware_specs.system_name
+
+
 class ModelQuality(Base):
     __tablename__ = "model_quality"
 

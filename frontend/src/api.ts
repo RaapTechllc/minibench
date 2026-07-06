@@ -155,6 +155,21 @@ export interface KnownModel {
   benchmarked: boolean;
 }
 
+export interface ReferenceProfile {
+  id: number;
+  profile_key: string;
+  display_name: string;
+  description: string | null;
+  engine: string | null;
+  engine_version_min: string | null;
+  quantization: string | null;
+  context_length: number | null;
+  temperature: number | null;
+  top_p: number | null;
+  max_tokens: number | null;
+  representative_system: string | null;
+}
+
 async function fetchJSON<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -199,6 +214,7 @@ export const api = {
     return fetchJSON<LeaderboardEntry[]>(`/api/v1/leaderboard${qs}`);
   },
   getHardware: () => fetchJSON<HardwareSpec[]>('/api/v1/hardware'),
+  getReferenceProfiles: () => fetchJSON<ReferenceProfile[]>('/api/v1/profiles'),
   getCompare: (a: number, b: number) =>
     fetchJSON<{ a: Benchmark; b: Benchmark }>(`/api/v1/compare?a=${a}&b=${b}`),
   getStats: () => fetchJSON<Stats>('/api/v1/stats'),

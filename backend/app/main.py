@@ -14,12 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db, engine, Base
-from app.models import Benchmark, HardwareSpec, ModelQuality
+from app.models import Benchmark, HardwareSpec, ModelQuality, ReferenceProfile
 from app.schemas import (
     BenchmarkSubmit,
     BenchmarkResponse,
     HardwareSpecResponse,
     ModelQualityResponse,
+    ReferenceProfileResponse,
     LeaderboardEntry,
     CompareResponse,
     StatsResponse,
@@ -291,6 +292,15 @@ async def leaderboard(
 @app.get("/api/v1/hardware", response_model=list[HardwareSpecResponse])
 async def list_hardware(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(HardwareSpec).order_by(HardwareSpec.memory_bandwidth_gbs.desc()))
+    return result.scalars().all()
+
+
+# ─── GET /api/v1/profiles ────────────────────────────────────────────────────
+
+@app.get("/api/v1/profiles", response_model=list[ReferenceProfileResponse])
+async def list_reference_profiles(db: AsyncSession = Depends(get_db)):
+    """Canonical reference profiles — the pinned configs models are run on."""
+    result = await db.execute(select(ReferenceProfile).order_by(ReferenceProfile.id))
     return result.scalars().all()
 
 

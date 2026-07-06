@@ -154,6 +154,81 @@ HARDWARE_SPECS = [
     },
 ]
 
+# Canonical run configurations for the capability pivot (docs/PIVOT-PLAN.md W1).
+# A model is benchmarked ON a profile, so numbers are comparable. One official
+# setting per profile — the descriptions record why it's the official one.
+REFERENCE_PROFILES = [
+    {
+        "profile_key": "consumer-gpu-24gb",
+        "display_name": "Consumer GPU 24 GB",
+        "description": (
+            "Single consumer GPU with 24 GB VRAM (RTX 4090/3090 class). "
+            "ollama (llama.cpp backend) with Q4_K_M — the most common community "
+            "default: near-FP16 quality at ~4.8 bits/weight, fits 30B-class "
+            "models fully in VRAM."
+        ),
+        "engine": "ollama",
+        "engine_version_min": "0.5",
+        "quantization": "Q4_K_M",
+        "context_length": 8192,
+        "temperature": 0.2,
+        "top_p": 0.95,
+        "max_tokens": 1024,
+        "representative_system": None,
+    },
+    {
+        "profile_key": "apple-unified-32gb",
+        "display_name": "Apple Silicon unified 32 GB",
+        "description": (
+            "Apple-silicon Mac with >=24 GB unified memory (Mac Mini M4 Pro "
+            "class). MLX 4-bit — the recommended Apple-native path; unified "
+            "memory lets models spill past dedicated-VRAM limits."
+        ),
+        "engine": "MLX",
+        "engine_version_min": "0.21",
+        "quantization": "4bit",
+        "context_length": 8192,
+        "temperature": 0.2,
+        "top_p": 0.95,
+        "max_tokens": 1024,
+        "representative_system": "Mac Mini M4 Pro",
+    },
+    {
+        "profile_key": "cpu-only-mini-pc",
+        "display_name": "CPU-only mini PC",
+        "description": (
+            "No dedicated GPU: DDR5 mini PC (Ryzen 7940HS / Core Ultra class). "
+            "ollama with Q4_K_M; memory bandwidth is the bottleneck, which is "
+            "exactly what the legacy hardware benchmark measured."
+        ),
+        "engine": "ollama",
+        "engine_version_min": "0.5",
+        "quantization": "Q4_K_M",
+        "context_length": 4096,
+        "temperature": 0.2,
+        "top_p": 0.95,
+        "max_tokens": 1024,
+        "representative_system": "Minisforum UM790 Pro",
+    },
+    {
+        "profile_key": "provider-api",
+        "display_name": "Provider API (OpenRouter)",
+        "description": (
+            "Closed / API-only models. Engine and quantization are the "
+            "provider's; we pin the dated model snapshot, provider.order and "
+            "allow_fallbacks=false, and record the serving provider per run."
+        ),
+        "engine": None,
+        "engine_version_min": None,
+        "quantization": None,
+        "context_length": 8192,
+        "temperature": 0.2,
+        "top_p": 0.95,
+        "max_tokens": 1024,
+        "representative_system": None,
+    },
+]
+
 MODEL_QUALITY = [
     {"model_family": "Llama-3", "model_variant": "Llama-3-8B-Instruct", "params_b": 8.0, "mmlu_score": 68.4, "lmsys_elo": None, "source_url": "https://huggingface.co/meta-llama/Meta-Llama-3-8B"},
     {"model_family": "Llama-3", "model_variant": "Llama-3-70B-Instruct", "params_b": 70.0, "mmlu_score": 82.0, "lmsys_elo": None, "source_url": "https://huggingface.co/meta-llama/Meta-Llama-3-70B"},
@@ -414,6 +489,15 @@ def seed_model_quality(session: Session):
     session.commit()
 
 
+def seed_reference_profiles(session: Session):
+    from app.models import ReferenceProfile
+    for rp in REFERENCE_PROFILES:
+        existing = session.query(ReferenceProfile).filter_by(profile_key=rp["profile_key"]).first()
+        if not existing:
+            session.add(ReferenceProfile(**rp))
+    session.commit()
+
+
 def seed_benchmarks(session: Session):
     from app.models import Benchmark
     # Only seed if table is empty
@@ -436,6 +520,7 @@ def run_seed():
     try:
         seed_hardware_specs(session)
         seed_model_quality(session)
+        seed_reference_profiles(session)
         seed_benchmarks(session)
         print("Seed data loaded successfully.")
     finally:
