@@ -276,5 +276,8 @@ class KnownModelResponse(BaseModel):
     prompt_price: Optional[Decimal] = None
     completion_price: Optional[Decimal] = None
     benchmarked: bool
+    family: Optional[str] = None
+    license: Optional[str] = None
+    snapshot_date: Optional[date] = None
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())

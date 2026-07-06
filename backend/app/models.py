@@ -198,3 +198,7 @@ class KnownModel(Base):
     prompt_price = Column(Numeric(12, 8))
     completion_price = Column(Numeric(12, 8))
     benchmarked = Column(Boolean, nullable=False, default=False)
+    # Catalog annotations (docs/PIVOT-PLAN.md W2)
+    family = Column(String(64))          # Qwen, Kimi, GLM, Claude, ...
+    license = Column(String(16))         # open | closed
+    snapshot_date = Column(Date)         # provider release date of the pinned id
