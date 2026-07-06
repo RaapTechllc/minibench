@@ -164,7 +164,6 @@ MODEL_QUALITY = [
     {"model_family": "Qwen2.5", "model_variant": "Qwen2.5-72B-Instruct", "params_b": 72.0, "mmlu_score": 85.3, "lmsys_elo": None, "source_url": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct"},
 ]
 
-# Sample benchmark submissions for demonstration
 SAMPLE_BENCHMARKS = [
     {
         "cpu_model": "Apple M4 Pro",
@@ -393,6 +392,106 @@ SAMPLE_BENCHMARKS = [
 ]
 
 
+ARENA_MODELS = [
+    {
+        "model_id": "openai/gpt-5.5",
+        "display_name": "GPT-5.5",
+        "provider": "OpenAI",
+        "modality": "multimodal",
+        "task_tags": ["overall", "agentic_coding", "long_running", "reasoning"],
+        "arena_rank": 1,
+        "arena_score": 1462.0,
+        "intelligence_index": 73.0,
+        "output_speed_tps": 88.0,
+        "cost_per_million_tokens": 17.50,
+        "context_window": 400000,
+        "strengths": ["frontier reasoning", "tool use", "coding agents"],
+        "source_name": "LMArena / Artificial Analysis references",
+        "source_url": "https://lmarena.ai/leaderboard",
+    },
+    {
+        "model_id": "anthropic/claude-opus-4.5",
+        "display_name": "Claude Opus 4.5",
+        "provider": "Anthropic",
+        "modality": "text",
+        "task_tags": ["overall", "agentic_coding", "long_running", "writing"],
+        "arena_rank": 2,
+        "arena_score": 1454.0,
+        "intelligence_index": 72.0,
+        "output_speed_tps": 64.0,
+        "cost_per_million_tokens": 35.00,
+        "context_window": 200000,
+        "strengths": ["long-horizon coding", "planning", "review quality"],
+        "source_name": "LMArena / SWE-bench style references",
+        "source_url": "https://swebench.com/",
+    },
+    {
+        "model_id": "xai/grok-4.1",
+        "display_name": "Grok 4.1",
+        "provider": "xAI",
+        "modality": "multimodal",
+        "task_tags": ["overall", "agentic_coding", "research", "reasoning"],
+        "arena_rank": 3,
+        "arena_score": 1447.0,
+        "intelligence_index": 70.0,
+        "output_speed_tps": 112.0,
+        "cost_per_million_tokens": 12.00,
+        "context_window": 256000,
+        "strengths": ["fresh knowledge workflows", "fast iteration", "tool-heavy research"],
+        "source_name": "LMArena / Artificial Analysis references",
+        "source_url": "https://artificialanalysis.ai/",
+    },
+    {
+        "model_id": "google/gemini-3-pro",
+        "display_name": "Gemini 3 Pro",
+        "provider": "Google",
+        "modality": "multimodal",
+        "task_tags": ["overall", "image", "long_running", "reasoning"],
+        "arena_rank": 4,
+        "arena_score": 1438.0,
+        "intelligence_index": 69.0,
+        "output_speed_tps": 96.0,
+        "cost_per_million_tokens": 10.00,
+        "context_window": 1000000,
+        "strengths": ["long context", "multimodal analysis", "document work"],
+        "source_name": "Artificial Analysis / LiveBench references",
+        "source_url": "https://livebench.ai/",
+    },
+    {
+        "model_id": "openai/gpt-image-2",
+        "display_name": "GPT Image 2",
+        "provider": "OpenAI",
+        "modality": "image",
+        "task_tags": ["image", "creative", "design"],
+        "arena_rank": 5,
+        "arena_score": 1395.0,
+        "intelligence_index": None,
+        "output_speed_tps": None,
+        "cost_per_million_tokens": None,
+        "context_window": None,
+        "strengths": ["prompt adherence", "text rendering", "iterative editing"],
+        "source_name": "LMArena image arena reference",
+        "source_url": "https://lmarena.ai/leaderboard/image",
+    },
+    {
+        "model_id": "black-forest-labs/flux-2-pro",
+        "display_name": "FLUX 2 Pro",
+        "provider": "Black Forest Labs",
+        "modality": "image",
+        "task_tags": ["image", "creative", "design"],
+        "arena_rank": 6,
+        "arena_score": 1388.0,
+        "intelligence_index": None,
+        "output_speed_tps": None,
+        "cost_per_million_tokens": None,
+        "context_window": None,
+        "strengths": ["photorealism", "style control", "commercial image workflows"],
+        "source_name": "LMArena image arena reference",
+        "source_url": "https://lmarena.ai/leaderboard/image",
+    },
+]
+
+
 def seed_hardware_specs(session: Session):
     from app.models import HardwareSpec
     for spec in HARDWARE_SPECS:
@@ -423,6 +522,18 @@ def seed_benchmarks(session: Session):
         session.commit()
 
 
+def seed_arena_models(session: Session):
+    from app.models import ArenaModel
+    for model in ARENA_MODELS:
+        existing = session.query(ArenaModel).filter_by(model_id=model["model_id"]).first()
+        if not existing:
+            session.add(ArenaModel(**model))
+        else:
+            for key, value in model.items():
+                setattr(existing, key, value)
+    session.commit()
+
+
 def run_seed():
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
@@ -437,6 +548,7 @@ def run_seed():
         seed_hardware_specs(session)
         seed_model_quality(session)
         seed_benchmarks(session)
+        seed_arena_models(session)
         print("Seed data loaded successfully.")
     finally:
         session.close()

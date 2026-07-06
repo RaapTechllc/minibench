@@ -26,6 +26,7 @@ from app.schemas import (
 )
 from app.seed import run_seed
 from app.agents_router import router as agents_router
+from app.arena_router import router as arena_router
 
 
 @asynccontextmanager
@@ -63,6 +64,8 @@ app.add_middleware(
 
 # Agent-benchmark product (additive; separate router + tables).
 app.include_router(agents_router)
+# Arena-style public model leaderboard + voting.
+app.include_router(arena_router)
 
 
 def compute_hei(tokens_per_second: Decimal, model_quality_score: Optional[Decimal], hardware_price_usd: Optional[Decimal]) -> Optional[float]:

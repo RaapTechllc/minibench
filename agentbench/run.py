@@ -269,7 +269,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.publish:
         submit = to_agent_run_submit(summary, results, provider=args.provider)
-        published = publish_run(args.publish, submit)
+        try:
+            published = publish_run(args.publish, submit)
+        except RuntimeError as exc:
+            print(f"Error publishing run: {exc}", file=sys.stderr)
+            return 1
         print(f"Published run_id={published.get('run_id')} to {args.publish}")
 
     return 0

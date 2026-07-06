@@ -257,3 +257,44 @@ class KnownModelResponse(BaseModel):
     benchmarked: bool
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+# ─── Arena dashboard + voting schemas ─────────────────────────────────────────
+
+
+class ArenaModelResponse(BaseModel):
+    id: int
+    model_id: str
+    display_name: str
+    provider: str
+    modality: str
+    task_tags: list[str]
+    arena_rank: Optional[int] = None
+    arena_score: Optional[Decimal] = None
+    intelligence_index: Optional[Decimal] = None
+    output_speed_tps: Optional[Decimal] = None
+    cost_per_million_tokens: Optional[Decimal] = None
+    context_window: Optional[int] = None
+    strengths: list[str]
+    source_name: str
+    source_url: str
+    updated_at: datetime
+    vote_count: int = 0
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
+class ArenaVoteSubmit(BaseModel):
+    task: str = Field(..., min_length=2, max_length=64)
+    model_id: str = Field(..., min_length=2, max_length=160)
+
+    model_config = ConfigDict(protected_namespaces=())
+
+
+class ArenaVoteResponse(BaseModel):
+    task: str
+    model_id: str
+    vote_count: int
+    accepted: bool
+
+    model_config = ConfigDict(protected_namespaces=())

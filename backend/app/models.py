@@ -173,3 +173,48 @@ class KnownModel(Base):
     prompt_price = Column(Numeric(12, 8))
     completion_price = Column(Numeric(12, 8))
     benchmarked = Column(Boolean, nullable=False, default=False)
+
+
+class ArenaModel(Base):
+    """Public model catalog for the Arena-style dashboard.
+
+    This is distinct from local hardware runs. Rows are sourced from external
+    leaderboard/market references plus MiniBench's own task taxonomy, then used
+    as the voting surface for real user preference data.
+    """
+
+    __tablename__ = "arena_models"
+    __table_args__ = (UniqueConstraint("model_id", name="uq_arena_model"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    model_id = Column(String(160), nullable=False)
+    display_name = Column(String(160), nullable=False)
+    provider = Column(String(64), nullable=False)
+    modality = Column(String(32), nullable=False, default="text")  # text, image, multimodal, agent
+    task_tags = Column(JSONB, nullable=False, default=list)
+    arena_rank = Column(Integer)
+    arena_score = Column(Numeric(8, 2))
+    intelligence_index = Column(Numeric(8, 2))
+    output_speed_tps = Column(Numeric(8, 2))
+    cost_per_million_tokens = Column(Numeric(10, 4))
+    context_window = Column(Integer)
+    strengths = Column(JSONB, nullable=False, default=list)
+    source_name = Column(String(96), nullable=False)
+    source_url = Column(Text, nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ArenaVote(Base):
+    """Anonymous per-task model preference vote.
+
+    Until proper accounts exist, the API de-dupes one vote per task/model/IP hash.
+    """
+
+    __tablename__ = "arena_votes"
+    __table_args__ = (UniqueConstraint("task", "model_id", "ip_hash", name="uq_arena_vote_once"),)
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    task = Column(String(64), nullable=False)
+    model_id = Column(String(160), ForeignKey("arena_models.model_id"), nullable=False)
+    ip_hash = Column(String(64), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

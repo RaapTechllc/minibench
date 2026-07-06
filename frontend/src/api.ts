@@ -119,20 +119,51 @@ export interface KnownModel {
   benchmarked: boolean;
 }
 
-async function fetchJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
+export interface ArenaModel {
+  id: number;
+  model_id: string;
+  display_name: string;
+  provider: string;
+  modality: string;
+  task_tags: string[];
+  arena_rank: number | null;
+  arena_score: number | null;
+  intelligence_index: number | null;
+  output_speed_tps: number | null;
+  cost_per_million_tokens: number | null;
+  context_window: number | null;
+  strengths: string[];
+  source_name: string;
+  source_url: string;
+  updated_at: string;
+  vote_count: number;
+}
+
+export interface ArenaVoteResponse {
+  task: string;
+  model_id: string;
+  vote_count: number;
+  accepted: boolean;
+}
+
+async function fetchJSON<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, init);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
 
 export const api = {
-  getBenchmarks: (params?: Record<string, string>) => {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  getBenchmarks: (params?: Record<string, string | number>) => {
+    const qs = params ? '?' + new URLSearchParams(
+      Object.entries(params).map(([k, v]) => [k, String(v)])
+    ).toString() : '';
     return fetchJSON<Benchmark[]>(`/api/v1/benchmarks${qs}`);
   },
   getBenchmark: (id: number) => fetchJSON<Benchmark>(`/api/v1/benchmarks/${id}`),
-  getLeaderboard: (params?: Record<string, string>) => {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  getLeaderboard: (params?: Record<string, string | number>) => {
+    const qs = params ? '?' + new URLSearchParams(
+      Object.entries(params).map(([k, v]) => [k, String(v)])
+    ).toString() : '';
     return fetchJSON<LeaderboardEntry[]>(`/api/v1/leaderboard${qs}`);
   },
   getHardware: () => fetchJSON<HardwareSpec[]>('/api/v1/hardware'),
@@ -140,9 +171,20 @@ export const api = {
     fetchJSON<{ a: Benchmark; b: Benchmark }>(`/api/v1/compare?a=${a}&b=${b}`),
   getStats: () => fetchJSON<Stats>('/api/v1/stats'),
   getModels: () => fetchJSON<ModelQuality[]>('/api/v1/models'),
-  getAgentLeaderboard: (params?: Record<string, string>) => {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+  getAgentLeaderboard: (params?: Record<string, string | number>) => {
+    const qs = params ? '?' + new URLSearchParams(
+      Object.entries(params).map(([k, v]) => [k, String(v)])
+    ).toString() : '';
     return fetchJSON<AgentLeaderboardEntry[]>(`/api/v1/agents/leaderboard${qs}`);
   },
   getNewModels: () => fetchJSON<KnownModel[]>('/api/v1/agents/models/new'),
+  getArenaModels: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return fetchJSON<ArenaModel[]>(`/api/v1/arena/models${qs}`);
+  },
+  voteArenaModel: (task: string, model_id: string) => fetchJSON<ArenaVoteResponse>('/api/v1/arena/votes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task, model_id }),
+  }),
 };
