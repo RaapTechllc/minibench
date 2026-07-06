@@ -10,6 +10,28 @@ _Lightweight state for `/audit` and `/goal`. Source-backed; keep it small._
   frontend `vite build` (tsc) ✓
 
 ## Delivered this run (slice)
+**Capability pivot, slices 1–5** (branch `cursor/capability-pivot-4ffb`,
+2026-07-06; spec in `docs/PIVOT-PLAN.md` — deliverable 1, for sign-off on the PR).
+- **Docs:** PIVOT-PLAN.md (defaults chosen for budget/provider/categories/
+  profiles; dictated model names resolved against the live OpenRouter feed) +
+  SPRINT-PLAN-FABLE5.md landed in docs/.
+- **W1:** `reference_profiles` table/seed/`GET /api/v1/profiles` + Hardware-page
+  "How we run models" panel — hardware demoted to the fixed test rig.
+- **W2:** `agentbench/catalog.py` → committed
+  `backend/app/data/known_models_seed.json` (42 pinned ids, family/license/
+  snapshot_date columns added to known_models). Yi/InternLM absent from the
+  feed, recorded not invented.
+- **W3:** `minibench_gen.py` (procedural, computed gold, canary; committed dev
+  slice `tasks/minibench-core-v1.json`, seed 20260706), `single: true` config
+  mode + `run.py --model`, `cost_check.py` budget guard ($3.14 est. worst case
+  vs $5 budget), CI dry-run + budget steps.
+- **W4:** `GET /api/v1/agents/models/leaderboard` (best single-model run per
+  model, catalog join, per-category pass rates, Pareto) + Models page + nav.
+- Verified end-to-end: fresh seed → publish dry run via `run.py --model
+  --publish` → model leaderboard row with catalog join → Models page rendering.
+- Gates: backend 26/26 · agentbench 60/60 · frontend lint/test(12)/build green.
+
+## Delivered previously (slice)
 **Manual submission form on `/submit`** (branch
 `cursor/manual-submit-form-4ffb`, 2026-07-06). TSD §6 — the page now offers
 CLI instructions *and* a form.

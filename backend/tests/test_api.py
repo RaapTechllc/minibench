@@ -51,6 +51,19 @@ def test_hardware_sorted_by_bandwidth_desc(client):
     assert bandwidths == sorted(bandwidths, reverse=True)
 
 
+def test_reference_profiles_seeded_and_pinned(client):
+    profiles = client.get("/api/v1/profiles").json()
+    keys = [p["profile_key"] for p in profiles]
+    assert keys == ["consumer-gpu-24gb", "apple-unified-32gb", "cpu-only-mini-pc", "provider-api"]
+    by_key = {p["profile_key"]: p for p in profiles}
+    # Local profiles pin an engine + quantization; the API profile pins neither.
+    assert by_key["consumer-gpu-24gb"]["quantization"] == "Q4_K_M"
+    assert by_key["apple-unified-32gb"]["engine"] == "MLX"
+    assert by_key["provider-api"]["engine"] is None
+    # Every profile documents why it's the official setting.
+    assert all(p["description"] for p in profiles)
+
+
 def test_list_benchmarks_total_count_header(client):
     resp = client.get("/api/v1/benchmarks")
     assert resp.status_code == 200

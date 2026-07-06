@@ -1,14 +1,48 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import type { HardwareSpec } from '../api';
+import type { HardwareSpec, ReferenceProfile } from '../api';
 import BandwidthBadge from '../components/BandwidthBadge';
+
+function ProfileCard({ p }: { p: ReferenceProfile }) {
+  const pins: [string, string | number | null][] = [
+    ['Engine', p.engine ?? 'provider-served'],
+    ['Quant', p.quantization ?? 'provider-served'],
+    ['Context', p.context_length],
+    ['Temp', p.temperature],
+    ['Max tokens', p.max_tokens],
+  ];
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-white font-semibold">{p.display_name}</h3>
+        <code className="text-xs text-cyan-400">{p.profile_key}</code>
+      </div>
+      {p.representative_system && (
+        <p className="text-xs text-gray-500 mt-0.5">Reference rig: {p.representative_system}</p>
+      )}
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-sm">
+        {pins.map(([label, value]) => (
+          <div key={label} className="flex justify-between gap-2">
+            <dt className="text-gray-500">{label}</dt>
+            <dd className="text-gray-200">{value ?? '—'}</dd>
+          </div>
+        ))}
+      </dl>
+      {p.description && <p className="text-xs text-gray-400 mt-3">{p.description}</p>}
+    </div>
+  );
+}
 
 export default function Hardware() {
   const [specs, setSpecs] = useState<HardwareSpec[]>([]);
+  const [profiles, setProfiles] = useState<ReferenceProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getHardware().then(setSpecs).finally(() => setLoading(false));
+    Promise.all([
+      api.getHardware().then(setSpecs),
+      api.getReferenceProfiles().then(setProfiles).catch(() => setProfiles([])),
+    ]).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="text-center py-20 text-gray-400">Loading...</div>;
@@ -16,9 +50,19 @@ export default function Hardware() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white">Hardware Database</h1>
-        <p className="text-gray-400 mt-1">Known hardware specs sorted by memory bandwidth (the critical metric for LLM inference).</p>
+        <h1 className="text-3xl font-bold text-white">Hardware &amp; Reference Profiles</h1>
+        <p className="text-gray-400 mt-1">Hardware is the test rig, not the competition: models are benchmarked on a fixed reference profile so capability numbers are comparable.</p>
       </div>
+
+      {profiles.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-white mb-1">How we run models</h2>
+          <p className="text-sm text-gray-400 mb-3">One official, pinned configuration per profile. A benchmark result always names the profile it ran on.</p>
+          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {profiles.map(p => <ProfileCard key={p.id} p={p} />)}
+          </div>
+        </div>
+      )}
 
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-x-auto">
         <table className="w-full text-sm text-left">

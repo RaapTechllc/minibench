@@ -100,6 +100,23 @@ class HardwareSpecResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
+class ReferenceProfileResponse(BaseModel):
+    id: int
+    profile_key: str
+    display_name: str
+    description: Optional[str] = None
+    engine: Optional[str] = None
+    engine_version_min: Optional[str] = None
+    quantization: Optional[str] = None
+    context_length: Optional[int] = None
+    temperature: Optional[Decimal] = None
+    top_p: Optional[Decimal] = None
+    max_tokens: Optional[int] = None
+    representative_system: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+
 class ModelQualityResponse(BaseModel):
     id: int
     model_family: str
@@ -233,6 +250,37 @@ class AgentLeaderboardEntry(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
 
+class ModelLeaderboardEntry(BaseModel):
+    """Best published single-model run per model string (the capability axis)."""
+
+    rank: int
+    model_string: str                      # e.g. openrouter/moonshotai/kimi-k2.7-code
+    run_id: UUID
+    benchmark_suite: str
+    provider: Optional[str] = None
+    # Catalog annotations (joined from known_models when the id matches)
+    display_name: Optional[str] = None
+    family: Optional[str] = None
+    license: Optional[str] = None
+    prompt_price: Optional[Decimal] = None
+    completion_price: Optional[Decimal] = None
+    # Run metrics
+    n_tasks: int
+    n_trials: int
+    pass_rate: Decimal
+    pass_hat_k: Optional[Decimal] = None
+    ci95_low: Optional[Decimal] = None
+    ci95_high: Optional[Decimal] = None
+    cost_usd_per_task: Optional[Decimal] = None
+    latency_p50_ms: Optional[int] = None
+    latency_p95_ms: Optional[int] = None
+    submitted_at: datetime
+    category_pass_rates: dict[str, float] = Field(default_factory=dict)
+    on_pareto_frontier: bool = False
+
+    model_config = ConfigDict(protected_namespaces=())
+
+
 class AgentTaskResultResponse(BaseModel):
     task_id: str
     category: Optional[str] = None
@@ -259,5 +307,8 @@ class KnownModelResponse(BaseModel):
     prompt_price: Optional[Decimal] = None
     completion_price: Optional[Decimal] = None
     benchmarked: bool
+    family: Optional[str] = None
+    license: Optional[str] = None
+    snapshot_date: Optional[date] = None
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())

@@ -1,5 +1,5 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Cpu, BarChart3, GitCompare, Terminal, Database, Bot, Calculator } from 'lucide-react';
+import { Cpu, BarChart3, GitCompare, Terminal, Database, Bot, Calculator, Trophy } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
 import Compare from './pages/Compare';
@@ -9,9 +9,11 @@ import BenchmarkDetail from './pages/BenchmarkDetail';
 import Agents from './pages/Agents';
 import RunDetail from './pages/RunDetail';
 import MoaCalculator from './pages/MoaCalculator';
+import Models from './pages/Models';
 
 const NAV = [
   { path: '/', label: 'Dashboard', icon: BarChart3 },
+  { path: '/models', label: 'Models', icon: Trophy },
   { path: '/leaderboard', label: 'Leaderboard', icon: Cpu },
   { path: '/agents', label: 'Agents', icon: Bot },
   { path: '/compare', label: 'Compare', icon: GitCompare },
@@ -53,6 +55,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 py-6">
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/models" element={<Models />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/agents/runs/:runId" element={<RunDetail />} />

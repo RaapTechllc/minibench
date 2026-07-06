@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from agentbench.config import load_moa_config, MoAConfig
+from agentbench.config import load_moa_config, single_model_config, MoAConfig
 from agentbench.client import OpenAICompatClient
 from agentbench.grading import grade
 from agentbench.moa import MoAModel, MoAResult
@@ -221,7 +221,13 @@ def publish_run(api_url: str, payload: dict[str, Any]) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     _load_env_files()
     ap = argparse.ArgumentParser(description="Run a MoA config against a task suite.")
-    ap.add_argument("--config", required=True)
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--config", help="MoA preset YAML")
+    src.add_argument(
+        "--model",
+        help="score ONE model as one model string (e.g. openrouter/moonshotai/kimi-k2.7-code); "
+        "single call per prompt, no aggregator",
+    )
     ap.add_argument("--tasks", required=True)
     ap.add_argument("--trials", type=int, default=3)
     ap.add_argument("--provider", default="openrouter")
@@ -235,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = ap.parse_args(argv)
 
-    config = load_moa_config(args.config)
+    config = single_model_config(args.model) if args.model else load_moa_config(args.config)
     suite, tasks = load_tasks(args.tasks)
 
     if args.dry_run:
