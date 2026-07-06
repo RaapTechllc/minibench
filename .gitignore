@@ -14,3 +14,4 @@ build/
 benchmarks/results/
 agentbench/results/*.json
 !agentbench/results/moa-dev-our-coding-v2-live.json
+!agentbench/results/minibench-core-v1-*.json

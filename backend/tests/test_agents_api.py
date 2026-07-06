@@ -121,6 +121,22 @@ def test_model_leaderboard_best_run_per_model_with_catalog_join(client):
     assert entry["on_pareto_frontier"] is True
 
 
+def test_publish_flips_benchmarked_flag(client):
+    kimi = "openrouter/moonshotai/kimi-k2.7-code"
+    ids_before = {r["model_id"] for r in client.get("/api/v1/agents/models/new?limit=200").json()}
+    assert "moonshotai/kimi-k2.7-code" in ids_before
+
+    client.post("/api/v1/agents/runs", json=_run_payload(
+        benchmark_suite="minibench-core-v1",
+        moa_config={"name": "single-kimi", "self_moa": False, "models": [kimi]},
+    ))
+
+    ids_after = {r["model_id"] for r in client.get("/api/v1/agents/models/new?limit=200").json()}
+    assert "moonshotai/kimi-k2.7-code" not in ids_after
+    # Untouched catalog rows keep waiting for a run.
+    assert "xiaomi/mimo-v2.5" in ids_after
+
+
 def test_master_catalog_seeded_unbenchmarked(client):
     rows = client.get("/api/v1/agents/models/new").json()
     by_id = {r["model_id"]: r for r in rows}

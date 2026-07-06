@@ -93,6 +93,23 @@ async def submit_agent_run(data: AgentRunSubmit, db: AsyncSession = Depends(get_
                 raw_output_ref=r.raw_output_ref,
             )
         )
+    # A published run marks its models as benchmarked so they leave the
+    # "New — not yet benchmarked" panel. Model strings are provider-prefixed
+    # ("openrouter/<catalog id>"); the catalog stores (provider, model_id).
+    for model_string in (data.moa_config or {}).get("models", []):
+        provider, _, model_id = model_string.partition("/")
+        if not model_id:
+            continue
+        km = (
+            await db.execute(
+                select(KnownModel).where(
+                    KnownModel.provider == provider, KnownModel.model_id == model_id
+                )
+            )
+        ).scalars().first()
+        if km and not km.benchmarked:
+            km.benchmarked = True
+
     await db.commit()
     await db.refresh(run)
     return run
