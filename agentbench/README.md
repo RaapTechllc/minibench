@@ -26,7 +26,10 @@ result artifacts**.
 | `tracker.py` | Poll OpenRouter `/models`, diff against known ids → detect new launches. |
 | `run.py` | CLI: run a config against a task suite with N trials, grade, summarize, write a committable artifact. |
 | `presets/` | MoA configs: `moa-v1` (production), `moa-dev` (cheap testing), Self-MoA baselines. |
-| `tasks/` | `coding-v1` (smoke/CI), `coding-v2` (harder eval). |
+| `tasks/` | `coding-v1` (smoke/CI), `coding-v2` (harder eval), `minibench-core-v1` (canonical capability dev slice). |
+| `minibench_gen.py` | Procedural generator for `minibench-*` suites — computed gold, canary, committed dev slice (seed 20260706); private split regenerated with an uncommitted seed. |
+| `catalog.py` | Master model catalog: joins the strategic-family list against the live OpenRouter feed → `backend/app/data/known_models_seed.json`. |
+| `cost_check.py` | Budget guard: tasks x trials x tokens x price against the priciest catalog model must stay ≤ $5 (CI-enforced). |
 
 ## Running
 
@@ -50,6 +53,20 @@ Production eval (expensive 70B+ MoA, easy smoke tasks — use only when comparin
 export OPENROUTER_API_KEY=sk-or-...
 python -m agentbench.run --config agentbench/presets/moa-v1.yaml \
     --tasks agentbench/tasks/coding-v2.json --trials 5 --provider openrouter
+```
+
+Score one catalog model as one model string (single call per prompt, no aggregator):
+
+```bash
+python -m agentbench.run --model openrouter/moonshotai/kimi-k2.7-code \
+    --tasks agentbench/tasks/minibench-core-v1.json --trials 3 --provider openrouter
+```
+
+Regenerate the master catalog seed / check a suite budget:
+
+```bash
+python -m agentbench.catalog --fetch
+python -m agentbench.cost_check --tasks agentbench/tasks/minibench-core-v1.json --trials 3
 ```
 
 Tests:

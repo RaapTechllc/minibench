@@ -97,6 +97,11 @@ class MoAConfig:
     parallel: bool = True
     self_moa: bool = False
     self_moa_samples: int = 3
+    # single=True scores ONE model as one model string: exactly one proposer,
+    # one call per prompt, no aggregation round. This is how each catalog model
+    # gets a capability score (docs/PIVOT-PLAN.md W3) without paying for an
+    # aggregator call it doesn't need.
+    single: bool = False
 
     def __post_init__(self) -> None:
         if not self.name:
@@ -105,6 +110,16 @@ class MoAConfig:
             raise ConfigError(f"moa '{self.name}' has no proposers")
         if self.layers < 1:
             raise ConfigError(f"moa '{self.name}' layers must be >= 1")
+        if self.single:
+            if len(self.proposers) != 1:
+                raise ConfigError(
+                    f"moa '{self.name}' is single but has "
+                    f"{len(self.proposers)} proposers (need exactly 1)"
+                )
+            if self.self_moa:
+                raise ConfigError(f"moa '{self.name}' cannot be both single and self_moa")
+            if self.layers != 1:
+                raise ConfigError(f"moa '{self.name}' single mode requires layers=1")
         if self.self_moa:
             if len(self.proposers) != 1:
                 raise ConfigError(
@@ -132,9 +147,15 @@ class MoAConfig:
         proposers = d.get("proposers")
         if not isinstance(proposers, list) or not proposers:
             raise ConfigError("moa config needs a non-empty 'proposers' list")
+        single = bool(d.get("single", False))
         aggregator = d.get("aggregator")
         if not isinstance(aggregator, dict):
-            raise ConfigError("moa config needs an 'aggregator' mapping")
+            if single:
+                # Single mode never calls the aggregator; mirror the proposer so
+                # downstream code (models property, snapshot pinning) stays uniform.
+                aggregator = dict(proposers[0])
+            else:
+                raise ConfigError("moa config needs an 'aggregator' mapping")
         return MoAConfig(
             name=str(d.get("name", "")),
             proposers=tuple(ProposerConfig.from_dict(p) for p in proposers),
@@ -143,7 +164,22 @@ class MoAConfig:
             parallel=bool(d.get("parallel", True)),
             self_moa=bool(d.get("self_moa", False)),
             self_moa_samples=int(d.get("self_moa_samples", 3)),
+            single=single,
         )
+
+
+def single_model_config(model: str, *, temperature: float = 0.2, max_tokens: int = 1024) -> MoAConfig:
+    """Build the one-call config that scores ``model`` as one model string."""
+    slug = model.split("/")[-1]
+    return MoAConfig.from_dict(
+        {
+            "name": f"single-{slug}",
+            "single": True,
+            "proposers": [
+                {"model": model, "temperature": temperature, "max_tokens": max_tokens}
+            ],
+        }
+    )
 
 
 def load_moa_config(path: str | Path) -> MoAConfig:

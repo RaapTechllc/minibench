@@ -1,0 +1,213 @@
+{
+  "suite": "minibench-core-v1",
+  "notes": "Canonical capability minibenchmark, dev slice. Procedurally generated (agentbench.minibench_gen, seed 20260706); the private split uses an uncommitted seed. Budget: see agentbench/cost_check.py.",
+  "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN",
+  "generator_seed": 20260706,
+  "tasks": [
+    {
+      "id": "mb-reason-01",
+      "category": "reasoning",
+      "prompt": "A meeting starts at 06:26 and ends at 08:40 the same day. How many minutes long is it? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 134,
+        "tol": 1e-06
+      }
+    },
+    {
+      "id": "mb-reason-02",
+      "category": "reasoning",
+      "prompt": "An item costs $168. Add 5% tax, then apply a 10% discount to the taxed price. What is the final price in dollars, rounded to 2 decimal places? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 158.76,
+        "tol": 0.011
+      }
+    },
+    {
+      "id": "mb-reason-03",
+      "category": "reasoning",
+      "prompt": "An arithmetic sequence starts at 9 and increases by 5 each step. What is the 13th term (the first term is term 1)? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 69,
+        "tol": 1e-06
+      }
+    },
+    {
+      "id": "mb-reason-04",
+      "category": "reasoning",
+      "prompt": "A meeting starts at 11:19 and ends at 17:22 the same day. How many minutes long is it? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 363,
+        "tol": 1e-06
+      }
+    },
+    {
+      "id": "mb-reason-05",
+      "category": "reasoning",
+      "prompt": "An item costs $76. Add 12% tax, then apply a 15% discount to the taxed price. What is the final price in dollars, rounded to 2 decimal places? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 72.35,
+        "tol": 0.011
+      }
+    },
+    {
+      "id": "mb-struct-01",
+      "category": "tool-use",
+      "prompt": "Extract the order into JSON. Respond with ONLY a JSON object with keys `order_id` (string), `qty` (integer) and `total` (number, qty x unit price, rounded to 2 decimals). Text: 'Order #A1700: 16 units at $15.98 each, placed by Noah.'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "order_id": "A1700",
+          "qty": 16,
+          "total": 255.68
+        }
+      }
+    },
+    {
+      "id": "mb-struct-02",
+      "category": "tool-use",
+      "prompt": "Parse this log line. Respond with ONLY a JSON object with keys `level` (string, as written), `service` (string) and `code` (integer status code). Log line: '2026-07-01T12:25:00Z [ERROR] inventory: upstream returned 548'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "level": "ERROR",
+          "service": "inventory",
+          "code": 548
+        }
+      }
+    },
+    {
+      "id": "mb-struct-03",
+      "category": "tool-use",
+      "prompt": "Extract the order into JSON. Respond with ONLY a JSON object with keys `order_id` (string), `qty` (integer) and `total` (number, qty x unit price, rounded to 2 decimals). Text: 'Order #A7946: 17 units at $5.07 each, placed by Eli.'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "order_id": "A7946",
+          "qty": 17,
+          "total": 86.19
+        }
+      }
+    },
+    {
+      "id": "mb-struct-04",
+      "category": "tool-use",
+      "prompt": "Parse this log line. Respond with ONLY a JSON object with keys `level` (string, as written), `service` (string) and `code` (integer status code). Log line: '2026-07-01T12:52:00Z [INFO] search: upstream returned 472'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "level": "INFO",
+          "service": "search",
+          "code": 472
+        }
+      }
+    },
+    {
+      "id": "mb-struct-05",
+      "category": "tool-use",
+      "prompt": "Extract the order into JSON. Respond with ONLY a JSON object with keys `order_id` (string), `qty` (integer) and `total` (number, qty x unit price, rounded to 2 decimals). Text: 'Order #A8485: 14 units at $57.70 each, placed by Zoe.'",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "order_id": "A8485",
+          "qty": 14,
+          "total": 807.8
+        }
+      }
+    },
+    {
+      "id": "mb-format-01",
+      "category": "instruction",
+      "prompt": "Sort these words alphabetically and output them comma-separated (single line, lowercase, exactly `word, word, ...`), and nothing else: maple copper ember signal falcon quartz willow",
+      "verification": {
+        "type": "exact_match",
+        "expected": "copper, ember, falcon, maple, quartz, signal, willow"
+      }
+    },
+    {
+      "id": "mb-format-02",
+      "category": "instruction",
+      "prompt": "Remove duplicate words, keeping the FIRST occurrence of each, preserving order. Output the result as a single space-separated line and nothing else: violet thunder falcon meadow maple python harbor harbor maple violet",
+      "verification": {
+        "type": "exact_match",
+        "expected": "violet thunder falcon meadow maple python harbor"
+      }
+    },
+    {
+      "id": "mb-format-03",
+      "category": "instruction",
+      "prompt": "Sort these words alphabetically and output them comma-separated (single line, lowercase, exactly `word, word, ...`), and nothing else: violet python signal ember maple basil thunder quartz",
+      "verification": {
+        "type": "exact_match",
+        "expected": "basil, ember, maple, python, quartz, signal, thunder, violet"
+      }
+    },
+    {
+      "id": "mb-format-04",
+      "category": "instruction",
+      "prompt": "Remove duplicate words, keeping the FIRST occurrence of each, preserving order. Output the result as a single space-separated line and nothing else: basil willow maple falcon indigo quartz thunder indigo maple basil",
+      "verification": {
+        "type": "exact_match",
+        "expected": "basil willow maple falcon indigo quartz thunder"
+      }
+    },
+    {
+      "id": "mb-format-05",
+      "category": "instruction",
+      "prompt": "Sort these words alphabetically and output them comma-separated (single line, lowercase, exactly `word, word, ...`), and nothing else: thunder indigo python willow copper signal ember",
+      "verification": {
+        "type": "exact_match",
+        "expected": "copper, ember, indigo, python, signal, thunder, willow"
+      }
+    },
+    {
+      "id": "mb-code-01",
+      "category": "coding",
+      "prompt": "Write a Python function `digit_sum(n)` returning the sum of the decimal digits of the integer n (ignore any sign). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import digit_sum\n\ndef test_values():\n    assert digit_sum(536477) == 32\n    assert digit_sum(116981) == 26\n    assert digit_sum(179295) == 33\n    assert digit_sum(65379) == 30\ndef test_negative():\n    assert digit_sum(-536477) == 32\n"
+      }
+    },
+    {
+      "id": "mb-code-02",
+      "category": "coding",
+      "prompt": "Write a Python function `rle(s)` that run-length encodes a string: each maximal run of a repeated character becomes the character followed by the run length (e.g. 'aab' -> 'a2b1'). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import rle\n\ndef test_values():\n    assert rle('bcacccbcbb') == 'b1c1a1c3b1c1b2'\n    assert rle('bcccb') == 'b1c3b1'\n    assert rle('abcacaaab') == 'a1b1c1a1c1a3b1'\n    assert rle('cbca') == 'c1b1c1a1'\ndef test_empty():\n    assert rle('') == ''\n"
+      }
+    },
+    {
+      "id": "mb-code-03",
+      "category": "coding",
+      "prompt": "Write a Python function `digit_sum(n)` returning the sum of the decimal digits of the integer n (ignore any sign). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import digit_sum\n\ndef test_values():\n    assert digit_sum(297739) == 37\n    assert digit_sum(813946) == 31\n    assert digit_sum(554468) == 32\n    assert digit_sum(865282) == 31\ndef test_negative():\n    assert digit_sum(-297739) == 37\n"
+      }
+    },
+    {
+      "id": "mb-code-04",
+      "category": "coding",
+      "prompt": "Write a Python function `rle(s)` that run-length encodes a string: each maximal run of a repeated character becomes the character followed by the run length (e.g. 'aab' -> 'a2b1'). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import rle\n\ndef test_values():\n    assert rle('cbbcbba') == 'c1b2c1b2a1'\n    assert rle('cccccba') == 'c5b1a1'\n    assert rle('abaabaca') == 'a1b1a2b1a1c1a1'\n    assert rle('bcabbbbb') == 'b1c1a1b5'\ndef test_empty():\n    assert rle('') == ''\n"
+      }
+    },
+    {
+      "id": "mb-code-05",
+      "category": "coding",
+      "prompt": "Write a Python function `digit_sum(n)` returning the sum of the decimal digits of the integer n (ignore any sign). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import digit_sum\n\ndef test_values():\n    assert digit_sum(421560) == 18\n    assert digit_sum(574075) == 28\n    assert digit_sum(4664) == 20\n    assert digit_sum(846700) == 25\ndef test_negative():\n    assert digit_sum(-421560) == 18\n"
+      }
+    }
+  ]
+}

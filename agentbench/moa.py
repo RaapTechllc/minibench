@@ -108,6 +108,20 @@ class MoAModel:
 
     # ── public API ────────────────────────────────────────────────────────────
     def generate(self, prompt: str) -> MoAResult:
+        if self.config.single:
+            # One model, one call — no aggregation round to pay for.
+            call = self._run_proposer(self.config.proposers[0], prompt, None)
+            cost, prompt_tok, completion_tok = _aggregate_usage([call])
+            return MoAResult(
+                text=call.text,
+                cost_usd=cost,
+                prompt_tokens=prompt_tok,
+                completion_tokens=completion_tok,
+                latency_ms=call.latency_ms,
+                n_calls=1,
+                proposer_texts=[call.text],
+            )
+
         all_calls: list[ChatResult] = []
         prior: str | None = None
         last_proposer_texts: list[str] = []

@@ -66,6 +66,16 @@ jobs:
             --config agentbench/presets/moa-v1.yaml \
             --tasks agentbench/tasks/coding-v1.json \
             --trials 2 --dry-run --out /tmp/dryrun.json
+      - name: Minibench dry-run smoke (single-model path + suite validity)
+        run: |
+          python -m agentbench.run \
+            --model openrouter/moonshotai/kimi-k2.7-code \
+            --tasks agentbench/tasks/minibench-core-v1.json \
+            --trials 1 --dry-run --out /tmp/mb-dryrun.json
+      - name: Minibench cost budget guard
+        run: |
+          python -m agentbench.cost_check \
+            --tasks agentbench/tasks/minibench-core-v1.json --trials 3
       - name: benchmarks/ preset-drift guard
         run: |
           pip install pyyaml pytest

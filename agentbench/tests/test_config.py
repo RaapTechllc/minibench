@@ -5,7 +5,35 @@ from agentbench.config import (
     ConfigError,
     MoAConfig,
     load_moa_config,
+    single_model_config,
 )
+
+
+def test_single_model_config_one_call_shape():
+    cfg = single_model_config("openrouter/moonshotai/kimi-k2.7-code")
+    assert cfg.single is True
+    assert len(cfg.proposers) == 1
+    assert cfg.models == ["openrouter/moonshotai/kimi-k2.7-code"]
+    assert cfg.name == "single-kimi-k2.7-code"
+
+
+def test_single_rejects_multiple_proposers():
+    with pytest.raises(ConfigError, match="single"):
+        MoAConfig.from_dict({
+            "name": "bad",
+            "single": True,
+            "proposers": [{"model": "a"}, {"model": "b"}],
+        })
+
+
+def test_single_rejects_self_moa_combo():
+    with pytest.raises(ConfigError, match="single"):
+        MoAConfig.from_dict({
+            "name": "bad",
+            "single": True,
+            "self_moa": True,
+            "proposers": [{"model": "a"}],
+        })
 from agentbench.resources import MOA_V1, MOA_DEV, SELF_MOA, CODING_V1, CODING_V2
 
 

@@ -37,6 +37,26 @@ def test_moa_calls_all_proposers_then_aggregator():
     assert result.text == "resp-agg"
 
 
+def test_single_mode_makes_exactly_one_call():
+    seen = []
+
+    def responder(payload):
+        seen.append(payload["model"])
+        return "the answer", {"prompt_tokens": 12, "completion_tokens": 7, "cost": 0.0005}
+
+    cfg = MoAConfig.from_dict({
+        "name": "single-x",
+        "single": True,
+        "proposers": [{"model": "solo"}],
+    })
+    result = MoAModel(cfg, _client(FakeTransport(responder=responder))).generate("q")
+
+    assert seen == ["solo"]  # no aggregator round
+    assert result.n_calls == 1
+    assert result.text == "the answer"
+    assert result.prompt_tokens == 12 and result.completion_tokens == 7
+
+
 def test_moa_rolls_up_cost_and_tokens():
     def responder(payload):
         return "x", {"prompt_tokens": 10, "completion_tokens": 5, "cost": 0.002}
