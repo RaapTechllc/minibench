@@ -51,6 +51,27 @@ def test_hardware_sorted_by_bandwidth_desc(client):
     assert bandwidths == sorted(bandwidths, reverse=True)
 
 
+def test_list_benchmarks_total_count_header(client):
+    resp = client.get("/api/v1/benchmarks")
+    assert resp.status_code == 200
+    assert resp.headers["X-Total-Count"] == "8"
+    assert len(resp.json()) == 8
+
+
+def test_list_benchmarks_total_count_ignores_pagination(client):
+    resp = client.get("/api/v1/benchmarks", params={"limit": 3, "offset": 2})
+    assert resp.headers["X-Total-Count"] == "8"
+    assert len(resp.json()) == 3
+
+
+def test_list_benchmarks_total_count_respects_filters(client):
+    resp = client.get("/api/v1/benchmarks", params={"model": "Llama-3", "limit": 2})
+    body = resp.json()
+    assert resp.headers["X-Total-Count"] == "4"
+    assert len(body) == 2
+    assert all("Llama-3" in b["model_name"] for b in body)
+
+
 def test_submit_valid_autofills_quality_and_hei(client):
     resp = client.post("/api/v1/submit", json=_valid_payload())
     assert resp.status_code == 200

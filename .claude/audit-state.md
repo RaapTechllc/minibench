@@ -10,6 +10,18 @@ _Lightweight state for `/audit` and `/goal`. Source-backed; keep it small._
   frontend `vite build` (tsc) ✓
 
 ## Delivered this run (slice)
+**Pagination metadata for `GET /api/v1/benchmarks`** (branch
+`cursor/benchmarks-total-count-4ffb`, 2026-07-06).
+- `X-Total-Count` response header carries the filtered total (count query runs
+  the same filters, before offset/limit); exposed via CORS `expose_headers`.
+- Non-breaking: body stays `list[BenchmarkResponse]`; frontend untouched.
+- 3 new tests in `backend/tests/test_api.py` (first coverage for the list
+  endpoint): header equals seed total, unaffected by limit/offset, tracks
+  filters. Backend suite 23/23 locally.
+- Documented in README API table. Header (vs body envelope) chosen so existing
+  clients keep working; per SPRINT-PLAN-FABLE5 Theme A.
+
+## Delivered previously (slice)
 **Benchmark detail page.**
 - New `frontend/src/pages/BenchmarkDetail.tsx` at route `/benchmarks/:id`
   (registered in `App.tsx`) — full single-benchmark breakdown; reuses
@@ -32,8 +44,6 @@ _Lightweight state for `/audit` and `/goal`. Source-backed; keep it small._
 ## Open / deferred (from project spec, not yet built)
 - **Manual submission form** on `/submit` (TSD §6) — form → `POST
   /api/v1/submit`.
-- **Pagination metadata** for `GET /api/v1/benchmarks` (TSD §4 "paginated") —
-  e.g. an `X-Total-Count` header so clients can paginate.
 - **Optimized-inference tracking** (TSD §7): `effective_model_size_gb` vs raw,
   "optimized only" filter — larger, touches the data model.
 - **Frontend test runner** (Vitest + React Testing Library) — the FE currently

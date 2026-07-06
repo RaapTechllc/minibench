@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import FastAPI, Depends, HTTPException, Query, Request
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -59,6 +59,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count"],
 )
 
 # Agent-benchmark product (additive; separate router + tables).
@@ -181,6 +182,7 @@ async def submit_benchmark(data: BenchmarkSubmit, request: Request, db: AsyncSes
 
 @app.get("/api/v1/benchmarks", response_model=list[BenchmarkResponse])
 async def list_benchmarks(
+    response: Response,
     model: Optional[str] = None,
     quantization: Optional[str] = None,
     system_type: Optional[str] = None,
@@ -191,19 +193,29 @@ async def list_benchmarks(
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
-    q = select(Benchmark)
+    conditions = []
     if model:
-        q = q.where(Benchmark.model_name.ilike(f"%{model}%"))
+        conditions.append(Benchmark.model_name.ilike(f"%{model}%"))
     if quantization:
-        q = q.where(Benchmark.quantization == quantization)
+        conditions.append(Benchmark.quantization == quantization)
     if system_type:
-        q = q.where(Benchmark.system_type.ilike(f"%{system_type}%"))
+        conditions.append(Benchmark.system_type.ilike(f"%{system_type}%"))
     if engine:
-        q = q.where(Benchmark.inference_engine.ilike(f"%{engine}%"))
+        conditions.append(Benchmark.inference_engine.ilike(f"%{engine}%"))
+
+    total = await db.scalar(
+        select(func.count()).select_from(Benchmark).where(*conditions)
+    )
+    response.headers["X-Total-Count"] = str(total)
 
     col = getattr(Benchmark, sort_by)
-    q = q.order_by(col.desc() if order == "desc" else col.asc())
-    q = q.offset(offset).limit(limit)
+    q = (
+        select(Benchmark)
+        .where(*conditions)
+        .order_by(col.desc() if order == "desc" else col.asc())
+        .offset(offset)
+        .limit(limit)
+    )
 
     result = await db.execute(q)
     benchmarks = result.scalars().all()
