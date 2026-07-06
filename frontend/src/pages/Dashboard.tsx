@@ -35,12 +35,12 @@ const REFERENCES = [
   },
 ];
 
-export function fmtNum(v: number | null | undefined, suffix = '') {
+function fmtNum(v: number | null | undefined, suffix = '') {
   if (v == null) return '—';
   return `${Number(v).toLocaleString()}${suffix}`;
 }
 
-export function fmtCost(v: number | null) {
+function fmtCost(v: number | null) {
   if (v == null) return '—';
   return `$${Number(v).toFixed(v < 1 ? 3 : 2)}`;
 }
