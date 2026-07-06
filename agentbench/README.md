@@ -26,7 +26,7 @@ result artifacts**.
 | `tracker.py` | Poll OpenRouter `/models`, diff against known ids → detect new launches. |
 | `run.py` | CLI: run a config against a task suite with N trials, grade, summarize, write a committable artifact. |
 | `presets/` | MoA configs: `moa-v1` (production), `moa-dev` (cheap testing), Self-MoA baselines. |
-| `tasks/` | `coding-v1` (smoke/CI), `coding-v2` (harder eval). |
+| `tasks/` | `coding-v1` (smoke/CI), `coding-v2` (harder eval), `real-world-v1` (cross-domain knowledge-work suite). |
 
 ## Running
 
@@ -43,6 +43,26 @@ Cheap live testing (7B-class models, harder tasks — expect <100% pass rate):
 python -m agentbench.run --config agentbench/presets/moa-dev.yaml \
     --tasks agentbench/tasks/coding-v2.json --trials 2 --provider openrouter
 ```
+
+Real-world suite (proprietary cross-domain tasks — the recommended "which model for the job" eval):
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+# A single frontier model is usually enough here — the suite is objective, not MoA-specific.
+python -m agentbench.run --config agentbench/presets/self-moa-baseline.yaml \
+    --tasks agentbench/tasks/real-world-v1.json --trials 5 --provider openrouter
+```
+
+`real-world-v1` is 11 tasks across data extraction, structured transforms, business
+routing, careful reading, practical reasoning, and utility code — the work people
+actually pay LLMs to do. Every task is graded by an **executable oracle** (no
+LLM-as-judge), so it is cheap to run and deterministic. To check that a model's
+number is stable and not a lucky sample, run several trials and read the reported
+`pass_rate_ci95` (Wilson interval) and `pass_hat_k` (consistency across trials): a
+tight CI and a `pass_hat_k` close to `pass_rate` mean the result reproduces. Rerun
+the same command and the two runs should agree within the interval — if they don't,
+distrust the number before you publish it. `tests/test_real_world_suite.py` proves
+in CI that every oracle passes its gold answer and fails a plausible-but-wrong one.
 
 Production eval (expensive 70B+ MoA, easy smoke tasks — use only when comparing top configs):
 
