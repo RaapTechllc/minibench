@@ -90,3 +90,20 @@ def test_new_models_lists_only_unbenchmarked(client, seed_known_models):
     ids = {r["model_id"] for r in rows}
     assert "openrouter/new/model-a" in ids
     assert "openrouter/old/benchmarked" not in ids
+
+
+def test_leaderboard_surfaces_models_and_snapshot_date(client):
+    client.post("/api/v1/agents/runs", json=_run_payload(
+        moa_config={"name": "moa-v1", "self_moa": False, "models": ["a", "b", "c"]},
+        model_snapshot_date="2026-06-15",
+    ))
+    board = client.get("/api/v1/agents/leaderboard").json()
+    assert board[0]["models"] == ["a", "b", "c"]
+    assert board[0]["model_snapshot_date"] == "2026-06-15"
+
+
+def test_leaderboard_models_defaults_empty_when_absent(client):
+    client.post("/api/v1/agents/runs", json=_run_payload(moa_config=None))
+    board = client.get("/api/v1/agents/leaderboard").json()
+    assert board[0]["models"] == []
+    assert board[0]["model_snapshot_date"] is None

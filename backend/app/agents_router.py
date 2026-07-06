@@ -142,6 +142,8 @@ async def agent_leaderboard(
                 run_id=r.run_id,
                 config_name=cfg.get("name"),
                 self_moa=bool(cfg.get("self_moa", False)),
+                models=list(cfg.get("models", [])),
+                model_snapshot_date=r.model_snapshot_date,
                 benchmark_suite=r.benchmark_suite,
                 provider=r.provider,
                 n_tasks=r.n_tasks,
