@@ -161,12 +161,39 @@ async function fetchJSON<T>(path: string): Promise<T> {
   return res.json();
 }
 
+async function postJSON<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    // FastAPI errors carry a `detail` — a string for HTTPException,
+    // a list of {loc, msg} for 422 validation errors.
+    let message = `API error: ${res.status}`;
+    try {
+      const data = await res.json();
+      if (typeof data.detail === 'string') {
+        message = data.detail;
+      } else if (Array.isArray(data.detail)) {
+        message = data.detail
+          .map((d: { loc?: (string | number)[]; msg: string }) =>
+            `${(d.loc ?? []).slice(1).join('.')}: ${d.msg}`)
+          .join('; ');
+      }
+    } catch { /* keep generic message */ }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
 export const api = {
   getBenchmarks: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return fetchJSON<Benchmark[]>(`/api/v1/benchmarks${qs}`);
   },
   getBenchmark: (id: number) => fetchJSON<Benchmark>(`/api/v1/benchmarks/${id}`),
+  submitBenchmark: (payload: unknown) => postJSON<Benchmark>('/api/v1/submit', payload),
   getLeaderboard: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return fetchJSON<LeaderboardEntry[]>(`/api/v1/leaderboard${qs}`);
