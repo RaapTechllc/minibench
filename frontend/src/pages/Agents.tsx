@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Trophy, Zap, DollarSign, Gem } from 'lucide-react';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -16,7 +18,10 @@ interface ParetoPoint {
 
 function fmtCost(v: number | null): string {
   if (v == null) return '—';
-  return v < 0.01 ? `$${v.toFixed(4)}` : `$${v.toFixed(3)}`;
+  // Decimal fields serialize as JSON strings (pydantic), not numbers — coerce
+  // before formatting or .toFixed() throws on a string at render time.
+  const n = Number(v);
+  return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(3)}`;
 }
 
 function fmtPct(v: number | null): string {
@@ -45,6 +50,72 @@ function FrontierDot({ cx, cy, payload }: FrontierDotProps) {
   );
 }
 
+// PinchBench-style "quick pick" badges — computed client-side off the same
+// leaderboard data, so a viewer gets an instant recommendation without reading
+// the whole table. Only entries with a cost figure count for cost/value picks.
+interface QuickPick {
+  label: string;
+  entry: AgentLeaderboardEntry;
+  detail: string;
+  icon: typeof Trophy;
+  color: string;
+}
+
+function computeQuickPicks(entries: AgentLeaderboardEntry[]): QuickPick[] {
+  if (entries.length === 0) return [];
+  const priced = entries.filter(e => e.cost_usd_per_task != null);
+  const picks: QuickPick[] = [];
+
+  const mostAccurate = [...entries].sort((a, b) => Number(b.pass_rate) - Number(a.pass_rate))[0];
+  picks.push({
+    label: 'Highest accuracy',
+    entry: mostAccurate,
+    detail: fmtPct(mostAccurate.pass_rate),
+    icon: Trophy,
+    color: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/25',
+  });
+
+  const withLatency = entries.filter(e => e.latency_p50_ms != null);
+  if (withLatency.length > 0) {
+    const fastest = [...withLatency].sort((a, b) => (a.latency_p50_ms ?? 0) - (b.latency_p50_ms ?? 0))[0];
+    picks.push({
+      label: 'Fastest',
+      entry: fastest,
+      detail: `${fastest.latency_p50_ms}ms p50`,
+      icon: Zap,
+      color: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/25',
+    });
+  }
+
+  if (priced.length > 0) {
+    const cheapest = [...priced].sort((a, b) => (a.cost_usd_per_task ?? 0) - (b.cost_usd_per_task ?? 0))[0];
+    picks.push({
+      label: 'Cheapest',
+      entry: cheapest,
+      detail: fmtCost(cheapest.cost_usd_per_task),
+      icon: DollarSign,
+      color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/25',
+    });
+
+    // Value = accuracy per dollar. Guards against a free/near-zero-cost entry
+    // dominating by division blow-up.
+    const bestValue = [...priced].sort((a, b) => {
+      const va = Number(a.pass_rate) / Math.max(Number(a.cost_usd_per_task), 1e-6);
+      const vb = Number(b.pass_rate) / Math.max(Number(b.cost_usd_per_task), 1e-6);
+      return vb - va;
+    })[0];
+    picks.push({
+      label: 'Best value',
+      entry: bestValue,
+      detail: `${fmtPct(bestValue.pass_rate)} @ ${fmtCost(bestValue.cost_usd_per_task)}`,
+      icon: Gem,
+      color: 'text-purple-400 bg-purple-400/10 border-purple-400/25',
+    });
+  }
+
+  return picks;
+}
+
 export default function Agents() {
   const [entries, setEntries] = useState<AgentLeaderboardEntry[]>([]);
   const [newModels, setNewModels] = useState<KnownModel[]>([]);
@@ -71,6 +142,8 @@ export default function Agents() {
       self_moa: e.self_moa,
     }));
 
+  const quickPicks = computeQuickPicks(entries);
+
   return (
     <div className="space-y-6">
       <div>
@@ -90,6 +163,27 @@ export default function Agents() {
             {newModels.slice(0, 5).map(m => m.display_name || m.model_id).join(', ')}
             {newModels.length > 5 ? ` +${newModels.length - 5} more` : ''}
           </span>
+        </div>
+      )}
+
+      {quickPicks.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {quickPicks.map(({ label, entry, detail, icon: Icon, color }) => (
+            <Link
+              key={label}
+              to={`/agents/runs/${entry.run_id}`}
+              className={`rounded-xl border p-3 flex items-start gap-2.5 hover:opacity-90 transition-opacity ${color}`}
+            >
+              <Icon className="w-5 h-5 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <div className="text-xs uppercase tracking-wide opacity-80">{label}</div>
+                <div className="text-white font-semibold text-sm truncate">
+                  {entry.config_name ?? entry.run_id.slice(0, 8)}
+                </div>
+                <div className="text-xs opacity-90">{detail}</div>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
 
@@ -198,9 +292,12 @@ export default function Agents() {
                   <td className="p-3 text-gray-500 font-mono text-sm">#{e.rank}</td>
                   <td className="p-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-white font-medium whitespace-nowrap">
+                      <Link
+                        to={`/agents/runs/${e.run_id}`}
+                        className="text-white font-medium whitespace-nowrap hover:text-cyan-400 transition-colors"
+                      >
                         {e.config_name ?? e.run_id.slice(0, 8)}
-                      </span>
+                      </Link>
                       {e.self_moa && (
                         <span className="text-xs text-purple-400 bg-purple-400/10 border border-purple-400/25 rounded px-1.5 py-0.5">
                           Self-MoA
@@ -212,6 +309,9 @@ export default function Agents() {
                         </span>
                       )}
                     </div>
+                    {e.model_snapshot_date && (
+                      <div className="text-xs text-gray-600 mt-0.5">snapshot {e.model_snapshot_date}</div>
+                    )}
                   </td>
                   <td className="p-3 text-gray-400 text-xs whitespace-nowrap">{e.benchmark_suite}</td>
                   <td className="p-3 text-gray-400 text-xs whitespace-nowrap">{e.provider ?? '—'}</td>

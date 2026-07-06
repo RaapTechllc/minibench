@@ -7,6 +7,7 @@ import Submit from './pages/Submit';
 import Hardware from './pages/Hardware';
 import BenchmarkDetail from './pages/BenchmarkDetail';
 import Agents from './pages/Agents';
+import RunDetail from './pages/RunDetail';
 import MoaCalculator from './pages/MoaCalculator';
 
 const NAV = [
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/agents" element={<Agents />} />
+          <Route path="/agents/runs/:runId" element={<RunDetail />} />
           <Route path="/benchmarks/:id" element={<BenchmarkDetail />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/moa-calculator" element={<MoaCalculator />} />

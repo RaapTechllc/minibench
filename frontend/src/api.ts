@@ -93,6 +93,8 @@ export interface AgentLeaderboardEntry {
   run_id: string;
   config_name: string | null;
   self_moa: boolean;
+  models: string[];
+  model_snapshot_date: string | null;
   benchmark_suite: string;
   provider: string | null;
   n_tasks: number;
@@ -105,6 +107,40 @@ export interface AgentLeaderboardEntry {
   latency_p50_ms: number | null;
   latency_p95_ms: number | null;
   on_pareto_frontier: boolean;
+}
+
+export interface AgentTaskResult {
+  task_id: string;
+  category: string | null;
+  trial: number | null;
+  passed: boolean;
+  score: number | null;
+  cost_usd: number | null;
+  latency_ms: number | null;
+}
+
+export interface AgentRunDetail {
+  id: number;
+  run_id: string;
+  submitted_at: string;
+  harness: string | null;
+  harness_version: string | null;
+  moa_config: { name?: string; self_moa?: boolean; models?: string[] } | null;
+  benchmark_suite: string;
+  provider: string | null;
+  model_snapshot_date: string | null;
+  n_tasks: number;
+  n_trials: number;
+  pass_rate: number;
+  pass_hat_k: number | null;
+  ci95_low: number | null;
+  ci95_high: number | null;
+  cost_usd_per_task: number | null;
+  latency_p50_ms: number | null;
+  latency_p95_ms: number | null;
+  tokens_in: number | null;
+  tokens_out: number | null;
+  results: AgentTaskResult[];
 }
 
 export interface KnownModel {
@@ -145,4 +181,5 @@ export const api = {
     return fetchJSON<AgentLeaderboardEntry[]>(`/api/v1/agents/leaderboard${qs}`);
   },
   getNewModels: () => fetchJSON<KnownModel[]>('/api/v1/agents/models/new'),
+  getAgentRun: (runId: string) => fetchJSON<AgentRunDetail>(`/api/v1/agents/runs/${runId}`),
 };
