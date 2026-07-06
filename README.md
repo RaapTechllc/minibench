@@ -118,7 +118,7 @@ Set the API target with `MINIBENCH_API_URL` (default `http://localhost:3070`).
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/v1/submit` | Submit a benchmark (validated, rate-limited, dedup'd) |
-| GET | `/api/v1/benchmarks` | List (paginated, filterable, sortable) |
+| GET | `/api/v1/benchmarks` | List (paginated, filterable, sortable); `X-Total-Count` header carries the filtered total |
 | GET | `/api/v1/benchmarks/{id}` | Single benchmark detail |
 | GET | `/api/v1/leaderboard` | Ranked by HEI / t/s / bandwidth |
 | GET | `/api/v1/hardware` | Hardware specs database |
