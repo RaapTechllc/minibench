@@ -215,6 +215,8 @@ class AgentLeaderboardEntry(BaseModel):
     run_id: UUID
     config_name: Optional[str] = None
     self_moa: bool = False
+    models: list[str] = Field(default_factory=list)
+    model_snapshot_date: Optional[date] = None
     benchmark_suite: str
     provider: Optional[str] = None
     n_tasks: int
@@ -227,6 +229,8 @@ class AgentLeaderboardEntry(BaseModel):
     latency_p50_ms: Optional[int] = None
     latency_p95_ms: Optional[int] = None
     on_pareto_frontier: bool = False
+
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class AgentTaskResultResponse(BaseModel):
