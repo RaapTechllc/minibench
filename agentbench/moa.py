@@ -74,6 +74,7 @@ class MoAModel:
             proposer.model,
             messages,
             temperature=proposer.temperature,
+            top_p=proposer.top_p,
             max_tokens=proposer.max_tokens,
         )
 

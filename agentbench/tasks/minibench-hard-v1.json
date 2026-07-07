@@ -11,8 +11,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 68,
-        "tol": 1e-06
-      }
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-reason-02",
@@ -21,8 +24,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 1727.79,
-        "tol": 0.011
-      }
+        "tol": 0.011,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-reason-03",
@@ -31,8 +37,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 16.5,
-        "tol": 0.06
-      }
+        "tol": 0.06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-reason-04",
@@ -41,8 +50,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 338,
-        "tol": 1e-06
-      }
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-reason-05",
@@ -51,8 +63,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 1032.91,
-        "tol": 0.011
-      }
+        "tol": 0.011,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-struct-01",
@@ -64,8 +79,11 @@
           "n_lines": 5,
           "total_revenue": 618.65,
           "top_customer": "Ava"
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-struct-02",
@@ -77,8 +95,11 @@
           "n_errors": 4,
           "worst_service": "billing",
           "max_error_code": 583
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-struct-03",
@@ -90,8 +111,11 @@
           "n_lines": 5,
           "total_revenue": 940.83,
           "top_customer": "Kai"
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-struct-04",
@@ -103,8 +127,11 @@
           "n_errors": 4,
           "worst_service": "gateway",
           "max_error_code": 502
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-struct-05",
@@ -116,8 +143,11 @@
           "n_lines": 5,
           "total_revenue": 735.6,
           "top_customer": "Ava"
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-format-01",
@@ -125,8 +155,11 @@
       "prompt": "Sort these words by length (shortest first), breaking ties alphabetically. Output them joined by semicolons with no spaces, single line, nothing else: thunder indigo python willow copper signal ember basil",
       "verification": {
         "type": "exact_match",
-        "expected": "basil;ember;copper;indigo;python;signal;willow;thunder"
-      }
+        "expected": "basil;ember;copper;indigo;python;signal;willow;thunder",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-format-02",
@@ -134,8 +167,11 @@
       "prompt": "Apply a Caesar cipher with shift +9 to every word (lowercase a-z wraps around). Output the transformed words space-separated, single line, nothing else: python quartz thunder willow indigo copper",
       "verification": {
         "type": "exact_match",
-        "expected": "yhcqxw zdjaci cqdwmna fruuxf rwmrpx lxyyna"
-      }
+        "expected": "yhcqxw zdjaci cqdwmna fruuxf rwmrpx lxyyna",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-format-03",
@@ -143,8 +179,11 @@
       "prompt": "Sort these words by length (shortest first), breaking ties alphabetically. Output them joined by semicolons with no spaces, single line, nothing else: python violet willow basil ember thunder harbor maple copper",
       "verification": {
         "type": "exact_match",
-        "expected": "basil;ember;maple;copper;harbor;python;violet;willow;thunder"
-      }
+        "expected": "basil;ember;maple;copper;harbor;python;violet;willow;thunder",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-format-04",
@@ -152,8 +191,11 @@
       "prompt": "Apply a Caesar cipher with shift +7 to every word (lowercase a-z wraps around). Output the transformed words space-separated, single line, nothing else: indigo maple ember harbor quartz meadow",
       "verification": {
         "type": "exact_match",
-        "expected": "pukpnv thwsl ltily ohyivy xbhyag tlhkvd"
-      }
+        "expected": "pukpnv thwsl ltily ohyivy xbhyag tlhkvd",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-format-05",
@@ -161,8 +203,11 @@
       "prompt": "Sort these words by length (shortest first), breaking ties alphabetically. Output them joined by semicolons with no spaces, single line, nothing else: falcon signal basil python indigo maple",
       "verification": {
         "type": "exact_match",
-        "expected": "basil;maple;falcon;indigo;python;signal"
-      }
+        "expected": "basil;maple;falcon;indigo;python;signal",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-code-01",
@@ -171,7 +216,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "from solution import merge_intervals\n\ndef test_values():\n    assert merge_intervals([[42, 48], [29, 38], [25, 30], [11, 18], [38, 49], [45, 54]]) == [[11, 18], [25, 54]]\n    assert merge_intervals([[3, 12], [10, 15], [4, 5], [16, 17], [47, 50], [35, 40]]) == [[3, 15], [16, 17], [35, 40], [47, 50]]\n    assert merge_intervals([[25, 30], [25, 31], [19, 26], [35, 36]]) == [[19, 31], [35, 36]]\n    assert merge_intervals([[23, 26], [20, 26], [28, 32]]) == [[20, 26], [28, 32]]\ndef test_single():\n    assert merge_intervals([[1, 2]]) == [[1, 2]]\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-code-02",
@@ -180,7 +226,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "import pathlib\nimport re as _re\nfrom solution import evaluate\n\ndef test_values():\n    assert evaluate('(14 - 8) * (4 * 4)') == 96\n    assert evaluate('((8 * 2) * (3 - 9))') == -96\n    assert evaluate('((17 + 11) + (4 + 1))') == 33\n    assert evaluate('(5 * 20 * 11 - 4)') == 1096\ndef test_precedence():\n    assert evaluate('2 + 3 * 4') == 14\ndef test_no_eval():\n    src = pathlib.Path('solution.py').read_text()\n    assert not _re.search(r'\\b(eval|exec)\\s*\\(', src)\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-code-03",
@@ -189,7 +236,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "from solution import merge_intervals\n\ndef test_values():\n    assert merge_intervals([[45, 54], [0, 3], [40, 46]]) == [[0, 3], [40, 54]]\n    assert merge_intervals([[24, 35], [50, 52], [26, 28], [16, 24], [8, 13], [18, 22]]) == [[8, 13], [16, 35], [50, 52]]\n    assert merge_intervals([[21, 27], [28, 35], [29, 33], [19, 22]]) == [[19, 27], [28, 35]]\n    assert merge_intervals([[6, 7], [0, 5], [37, 40]]) == [[0, 5], [6, 7], [37, 40]]\ndef test_single():\n    assert merge_intervals([[1, 2]]) == [[1, 2]]\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-code-04",
@@ -198,7 +246,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "import pathlib\nimport re as _re\nfrom solution import evaluate\n\ndef test_values():\n    assert evaluate('(12 - 15) - (7 - 13)') == 3\n    assert evaluate('(8 * 2) - (1 - 20)') == 35\n    assert evaluate('(3 * 14 * 1 + 16)') == 58\n    assert evaluate('(9 + 13) - 11 - 3') == 8\ndef test_precedence():\n    assert evaluate('2 + 3 * 4') == 14\ndef test_no_eval():\n    src = pathlib.Path('solution.py').read_text()\n    assert not _re.search(r'\\b(eval|exec)\\s*\\(', src)\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     },
     {
       "id": "mbh-code-05",
@@ -207,7 +256,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "from solution import merge_intervals\n\ndef test_values():\n    assert merge_intervals([[20, 29], [17, 28], [31, 33]]) == [[17, 29], [31, 33]]\n    assert merge_intervals([[41, 42], [37, 42], [6, 14]]) == [[6, 14], [37, 42]]\n    assert merge_intervals([[33, 34], [22, 28], [35, 37], [17, 24], [32, 43], [17, 25]]) == [[17, 28], [32, 43]]\n    assert merge_intervals([[20, 29], [18, 19], [16, 24], [27, 30], [48, 54]]) == [[16, 30], [48, 54]]\ndef test_single():\n    assert merge_intervals([[1, 2]]) == [[1, 2]]\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
     }
   ]
 }

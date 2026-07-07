@@ -475,6 +475,13 @@ SUITES = {
 
 # ── assembly ──────────────────────────────────────────────────────────────────
 
+# Text graders run in strict (grader v2) mode: the prompts demand answer-only
+# output, so the grader enforces it — closing decoy-burying and prompt-maxing
+# holes. Generous char cap so honest reasoning-then-final-line still passes.
+_STRICT_TYPES = {"numeric_match", "json_fields", "exact_match"}
+MAX_OUTPUT_CHARS = 2000
+
+
 def generate_tasks(seed: int, per_category: int = 5, suite: str = "core") -> list[dict[str, Any]]:
     """Deterministic task list for a seed. ``_gold`` is a correct answer used by
     the grader self-tests; ``write_suite`` strips it from the published file."""
@@ -482,12 +489,24 @@ def generate_tasks(seed: int, per_category: int = 5, suite: str = "core") -> lis
     tasks: list[dict[str, Any]] = []
     for gen in SUITES[suite]["generators"]:
         tasks.extend(gen(rng, per_category))
+    for task in tasks:
+        spec = task["verification"]
+        if spec["type"] in _STRICT_TYPES:
+            spec["strict"] = True
+            spec["max_output_chars"] = MAX_OUTPUT_CHARS
     return tasks
 
 
 def write_suite(tasks: list[dict[str, Any]], out: Path, *, seed: int, suite: str = "core") -> dict[str, Any]:
     spec = SUITES[suite]
-    public_tasks = [{k: v for k, v in t.items() if k != "_gold"} for t in tasks]
+    # Stamp the canary onto every published task object (never inside the
+    # prompt string a model sees) so scrapers that ingest the file co-locate
+    # the tripwire with the task text — grade-time echo detection then catches
+    # contaminated models.
+    public_tasks = [
+        {**{k: v for k, v in t.items() if k != "_gold"}, "canary": spec["canary"]}
+        for t in tasks
+    ]
     payload = {
         "suite": spec["name"],
         "notes": spec["notes"].format(seed=seed),

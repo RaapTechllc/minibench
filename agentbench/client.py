@@ -12,8 +12,28 @@ returns no cost, so it stays ``None`` and callers price it as free/local.
 from __future__ import annotations
 
 import os
+import random
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
+
+
+class InfraError(RuntimeError):
+    """A transient infrastructure failure (rate limit, 5xx, timeout) that
+    survived every retry. Callers must NOT score this as a model failure —
+    doing so corrupts rankings with provider luck."""
+
+    def __init__(self, message: str, *, status: int | None = None, attempts: int = 0) -> None:
+        super().__init__(message)
+        self.status = status
+        self.attempts = attempts
+
+
+# Transient statuses worth retrying. Other 4xx (401/403/404/422) are config
+# bugs and raise immediately.
+RETRYABLE_STATUSES = frozenset({408, 429, 500, 502, 503, 504, 529})
+MAX_ATTEMPTS = 5
+BACKOFF_BASE_S = 2.0
+BACKOFF_CAP_S = 60.0
 
 # Well-known OpenAI-compatible endpoints. base_url + api_key + model are the only
 # things that differ between providers (the brief's "one client covers all three").
@@ -84,17 +104,67 @@ class Transport(Protocol):
 
 
 class HttpxTransport:
-    """Real transport. httpx is imported lazily so offline tests never need it."""
+    """Real transport with retry/backoff. httpx is imported lazily so offline
+    tests never need it; ``post``/``sleep`` are injectable for retry tests.
 
-    def __init__(self, timeout: float = 300.0) -> None:
+    Rate limits, 5xx and timeouts are retried with exponential backoff + full
+    jitter (honoring ``Retry-After``); exhaustion raises :class:`InfraError` so
+    the harness can account the trial as infrastructure, not capability.
+    """
+
+    def __init__(
+        self,
+        timeout: float = 300.0,
+        *,
+        post: Callable[..., Any] | None = None,
+        sleep: Callable[[float], None] | None = None,
+        max_attempts: int = MAX_ATTEMPTS,
+    ) -> None:
         self._timeout = timeout
+        self._post = post
+        self._sleep = sleep
+        self._max_attempts = max_attempts
+
+    def _backoff_s(self, attempt: int, retry_after: str | None) -> float:
+        if retry_after:
+            try:
+                # Clamp to [0, cap]: a malformed/negative Retry-After (e.g. "-1")
+                # must never reach time.sleep, which raises on a negative delay.
+                return max(0.0, min(float(retry_after), BACKOFF_CAP_S))
+            except ValueError:
+                pass
+        cap = min(BACKOFF_CAP_S, BACKOFF_BASE_S * (2 ** attempt))
+        return random.uniform(0, cap)  # full jitter
 
     def post_json(self, url: str, headers: dict[str, str], json: dict[str, Any]) -> dict[str, Any]:
         import httpx  # lazy: only required when actually hitting the network
 
-        resp = httpx.post(url, headers=headers, json=json, timeout=self._timeout)
-        resp.raise_for_status()
-        return resp.json()
+        post = self._post or httpx.post
+        sleep = self._sleep or __import__("time").sleep
+        last_status: int | None = None
+        last_err: str = "unknown"
+
+        for attempt in range(self._max_attempts):
+            try:
+                resp = post(url, headers=headers, json=json, timeout=self._timeout)
+            except (httpx.TimeoutException, httpx.TransportError) as e:
+                last_status, last_err = None, f"{type(e).__name__}: {e}"
+                if attempt + 1 < self._max_attempts:
+                    sleep(self._backoff_s(attempt, None))
+                continue
+            if resp.status_code in RETRYABLE_STATUSES:
+                last_status, last_err = resp.status_code, f"HTTP {resp.status_code}"
+                if attempt + 1 < self._max_attempts:
+                    sleep(self._backoff_s(attempt, resp.headers.get("Retry-After")))
+                continue
+            resp.raise_for_status()  # non-retryable 4xx: config bug, fail fast
+            return resp.json()
+
+        raise InfraError(
+            f"transient failure after {self._max_attempts} attempts: {last_err}",
+            status=last_status,
+            attempts=self._max_attempts,
+        )
 
     def get_json(self, url: str, headers: dict[str, str]) -> dict[str, Any]:
         import httpx
@@ -142,6 +212,7 @@ class OpenAICompatClient:
         messages: list[ChatMessage],
         *,
         temperature: float = 0.7,
+        top_p: float | None = None,
         max_tokens: int = 2048,
         clock=None,
     ) -> ChatResult:
@@ -156,11 +227,17 @@ class OpenAICompatClient:
             # Ask OpenRouter to include real cost accounting in the response.
             "usage": {"include": True},
         }
+        if top_p is not None:
+            payload["top_p"] = top_p
         started = clock() if clock else _monotonic_ns()
         body = self._transport.post_json(f"{self.base_url}/chat/completions", headers, payload)
-        ended = clock() if clock else _monotonic_ns()
-
         text = _extract_text(body)
+        if not text:
+            # A 200 with empty text is retried ONCE; if it repeats, it is a
+            # MODEL failure (it produced nothing) — never laundered as infra.
+            body = self._transport.post_json(f"{self.base_url}/chat/completions", headers, payload)
+            text = _extract_text(body)
+        ended = clock() if clock else _monotonic_ns()
         return ChatResult(
             text=text,
             usage=Usage.from_response(body),

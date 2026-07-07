@@ -197,6 +197,15 @@ class AgentRunSubmit(BaseModel):
     latency_p95_ms: Optional[int] = None
     tokens_in: Optional[int] = None
     tokens_out: Optional[int] = None
+    # Provenance / validity (agentbench anti-gaming protocol).
+    grader_version: Optional[str] = Field(None, max_length=8)
+    decoding: Optional[dict[str, Any]] = None
+    seed_sha256: Optional[str] = Field(None, max_length=64)
+    generator_sha256: Optional[str] = Field(None, max_length=64)
+    git_commit: Optional[str] = Field(None, max_length=64)
+    is_private_split: bool = False
+    n_infra_errors: int = Field(0, ge=0)
+    n_canary_flags: int = Field(0, ge=0)
     results: list[AgentTaskResultSubmit] = Field(default_factory=list)
 
     model_config = ConfigDict(protected_namespaces=())
@@ -223,6 +232,14 @@ class AgentRunResponse(BaseModel):
     latency_p95_ms: Optional[int] = None
     tokens_in: Optional[int] = None
     tokens_out: Optional[int] = None
+    grader_version: Optional[str] = None
+    decoding: Optional[dict[str, Any]] = None
+    seed_sha256: Optional[str] = None
+    generator_sha256: Optional[str] = None
+    git_commit: Optional[str] = None
+    is_private_split: Optional[bool] = None
+    n_infra_errors: Optional[int] = None
+    n_canary_flags: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
@@ -277,6 +294,10 @@ class ModelLeaderboardEntry(BaseModel):
     submitted_at: datetime
     category_pass_rates: dict[str, float] = Field(default_factory=dict)
     on_pareto_frontier: bool = False
+    # Validity badges: dev-slice scores are contamination-prone; only
+    # private-split scores are "official".
+    is_private_split: Optional[bool] = None
+    grader_version: Optional[str] = None
 
     model_config = ConfigDict(protected_namespaces=())
 

@@ -77,9 +77,13 @@ def test_repo_suite_file_is_current(suite, filename):
     suite_path = Path(__file__).resolve().parents[1] / "tasks" / filename
     committed = json.loads(suite_path.read_text(encoding="utf-8"))
     fresh = [
-        {k: v for k, v in t.items() if k != "_gold"}
+        {**{k: v for k, v in t.items() if k != "_gold"}, "canary": SUITES[suite]["canary"]}
         for t in generate_tasks(committed["generator_seed"], suite=suite)
     ]
     assert committed["tasks"] == fresh
     assert committed["suite"] == SUITES[suite]["name"]
     assert committed["canary"] == SUITES[suite]["canary"]
+    # Published text-grader specs must be strict (grader v2 anti-gaming mode).
+    for t in committed["tasks"]:
+        if t["verification"]["type"] != "unit_test":
+            assert t["verification"]["strict"] is True

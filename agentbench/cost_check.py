@@ -20,9 +20,15 @@ import argparse
 import json
 from pathlib import Path
 
-BUDGET_USD = 5.00
+# The budget guard is a worst-case ceiling: every call assumed to emit
+# MAX_OUTPUT_TOKENS at the priciest catalog model's completion price. That cap
+# is 4096 (reasoning-model headroom, see single_model_config), and reasoning
+# runs genuinely cost more, so the ceiling is set to $15 for a full dev-slice
+# run — still cheap enough to catch a suite that would cost hundreds, which is
+# all the guard is for. Real answer-only runs cost cents.
+BUDGET_USD = 15.00
 FIXED_OVERHEAD_TOKENS = 60
-MAX_OUTPUT_TOKENS = 1024  # matches single_model_config's max_tokens cap
+MAX_OUTPUT_TOKENS = 4096  # matches single_model_config's max_tokens cap
 
 CATALOG = Path(__file__).resolve().parents[1] / "backend" / "app" / "data" / "known_models_seed.json"
 
@@ -50,12 +56,22 @@ def estimate_cost(tasks: list[dict], trials: int, prompt_price: float, completio
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Check a suite against the cost budget.")
-    ap.add_argument("--tasks", required=True)
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--tasks", help="published suite JSON")
+    src.add_argument("--generate", help="estimate a generated suite (core|hard); "
+                     "uses a throwaway seed — instance sizes, not instances, matter here")
+    ap.add_argument("--per-category", type=int, default=5)
     ap.add_argument("--trials", type=int, default=3)
     ap.add_argument("--budget", type=float, default=BUDGET_USD)
     args = ap.parse_args(argv)
 
-    suite = json.loads(Path(args.tasks).read_text(encoding="utf-8"))
+    if args.generate:
+        from agentbench.minibench_gen import SUITES, generate_tasks
+
+        tasks = generate_tasks(0, args.per_category, suite=args.generate)
+        suite = {"suite": SUITES[args.generate]["name"], "tasks": tasks}
+    else:
+        suite = json.loads(Path(args.tasks).read_text(encoding="utf-8"))
     model = priciest_model()
     est = estimate_cost(
         suite["tasks"], args.trials, model["prompt_price"], model["completion_price"]

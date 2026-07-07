@@ -27,6 +27,13 @@ from app.schemas import (
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
 
 
+def _rankable(run: AgentRun) -> bool:
+    """Validity gate for leaderboard rows: contaminated runs (canary echoes)
+    and infra-tainted runs never rank. NULL-safe so legacy rows (pre-provenance)
+    still appear until they are superseded by private-split reruns."""
+    return not (run.n_canary_flags or 0) and not (run.n_infra_errors or 0)
+
+
 def _pareto_frontier(points: list[tuple[int, Optional[Decimal], Decimal]]) -> set[int]:
     """Indices on the accuracy-vs-cost Pareto frontier.
 
@@ -73,6 +80,14 @@ async def submit_agent_run(data: AgentRunSubmit, db: AsyncSession = Depends(get_
         latency_p95_ms=data.latency_p95_ms,
         tokens_in=data.tokens_in,
         tokens_out=data.tokens_out,
+        grader_version=data.grader_version,
+        decoding=data.decoding,
+        seed_sha256=data.seed_sha256,
+        generator_sha256=data.generator_sha256,
+        git_commit=data.git_commit,
+        is_private_split=data.is_private_split,
+        n_infra_errors=data.n_infra_errors,
+        n_canary_flags=data.n_canary_flags,
     )
     db.add(run)
     await db.flush()  # assign run.run_id before inserting child rows
@@ -132,7 +147,7 @@ async def agent_leaderboard(
         q = q.where(AgentRun.provider == provider)
 
     result = await db.execute(q)
-    runs = list(result.scalars().all())
+    runs = [r for r in result.scalars().all() if _rankable(r)]
 
     # Pareto frontier is computed over the filtered set (cost vs pass rate).
     points = [(idx, r.cost_usd_per_task, r.pass_rate) for idx, r in enumerate(runs)]
@@ -193,18 +208,23 @@ async def model_leaderboard(
     q = select(AgentRun)
     if suite:
         q = q.where(AgentRun.benchmark_suite == suite)
-    runs = list((await db.execute(q)).scalars().all())
+    runs = [r for r in (await db.execute(q)).scalars().all() if _rankable(r)]
 
     # One model string == model-centric. (Self-MoA also qualifies: same model.)
     single_runs = [r for r in runs if len((r.moa_config or {}).get("models", [])) == 1]
 
     best: dict[str, AgentRun] = {}
+
+    def _pref(r: AgentRun) -> tuple:
+        # Private-split runs ALWAYS supersede dev-slice runs for the same model:
+        # the dev slice is public (contamination-prone) and must never shadow an
+        # official private score, even a lower one.
+        return (bool(r.is_private_split), r.pass_rate, -(r.cost_usd_per_task or Decimal(0)))
+
     for r in single_runs:
         key = r.moa_config["models"][0]
         cur = best.get(key)
-        if cur is None or (r.pass_rate, -(r.cost_usd_per_task or Decimal(0))) > (
-            cur.pass_rate, -(cur.cost_usd_per_task or Decimal(0))
-        ):
+        if cur is None or _pref(r) > _pref(cur):
             best[key] = r
 
     # Catalog join: preset model strings are "openrouter/<catalog id>".
@@ -262,6 +282,8 @@ async def model_leaderboard(
                 submitted_at=r.submitted_at,
                 category_pass_rates=cat_rates.get(r.run_id, {}),
                 on_pareto_frontier=i in frontier,
+                is_private_split=r.is_private_split,
+                grader_version=r.grader_version,
             )
         )
     return entries
