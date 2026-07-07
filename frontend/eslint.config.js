@@ -19,5 +19,11 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Fetching data on mount with a loading flag legitimately calls setState
+      // inside an effect — a pattern the React docs endorse. This rule treats it
+      // as a cascade risk; keep it as a signal (warning) rather than a CI gate.
+      'react-hooks/set-state-in-effect': 'warn',
+    },
   },
 ])

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Terminal, Download, Upload, Cpu, ClipboardList, CheckCircle2, AlertCircle } from 'lucide-react';
 import { api, type Benchmark } from '../api';
 import { validateSubmitForm, buildSubmitPayload } from '../lib/submitForm';
+import { PageHeader, Card, CardHeader } from '../components/ui';
 
 interface FieldDef {
   name: string;
@@ -38,6 +39,8 @@ const PERFORMANCE_FIELDS: FieldDef[] = [
   { name: 'test_duration_secs', label: 'Test duration (s)', placeholder: '15', required: true },
 ];
 
+const CODE_BLOCK = 'rounded-lg bg-ink p-4 text-[13px] leading-relaxed text-paper overflow-x-auto font-mono';
+
 function FieldGroup({
   title, fields, values, errors, onChange,
 }: {
@@ -49,13 +52,13 @@ function FieldGroup({
 }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">{title}</h3>
+      <h3 className="text-[11px] font-semibold text-ink-3 uppercase tracking-[0.12em] mb-3">{title}</h3>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {fields.map(f => (
           <label key={f.name} className="block">
-            <span className="text-sm text-gray-300">
+            <span className="text-[13px] text-ink-2">
               {f.label}
-              {f.required && <span className="text-cyan-400 ml-0.5">*</span>}
+              {f.required && <span className="text-accent ml-0.5">*</span>}
             </span>
             <input
               type="text"
@@ -63,11 +66,11 @@ function FieldGroup({
               onChange={e => onChange(f.name, e.target.value)}
               placeholder={f.placeholder}
               aria-invalid={!!errors[f.name]}
-              className={`mt-1 w-full bg-gray-800 border rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-cyan-500 ${
-                errors[f.name] ? 'border-red-500' : 'border-gray-700'
+              className={`mt-1 w-full rounded-lg border bg-surface px-3 py-2 text-[14px] text-ink placeholder-ink-3 focus:border-accent transition-colors ${
+                errors[f.name] ? 'border-fail' : 'border-line-strong'
               }`}
             />
-            {errors[f.name] && <span className="text-xs text-red-400 mt-1 block">{errors[f.name]}</span>}
+            {errors[f.name] && <span className="text-xs text-fail mt-1 block">{errors[f.name]}</span>}
           </label>
         ))}
       </div>
@@ -106,79 +109,80 @@ function ManualSubmitForm() {
 
   if (result) {
     return (
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <div className="flex items-center gap-2 text-green-400 mb-3">
+      <Card className="border-pass bg-pass-soft p-6">
+        <div className="flex items-center gap-2 text-pass mb-3">
           <CheckCircle2 className="w-5 h-5" />
           <h2 className="text-lg font-semibold">Benchmark submitted</h2>
         </div>
-        <p className="text-sm text-gray-300">
+        <p className="text-[14px] text-ink-2">
           {result.system_type || result.cpu_model} — {result.model_name} ({result.quantization}) at{' '}
-          <span className="text-cyan-400 font-semibold">{Number(result.tokens_per_second)} t/s</span>
-          {result.hei != null && <> · HEI {Number(result.hei).toFixed(4)}</>}
+          <span className="tnum text-accent font-semibold">{Number(result.tokens_per_second)} t/s</span>
+          {result.hei != null && <> · HEI <span className="tnum">{Number(result.hei).toFixed(4)}</span></>}
         </p>
-        <div className="mt-4 flex gap-4 text-sm">
-          <Link to={`/benchmarks/${result.id}`} className="text-cyan-400 hover:underline">
+        <div className="mt-4 flex gap-4 text-[14px]">
+          <Link to={`/benchmarks/${result.id}`} className="text-accent hover:text-accent-strong">
             View submission →
           </Link>
           <button
             onClick={() => { setResult(null); setValues({}); }}
-            className="text-gray-400 hover:text-gray-200"
+            className="text-ink-2 hover:text-ink"
           >
             Submit another
           </button>
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <form onSubmit={onSubmit} className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-6" noValidate>
-      <div className="flex items-center gap-2 text-cyan-400">
-        <ClipboardList className="w-5 h-5" />
-        <h2 className="text-lg font-semibold">Manual Submission</h2>
-      </div>
-      <p className="text-sm text-gray-400 -mt-3">
-        Ran your benchmark another way? Enter the results directly. Fields marked
-        <span className="text-cyan-400"> *</span> are required; the same validation rules as the CLI apply.
-      </p>
-
-      <FieldGroup title="Hardware" fields={HARDWARE_FIELDS} values={values} errors={errors} onChange={onChange} />
-      <FieldGroup title="Software" fields={SOFTWARE_FIELDS} values={values} errors={errors} onChange={onChange} />
-      <FieldGroup title="Performance" fields={PERFORMANCE_FIELDS} values={values} errors={errors} onChange={onChange} />
-
-      {serverError && (
-        <div className="flex items-start gap-2 p-3 bg-red-400/10 border border-red-400/20 rounded-lg text-sm text-red-400">
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>{serverError}</span>
+    <Card className="p-6">
+      <form onSubmit={onSubmit} className="space-y-6" noValidate>
+        <div className="flex items-center gap-2 text-accent">
+          <ClipboardList className="w-5 h-5" />
+          <h2 className="text-lg font-semibold text-ink">Manual Submission</h2>
         </div>
-      )}
+        <p className="text-[14px] text-ink-2 -mt-3">
+          Ran your benchmark another way? Enter the results directly. Fields marked
+          <span className="text-accent"> *</span> are required; the same validation rules as the CLI apply.
+        </p>
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 disabled:cursor-not-allowed text-gray-950 font-semibold text-sm rounded-lg px-5 py-2.5"
-      >
-        {submitting ? 'Submitting…' : 'Submit benchmark'}
-      </button>
-    </form>
+        <FieldGroup title="Hardware" fields={HARDWARE_FIELDS} values={values} errors={errors} onChange={onChange} />
+        <FieldGroup title="Software" fields={SOFTWARE_FIELDS} values={values} errors={errors} onChange={onChange} />
+        <FieldGroup title="Performance" fields={PERFORMANCE_FIELDS} values={values} errors={errors} onChange={onChange} />
+
+        {serverError && (
+          <div className="flex items-start gap-2 p-3 bg-fail-soft border border-fail/30 rounded-lg text-[14px] text-fail">
+            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{serverError}</span>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="bg-accent hover:bg-accent-strong disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-[14px] rounded-lg px-5 py-2.5 transition-colors"
+        >
+          {submitting ? 'Submitting…' : 'Submit benchmark'}
+        </button>
+      </form>
+    </Card>
   );
 }
 
 export default function Submit() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white">Submit Benchmarks</h1>
-        <p className="text-gray-400 mt-1">Use the MiniBench CLI to benchmark your hardware and submit results — or enter them manually below.</p>
-      </div>
+      <PageHeader eyebrow="Contribute" title="Submit Benchmarks">
+        Use the MiniBench CLI to benchmark your hardware and submit results — or enter them manually below.
+      </PageHeader>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
-          <div className="flex items-center gap-2 text-cyan-400">
+        <Card className="animate-rise rise-1 p-6 space-y-4">
+          <div className="flex items-center gap-2 text-accent">
             <Download className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">1. Install</h2>
+            <h2 className="text-lg font-semibold text-ink">1. Install</h2>
           </div>
-          <pre className="bg-gray-950 border border-gray-800 rounded-lg p-4 text-sm text-gray-300 overflow-x-auto">
+          <pre className={CODE_BLOCK}>
 {`pip install minibench
 
 # Or from source:
@@ -186,14 +190,14 @@ git clone https://github.com/RaapTechllc/minibench
 cd minibench/cli
 pip install -e .`}
           </pre>
-        </div>
+        </Card>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
-          <div className="flex items-center gap-2 text-cyan-400">
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center gap-2 text-accent">
             <Cpu className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">2. Detect Hardware</h2>
+            <h2 className="text-lg font-semibold text-ink">2. Detect Hardware</h2>
           </div>
-          <pre className="bg-gray-950 border border-gray-800 rounded-lg p-4 text-sm text-gray-300 overflow-x-auto">
+          <pre className={CODE_BLOCK}>
 {`# Show detected hardware
 minibench detect
 
@@ -204,14 +208,14 @@ minibench detect
 # - Memory bandwidth (from lookup table)
 # - OS version`}
           </pre>
-        </div>
+        </Card>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
-          <div className="flex items-center gap-2 text-cyan-400">
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center gap-2 text-accent">
             <Terminal className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">3. Run Benchmark</h2>
+            <h2 className="text-lg font-semibold text-ink">3. Run Benchmark</h2>
           </div>
-          <pre className="bg-gray-950 border border-gray-800 rounded-lg p-4 text-sm text-gray-300 overflow-x-auto">
+          <pre className={CODE_BLOCK}>
 {`# Auto-detect model + run
 minibench run
 
@@ -228,40 +232,40 @@ minibench run \\
 # View local results
 minibench results`}
           </pre>
-        </div>
+        </Card>
 
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
-          <div className="flex items-center gap-2 text-cyan-400">
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center gap-2 text-accent">
             <Upload className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">4. Upload Results</h2>
+            <h2 className="text-lg font-semibold text-ink">4. Upload Results</h2>
           </div>
-          <pre className="bg-gray-950 border border-gray-800 rounded-lg p-4 text-sm text-gray-300 overflow-x-auto">
+          <pre className={CODE_BLOCK}>
 {`# Upload latest result
 minibench upload
 
 # Custom API endpoint
 minibench upload --api-url https://api.minibench.dev`}
           </pre>
-        </div>
+        </Card>
       </div>
 
       <ManualSubmitForm />
 
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-white mb-3">Test Methodology</h2>
-        <div className="space-y-2 text-sm text-gray-300">
-          <p><strong>Warmup:</strong> 3 throwaway prompts to warm caches</p>
-          <p><strong>Test:</strong> 5 standardized prompts (~200 tokens each)</p>
-          <p><strong>Metrics:</strong> Median t/s, p95 t/s, TTFT, total duration</p>
-          <p><strong>Validation:</strong> t/s must be 0.1-500, duration must be 10s+, 100+ total tokens</p>
-          <p><strong>Dedup:</strong> Same hardware+model fingerprint blocked for 1 hour</p>
+      <Card className="p-6">
+        <CardHeader title="Test Methodology" />
+        <div className="px-5 pb-5 space-y-2 text-[14px] text-ink-2">
+          <p><strong className="text-ink">Warmup:</strong> 3 throwaway prompts to warm caches</p>
+          <p><strong className="text-ink">Test:</strong> 5 standardized prompts (~200 tokens each)</p>
+          <p><strong className="text-ink">Metrics:</strong> Median t/s, p95 t/s, TTFT, total duration</p>
+          <p><strong className="text-ink">Validation:</strong> t/s must be 0.1-500, duration must be 10s+, 100+ total tokens</p>
+          <p><strong className="text-ink">Dedup:</strong> Same hardware+model fingerprint blocked for 1 hour</p>
+          <div className="mt-4 p-3 bg-frontier-soft border border-frontier/30 rounded-lg">
+            <p className="text-frontier">
+              Memory bandwidth is the #1 factor for local LLM performance. Always provide your system's memory bandwidth for the most useful comparison.
+            </p>
+          </div>
         </div>
-        <div className="mt-4 p-3 bg-yellow-400/10 border border-yellow-400/20 rounded-lg">
-          <p className="text-sm text-yellow-400">
-            Memory bandwidth is the #1 factor for local LLM performance. Always provide your system's memory bandwidth for the most useful comparison.
-          </p>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 }

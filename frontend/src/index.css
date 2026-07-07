@@ -1,1 +1,92 @@
 @import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────────────────
+   MiniBench design tokens — "precision instrument, in daylight".
+   Apple-light: airy, exact, one blue accent, soft depth. Data is the hero:
+   labels in the system sans, every measured number in a tabular monospace.
+   Single light theme, token-driven so a dark mode is a later token swap.
+   ───────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Surfaces — a cool precise paper, not cream */
+  --color-paper: #f5f5f7;      /* app background */
+  --color-surface: #ffffff;    /* cards, tables */
+  --color-surface-2: #fafafd;  /* zebra rows, insets */
+
+  /* Ink */
+  --color-ink: #1d1d1f;        /* primary text */
+  --color-ink-2: #6e6e73;      /* secondary */
+  --color-ink-3: #9a9aa0;      /* tertiary / captions */
+
+  /* Hairlines — the structural motif */
+  --color-line: #e8e8ed;
+  --color-line-strong: #d2d2d7;
+
+  /* Single accent: a confident, slightly deep azure */
+  --color-accent: #0a6cff;
+  --color-accent-strong: #0047c4;
+  --color-accent-soft: #eaf1ff;
+
+  /* Semantics */
+  --color-pass: #1a9e4b;
+  --color-pass-soft: #e6f6ec;
+  --color-fail: #d63a2f;
+  --color-fail-soft: #fdecea;
+  --color-frontier: #b8860b;   /* Pareto gold, muted for daylight */
+  --color-frontier-soft: #fbf3dc;
+
+  /* Type roles */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+               Roboto, system-ui, sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", "Roboto Mono",
+               ui-monospace, monospace;
+
+  /* Radii — Apple-soft */
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* Soft, layered depth (never harsh) */
+  --shadow-card: 0 1px 2px rgba(20, 20, 43, 0.04), 0 4px 16px rgba(20, 20, 43, 0.05);
+  --shadow-pop: 0 8px 30px rgba(20, 20, 43, 0.12);
+}
+
+@layer base {
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv01", "ss01";
+  }
+  /* Every measured number lines up: tabular monospace figures. */
+  .tnum { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  /* Visible keyboard focus everywhere (quality floor). */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  ::selection { background: var(--color-accent-soft); }
+}
+
+@layer utilities {
+  /* Entrance: a small, quiet rise on mount. One motion, used sparingly. */
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-rise { animation: rise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+  .rise-1 { animation-delay: 0.04s; }
+  .rise-2 { animation-delay: 0.10s; }
+  .rise-3 { animation-delay: 0.16s; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .animate-rise { animation: none; }
+  }
+}

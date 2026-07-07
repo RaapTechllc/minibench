@@ -12,16 +12,18 @@ export default function MemoryLabel({
 }) {
   return (
     <div className="flex flex-col text-xs">
-      <span className="text-gray-300">
-        <span className="text-gray-500">System RAM:</span> {ramGb ?? '?'} GB
-        {memType && <span className="text-gray-500 ml-1">({memType})</span>}
+      <span className="text-ink-2">
+        <span className="text-ink-3">System RAM:</span>{' '}
+        <span className="tnum text-ink">{ramGb ?? '?'}</span> GB
+        {memType && <span className="text-ink-3 ml-1">({memType})</span>}
       </span>
       {vramGb != null && vramGb > 0 ? (
-        <span className="text-purple-400">
-          <span className="text-purple-500">VRAM:</span> {vramGb} GB
+        <span className="text-accent">
+          <span className="text-accent">VRAM:</span>{' '}
+          <span className="tnum">{vramGb}</span> GB
         </span>
       ) : (
-        <span className="text-gray-600 text-[10px]">No dedicated VRAM</span>
+        <span className="text-ink-3 text-[10px]">No dedicated VRAM</span>
       )}
     </div>
   );

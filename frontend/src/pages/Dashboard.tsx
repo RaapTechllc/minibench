@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, Customized,
+  Customized,
 } from 'recharts';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { Benchmark, Stats } from '../api';
 import BandwidthBadge from '../components/BandwidthBadge';
-import { bandwidthColor } from '../lib/bandwidth';
+import {
+  Card, CardHeader, Stat, Badge, Skeleton, ErrorState,
+} from '../components/ui';
+import { CHART, TooltipCard, axisProps } from '../components/chart';
 
+/* Categorical identity colours per system — kept as a quiet signal (a swatch in
+   the tooltip), never as chart-wide colour: the figures speak in one blue. */
 const SYSTEM_COLORS: Record<string, string> = {
   'Mac Mini M4': '#06b6d4',
   'Mac Mini M4 Pro': '#22d3ee',
@@ -23,8 +28,8 @@ const SYSTEM_COLORS: Record<string, string> = {
 };
 
 function getColor(system: string | null) {
-  if (!system) return '#6b7280';
-  return SYSTEM_COLORS[system] || '#6b7280';
+  if (!system) return CHART.ink3;
+  return SYSTEM_COLORS[system] || CHART.ink3;
 }
 
 function truncate(str: string, n: number) {
@@ -67,9 +72,10 @@ interface ScatterPoint {
 interface CustomDotProps {
   cx?: number;
   cy?: number;
-  payload?: { ram: number; fill?: string };
+  payload?: { ram: number };
 }
 
+/* Dot size encodes RAM; every dot is the single accent blue. */
 function CustomDot(props: CustomDotProps) {
   const { cx, cy, payload } = props;
   if (!payload) return null;
@@ -77,10 +83,10 @@ function CustomDot(props: CustomDotProps) {
   return (
     <circle
       cx={cx} cy={cy} r={r}
-      fill={payload.fill || '#6b7280'}
-      opacity={0.78}
-      stroke={payload.fill || '#6b7280'}
-      strokeWidth={0.5}
+      fill={CHART.accent}
+      fillOpacity={0.7}
+      stroke="#fff"
+      strokeWidth={1}
     />
   );
 }
@@ -104,7 +110,7 @@ function ParetoOverlay(props: ParetoOverlayProps) {
     <g>
       <polyline
         points={pts}
-        stroke="#fbbf24"
+        stroke={CHART.frontier}
         strokeWidth={2}
         strokeDasharray="6 3"
         fill="none"
@@ -116,16 +122,16 @@ function ParetoOverlay(props: ParetoOverlayProps) {
         const label = truncate(pt.system, 20);
         return (
           <g key={i}>
-            <circle cx={cx} cy={cy} r={6} fill="#fbbf24" stroke="#030712" strokeWidth={1.5} />
+            <circle cx={cx} cy={cy} r={6} fill={CHART.frontier} stroke="#fff" strokeWidth={1.5} />
             <text
               x={cx + 10}
               y={cy}
-              fill="#f9fafb"
+              fill={CHART.ink3}
               fontSize={10}
               fontWeight="700"
               dominantBaseline="middle"
-              stroke="#030712"
-              strokeWidth={2.5}
+              stroke="#fff"
+              strokeWidth={3}
               paintOrder="stroke"
             >
               #{i + 1} {label}
@@ -165,7 +171,7 @@ function BwTrendOverlay(props: BwTrendOverlayProps) {
   return (
     <line
       x1={x1} y1={y1} x2={x2} y2={y2}
-      stroke="#f59e0b"
+      stroke={CHART.accent}
       strokeWidth={2}
       strokeDasharray="6 3"
       opacity={0.85}
@@ -173,18 +179,49 @@ function BwTrendOverlay(props: BwTrendOverlayProps) {
   );
 }
 
+const axisLabel = { fill: CHART.ink3, fontSize: 12 } as const;
+
 export default function Dashboard() {
   const [benchmarks, setBenchmarks] = useState<Benchmark[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
+  function load() {
+    setLoading(true);
+    setError(false);
     Promise.all([api.getBenchmarks(), api.getStats()])
       .then(([b, s]) => { setBenchmarks(b); setStats(s); })
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, []);
+  }
 
-  if (loading) return <div className="text-center py-20 text-gray-400">Loading...</div>;
+  useEffect(() => { load(); }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-10">
+        <div className="animate-rise space-y-4">
+          <div className="h-10 w-2/3 rounded-lg bg-surface-2 animate-pulse" />
+          <div className="h-5 w-1/2 rounded-lg bg-surface-2 animate-pulse" />
+        </div>
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-24 rounded-xl bg-surface-2 animate-pulse" />
+          ))}
+        </div>
+        <Skeleton rows={8} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState onRetry={load}>
+        We couldn't reach the benchmark API. Check your connection and try again.
+      </ErrorState>
+    );
+  }
 
   // Best performer by t/s
   const best = benchmarks.reduce<Benchmark | null>(
@@ -233,180 +270,170 @@ export default function Dashboard() {
   const bwXMin = bwData.length > 0 ? bwData[0].bandwidth : 0;
   const bwXMax = bwData.length > 0 ? bwData[bwData.length - 1].bandwidth : 0;
 
-  const systems = [...new Set(benchmarks.map(b => b.system_type).filter(Boolean))];
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-white">MiniBench</h1>
-        <p className="text-gray-400 mt-1">
+    <div className="space-y-12">
+      {/* Hero — a thesis, not a tile */}
+      <section className="animate-rise max-w-3xl pt-2">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent mb-3">
+          Local inference, measured
+        </div>
+        <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-ink leading-[1.05]">
+          Deterministic benchmarks for models and the machines that run them.
+        </h1>
+        <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
           {best
-            ? `${best.system_type} leads at ${Number(best.tokens_per_second).toFixed(1)} t/s — ${stats?.total_submissions ?? 0} runs across ${stats?.unique_systems ?? 0} systems.`
-            : 'Crowdsourced LLM inference benchmarks.'}
+            ? <>Crowdsourced throughput across real hardware. <span className="text-ink">{best.system_type}</span> currently leads at <span className="tnum text-ink">{Number(best.tokens_per_second).toFixed(1)}</span> t/s — one number, reproducibly measured.</>
+            : 'Crowdsourced throughput across real hardware — one number, reproducibly measured.'}
         </p>
-      </div>
+      </section>
 
-      {/* Hero stat strip */}
+      {/* Stat strip */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="col-span-2 bg-gray-900 border border-cyan-900/50 rounded-xl p-5">
-            <div className="text-xs text-gray-500 uppercase tracking-widest mb-1.5">Top Performer</div>
-            <div className="text-xl font-bold text-white truncate">{best?.system_type ?? '—'}</div>
-            <div className="flex items-baseline gap-1.5 mt-1">
-              <span className="text-4xl font-mono font-bold text-cyan-400">
-                {best ? Number(best.tokens_per_second).toFixed(1) : '—'}
-              </span>
-              <span className="text-base text-cyan-600">t/s</span>
-            </div>
-            <div className="text-xs text-gray-500 mt-2">
-              {best ? `${truncate(best.model_name, 28)} · ${best.quantization}` : ''}
-            </div>
-          </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <div className="text-xs text-gray-500 uppercase tracking-widest mb-1.5">Submissions</div>
-            <div className="text-3xl font-bold text-white">{stats.total_submissions}</div>
-            <div className="text-xs text-gray-500 mt-2">
-              {stats.unique_systems} systems · {stats.unique_models} models
-            </div>
-          </div>
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-            <div className="text-xs text-gray-500 uppercase tracking-widest mb-1.5">Best HEI</div>
-            <div className="text-3xl font-bold text-cyan-400">
-              {bestHei ? bestHei.toFixed(2) : '—'}
-            </div>
-            <div className="text-xs text-gray-500 mt-2">efficiency · value · speed</div>
-          </div>
+        <div className="animate-rise rise-1 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <Stat
+            label="Top performer"
+            accent
+            value={<>{best ? Number(best.tokens_per_second).toFixed(1) : '—'}<span className="text-lg text-ink-3 font-normal"> t/s</span></>}
+            sub={best ? `${truncate(best.system_type ?? '—', 20)} · ${best.quantization}` : undefined}
+          />
+          <Stat
+            label="Submissions"
+            value={stats.total_submissions}
+            sub={`${stats.unique_systems} systems · ${stats.unique_models} models`}
+          />
+          <Stat
+            label="Best HEI"
+            accent
+            value={bestHei ? bestHei.toFixed(2) : '—'}
+            sub="efficiency · value · speed"
+          />
+          <Stat
+            label="Peak throughput"
+            value={stats.max_tokens_per_second != null ? Number(stats.max_tokens_per_second).toFixed(0) : '—'}
+            sub={stats.avg_tokens_per_second != null ? `${Number(stats.avg_tokens_per_second).toFixed(1)} t/s average` : undefined}
+          />
         </div>
       )}
 
       {/* Efficiency Frontier */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <div className="flex items-start justify-between mb-1">
-          <h2 className="text-lg font-semibold text-white">Efficiency Frontier</h2>
-          <span className="text-xs text-gray-500 mt-1">dot size = RAM (GB)</span>
-        </div>
-        <p className="text-sm text-gray-400 mb-4">
-          Speed (t/s) vs. quality (MMLU). Gold dashed line connects Pareto-optimal systems — best quality at each speed tier.
-        </p>
-        <ResponsiveContainer width="100%" height={420}>
-          <ScatterChart margin={{ top: 20, right: 40, bottom: 40, left: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis
-              dataKey="x"
-              name="Tokens/sec"
-              type="number"
-              stroke="#6b7280"
-              label={{ value: 'Tokens/sec', position: 'insideBottom', offset: -20, fill: '#9ca3af', fontSize: 12 }}
-              tick={{ fill: '#6b7280', fontSize: 11 }}
-            />
-            <YAxis
-              dataKey="y"
-              name="MMLU Score"
-              type="number"
-              stroke="#6b7280"
-              label={{ value: 'MMLU Score', angle: -90, position: 'insideLeft', offset: 15, fill: '#9ca3af', fontSize: 12 }}
-              tick={{ fill: '#6b7280', fontSize: 11 }}
-            />
-            <Tooltip
-              cursor={{ stroke: '#4b5563', strokeWidth: 1, strokeDasharray: '4 4' }}
-              content={({ payload }) => {
-                if (!payload?.length) return null;
-                const d = payload[0].payload;
-                return (
-                  <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm shadow-xl">
-                    <div className="font-semibold text-white">{d.system}</div>
-                    <div className="text-gray-300">{d.model} ({d.quant})</div>
-                    <div className="text-cyan-400">{d.x} t/s</div>
-                    <div className="text-gray-400">MMLU: {d.y}</div>
-                    <div className={bandwidthColor(d.bw)}>BW: {d.bw} GB/s</div>
-                    <div className="text-gray-400">RAM: {d.ram} GB</div>
-                  </div>
-                );
-              }}
-            />
-            <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }} />
-            {systems.map(sys => (
-              <Scatter
-                key={sys}
-                name={sys!}
-                data={scatterData.filter(d => d.system === sys)}
-                fill={getColor(sys!)}
-                shape={CustomDot}
+      <Card className="animate-rise rise-2">
+        <CardHeader
+          title="Efficiency Frontier"
+          sub="Speed (t/s) vs. quality (MMLU). The gold line traces the Pareto-optimal systems — best quality at each speed tier."
+          right={<span className="text-[11px] text-ink-3">dot size = RAM (GB)</span>}
+        />
+        <div className="px-2 pb-4">
+          <ResponsiveContainer width="100%" height={420}>
+            <ScatterChart margin={{ top: 20, right: 40, bottom: 40, left: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
+              <XAxis
+                dataKey="x"
+                name="Tokens/sec"
+                type="number"
+                {...axisProps}
+                label={{ value: 'Tokens/sec', position: 'insideBottom', offset: -20, ...axisLabel }}
               />
-            ))}
-            <Customized component={(chartProps: { xAxisMap?: AxisMap; yAxisMap?: AxisMap }) => (
-              <ParetoOverlay {...chartProps} pareto={pareto} top2={paretoTop2} />
-            )} />
-          </ScatterChart>
-        </ResponsiveContainer>
-      </div>
+              <YAxis
+                dataKey="y"
+                name="MMLU Score"
+                type="number"
+                {...axisProps}
+                label={{ value: 'MMLU Score', angle: -90, position: 'insideLeft', offset: 15, ...axisLabel }}
+              />
+              <Tooltip
+                cursor={{ stroke: CHART.line, strokeWidth: 1, strokeDasharray: '4 4' }}
+                content={({ payload }) => {
+                  if (!payload?.length) return null;
+                  const d = payload[0].payload;
+                  return (
+                    <TooltipCard>
+                      <div className="flex items-center gap-1.5 font-semibold text-ink">
+                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: d.fill }} />
+                        {d.system}
+                      </div>
+                      <div className="text-ink-2">{d.model} ({d.quant})</div>
+                      <div className="tnum text-accent mt-1">{d.x} t/s</div>
+                      <div className="tnum text-ink-2">MMLU {d.y}</div>
+                      <div className="tnum text-frontier">{d.bw} GB/s</div>
+                      <div className="tnum text-ink-3">{d.ram} GB RAM</div>
+                    </TooltipCard>
+                  );
+                }}
+              />
+              <Scatter name="Benchmarks" data={scatterData} fill={CHART.accent} shape={CustomDot} />
+              <Customized component={(chartProps: { xAxisMap?: AxisMap; yAxisMap?: AxisMap }) => (
+                <ParetoOverlay {...chartProps} pareto={pareto} top2={paretoTop2} />
+              )} />
+            </ScatterChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
 
       {/* Bandwidth vs Throughput */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <div className="flex items-start justify-between mb-1">
-          <h2 className="text-lg font-semibold text-white">Memory Bandwidth vs Throughput</h2>
-          {reg && (
-            <span className="text-xs font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded mt-0.5">
-              R² = {reg.r2.toFixed(3)}
-            </span>
-          )}
+      <Card className="animate-rise rise-2">
+        <CardHeader
+          title="Memory Bandwidth vs Throughput"
+          sub={
+            reg
+              ? `Near-linear correlation confirms bandwidth as the dominant bottleneck. Trend: ${reg.slope.toFixed(2)} t/s per GB/s (blue line).`
+              : 'Near-linear correlation confirms memory bandwidth as the dominant bottleneck.'
+          }
+          right={reg ? <Badge tone="frontier"><span className="tnum">R² = {reg.r2.toFixed(3)}</span></Badge> : undefined}
+        />
+        <div className="px-2 pb-4">
+          <ResponsiveContainer width="100%" height={320}>
+            <ScatterChart margin={{ top: 10, right: 40, bottom: 40, left: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} />
+              <XAxis
+                dataKey="bandwidth"
+                name="Bandwidth (GB/s)"
+                type="number"
+                {...axisProps}
+                label={{ value: 'Memory Bandwidth (GB/s)', position: 'insideBottom', offset: -20, ...axisLabel }}
+              />
+              <YAxis
+                dataKey="tps"
+                name="Tokens/sec"
+                type="number"
+                {...axisProps}
+                label={{ value: 'Tokens/sec', angle: -90, position: 'insideLeft', offset: 15, ...axisLabel }}
+              />
+              <Tooltip
+                cursor={{ stroke: CHART.line, strokeWidth: 1, strokeDasharray: '4 4' }}
+                content={({ payload }) => {
+                  if (!payload?.length) return null;
+                  const d = payload[0].payload;
+                  return (
+                    <TooltipCard>
+                      <div className="font-semibold text-ink">{d.system}</div>
+                      <div className="tnum text-frontier mt-1">{d.bandwidth} GB/s</div>
+                      <div className="tnum text-accent">{d.tps} t/s</div>
+                    </TooltipCard>
+                  );
+                }}
+              />
+              <Scatter name="Benchmarks" data={bwData} fill={CHART.accent} fillOpacity={0.8} />
+              <Customized component={(chartProps: { xAxisMap?: AxisMap; yAxisMap?: AxisMap }) => (
+                <BwTrendOverlay {...chartProps} reg={reg} xMin={bwXMin} xMax={bwXMax} />
+              )} />
+            </ScatterChart>
+          </ResponsiveContainer>
         </div>
-        <p className="text-sm text-gray-400 mb-4">
-          Near-linear correlation confirms memory bandwidth as the dominant bottleneck.
-          {reg && ` Trend: ${reg.slope.toFixed(2)} t/s per GB/s (amber dashed line).`}
-        </p>
-        <ResponsiveContainer width="100%" height={320}>
-          <ScatterChart margin={{ top: 10, right: 40, bottom: 40, left: 20 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-            <XAxis
-              dataKey="bandwidth"
-              name="Bandwidth (GB/s)"
-              type="number"
-              stroke="#6b7280"
-              label={{ value: 'Memory Bandwidth (GB/s)', position: 'insideBottom', offset: -20, fill: '#9ca3af', fontSize: 12 }}
-              tick={{ fill: '#6b7280', fontSize: 11 }}
-            />
-            <YAxis
-              dataKey="tps"
-              name="Tokens/sec"
-              type="number"
-              stroke="#6b7280"
-              label={{ value: 'Tokens/sec', angle: -90, position: 'insideLeft', offset: 15, fill: '#9ca3af', fontSize: 12 }}
-              tick={{ fill: '#6b7280', fontSize: 11 }}
-            />
-            <Tooltip
-              cursor={{ stroke: '#4b5563', strokeWidth: 1, strokeDasharray: '4 4' }}
-              content={({ payload }) => {
-                if (!payload?.length) return null;
-                const d = payload[0].payload;
-                return (
-                  <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm shadow-xl">
-                    <div className="font-semibold text-white">{d.system}</div>
-                    <div className="text-amber-400">{d.bandwidth} GB/s</div>
-                    <div className="text-cyan-400">{d.tps} t/s</div>
-                  </div>
-                );
-              }}
-            />
-            <Scatter name="Benchmarks" data={bwData} fill="#22d3ee" opacity={0.85} />
-            <Customized component={(chartProps: { xAxisMap?: AxisMap; yAxisMap?: AxisMap }) => (
-              <BwTrendOverlay {...chartProps} reg={reg} xMin={bwXMin} xMax={bwXMax} />
-            )} />
-          </ScatterChart>
-        </ResponsiveContainer>
-      </div>
+      </Card>
 
       {/* Recent Submissions */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Recent Submissions</h2>
-          <Link to="/leaderboard" className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors">
-            Full leaderboard →
-          </Link>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-gray-400 border-b border-gray-700">
+      <Card className="animate-rise rise-2">
+        <CardHeader
+          title="Recent submissions"
+          right={
+            <Link to="/leaderboard" className="text-[13px] font-medium text-accent hover:text-accent-strong transition-colors">
+              Full leaderboard →
+            </Link>
+          }
+        />
+        <div className="overflow-x-auto px-5 pb-5">
+          <table className="w-full text-[13px] text-left">
+            <thead className="text-ink-3 border-b border-line">
               <tr>
                 <th className="pb-2.5 pr-4 font-medium">System</th>
                 <th className="pb-2.5 pr-4 font-medium">Model</th>
@@ -422,29 +449,29 @@ export default function Dashboard() {
               {benchmarks.slice(0, 10).map((b, idx) => (
                 <tr
                   key={b.id}
-                  className={`border-b border-gray-800/50 hover:bg-gray-800/40 transition-colors ${idx % 2 === 1 ? 'bg-gray-800/20' : ''}`}
+                  className={`border-b border-line hover:bg-surface-2 transition-colors ${idx % 2 === 1 ? 'bg-surface-2/40' : ''}`}
                 >
-                  <td className="py-2.5 pr-4 text-white font-medium whitespace-nowrap">{b.system_type || '—'}</td>
-                  <td className="py-2.5 pr-4 text-gray-300" title={b.model_name}>
+                  <td className="py-2.5 pr-4 text-ink font-medium whitespace-nowrap">{b.system_type || '—'}</td>
+                  <td className="py-2.5 pr-4 text-ink-2" title={b.model_name}>
                     {truncate(b.model_name, 22)}
                   </td>
-                  <td className="py-2.5 pr-4 text-gray-500 font-mono text-xs">{b.quantization}</td>
-                  <td className="py-2.5 pr-4 text-cyan-400 font-semibold font-mono">
+                  <td className="py-2.5 pr-4 tnum text-ink-3 text-xs">{b.quantization}</td>
+                  <td className="py-2.5 pr-4 tnum text-accent font-semibold">
                     {Number(b.tokens_per_second).toFixed(1)}
                   </td>
                   <td className="py-2.5 pr-4">
                     <BandwidthBadge gbs={b.memory_bandwidth_gbs ? Number(b.memory_bandwidth_gbs) : null} />
                   </td>
-                  <td className="py-2.5 pr-4 text-gray-400 text-xs whitespace-nowrap">
+                  <td className="py-2.5 pr-4 tnum text-ink-2 text-xs whitespace-nowrap">
                     {Number(b.total_ram_gb)} GB
                   </td>
-                  <td className="py-2.5 pr-4 text-gray-500 text-xs whitespace-nowrap">
+                  <td className="py-2.5 pr-4 text-ink-3 text-xs whitespace-nowrap">
                     {relativeTime(b.submitted_at)}
                   </td>
                   <td className="py-2.5">
                     <Link
                       to={`/benchmarks/${b.id}`}
-                      className="text-xs text-gray-500 hover:text-cyan-400 transition-colors whitespace-nowrap"
+                      className="text-xs text-ink-3 hover:text-accent transition-colors whitespace-nowrap"
                     >
                       View →
                     </Link>
@@ -454,7 +481,7 @@ export default function Dashboard() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { api } from '../api';
 import type { Benchmark } from '../api';
 import BandwidthBadge from '../components/BandwidthBadge';
 import MemoryLabel from '../components/MemoryLabel';
+import { Card, Skeleton, EmptyState } from '../components/ui';
 
 function num(value: number | string | null | undefined): number | null {
   if (value === null || value === undefined) return null;
@@ -18,11 +19,19 @@ function fmtDate(value: string): string {
   return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
 }
 
+function BackLink() {
+  return (
+    <Link to="/leaderboard" className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-strong transition-colors">
+      <ArrowLeft className="w-4 h-4" /> Back to leaderboard
+    </Link>
+  );
+}
+
 function Field({ label, value, accent }: { label: string; value: ReactNode; accent?: boolean }) {
   return (
-    <div className="flex justify-between gap-4 py-1.5 border-b border-gray-800/40 last:border-0">
-      <span className="text-gray-400 text-sm shrink-0">{label}</span>
-      <span className={`text-sm text-right ${accent ? 'text-cyan-400 font-semibold' : 'text-gray-200'}`}>
+    <div className="flex justify-between gap-4 py-1.5 border-b border-line last:border-0">
+      <span className="text-ink-2 text-sm shrink-0">{label}</span>
+      <span className={`text-sm text-right ${accent ? 'tnum text-accent font-semibold' : 'text-ink'}`}>
         {value ?? '—'}
       </span>
     </div>
@@ -31,10 +40,10 @@ function Field({ label, value, accent }: { label: string; value: ReactNode; acce
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-      <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">{title}</h2>
+    <Card className="p-5">
+      <h2 className="text-xs font-semibold text-ink-3 uppercase tracking-widest mb-3">{title}</h2>
       <div>{children}</div>
-    </div>
+    </Card>
   );
 }
 
@@ -75,33 +84,30 @@ export default function BenchmarkDetail() {
   if (invalidId) {
     return (
       <div className="space-y-4">
-        <Link to="/leaderboard" className="inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300">
-          <ArrowLeft className="w-4 h-4" /> Back to leaderboard
-        </Link>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-10 text-center">
-          <div className="text-lg font-semibold text-white">Invalid benchmark id</div>
-          <p className="text-gray-400 mt-1 text-sm">
-            <span className="font-mono text-gray-300">{id}</span> is not a valid benchmark id.
-          </p>
-        </div>
+        <BackLink />
+        <EmptyState title="Invalid benchmark id">
+          <span className="tnum text-ink">{id}</span> is not a valid benchmark id.
+        </EmptyState>
       </div>
     );
   }
 
-  if (loading) return <div className="text-center py-20 text-gray-400">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <BackLink />
+        <Skeleton rows={8} />
+      </div>
+    );
+  }
 
   if (notFound || !benchmark) {
     return (
       <div className="space-y-4">
-        <Link to="/leaderboard" className="inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300">
-          <ArrowLeft className="w-4 h-4" /> Back to leaderboard
-        </Link>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-10 text-center">
-          <div className="text-lg font-semibold text-white">Benchmark not found</div>
-          <p className="text-gray-400 mt-1 text-sm">
-            No benchmark with id <span className="font-mono text-gray-300">{id}</span> exists.
-          </p>
-        </div>
+        <BackLink />
+        <EmptyState title="Benchmark not found">
+          No benchmark with id <span className="tnum text-ink">{id}</span> exists.
+        </EmptyState>
       </div>
     );
   }
@@ -117,58 +123,56 @@ export default function BenchmarkDetail() {
 
   return (
     <div className="space-y-6">
-      <Link to="/leaderboard" className="inline-flex items-center gap-1.5 text-sm text-cyan-400 hover:text-cyan-300">
-        <ArrowLeft className="w-4 h-4" /> Back to leaderboard
-      </Link>
+      <BackLink />
 
       {/* Header */}
-      <div className="bg-gray-900 border border-cyan-900/50 rounded-xl p-6">
-        <div className="text-xs text-gray-500 uppercase tracking-widest mb-1">Benchmark #{b.id}</div>
-        <h1 className="text-2xl font-bold text-white">{b.system_type || b.cpu_model}</h1>
-        <div className="text-gray-400 mt-1 text-sm">
+      <Card className="p-6 animate-rise rise-1">
+        <div className="text-[11px] text-ink-3 uppercase tracking-[0.14em] mb-1">Benchmark #{b.id}</div>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink">{b.system_type || b.cpu_model}</h1>
+        <div className="text-ink-2 mt-1 text-sm">
           {b.model_name} · {b.quantization} · {b.inference_engine}
         </div>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-3 mt-4">
           <div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-4xl font-mono font-bold text-cyan-400">{Number(b.tokens_per_second).toFixed(1)}</span>
-              <span className="text-base text-cyan-600">t/s</span>
+              <span className="tnum text-4xl font-semibold text-ink">{Number(b.tokens_per_second).toFixed(1)}</span>
+              <span className="text-base text-accent">t/s</span>
             </div>
-            <div className="text-xs text-gray-500 mt-0.5">throughput</div>
+            <div className="text-xs text-ink-3 mt-0.5">throughput</div>
           </div>
           <div>
-            <div className="text-2xl font-mono font-bold text-white">{b.hei?.toFixed(2) ?? '—'}</div>
-            <div className="text-xs text-gray-500 mt-0.5">HEI (value)</div>
+            <div className="tnum text-2xl font-semibold text-ink">{b.hei?.toFixed(2) ?? '—'}</div>
+            <div className="text-xs text-ink-3 mt-0.5">HEI (value)</div>
           </div>
           <div>
             <BandwidthBadge gbs={num(b.memory_bandwidth_gbs)} />
-            <div className="text-xs text-gray-500 mt-1">memory bandwidth</div>
+            <div className="text-xs text-ink-3 mt-1">memory bandwidth</div>
           </div>
         </div>
-      </div>
+      </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
         <Section title="Performance">
-          <Field label="Tokens / sec" value={`${Number(b.tokens_per_second).toFixed(2)}`} accent />
-          <Field label="Time to first token" value={ttft != null ? `${ttft.toFixed(3)} s` : '—'} />
-          <Field label="Prompt tokens" value={b.prompt_tokens} />
-          <Field label="Completion tokens" value={b.completion_tokens} />
-          <Field label="Test duration" value={`${Number(b.test_duration_secs).toFixed(1)} s`} />
-          <Field label="Total power" value={power != null ? `${power.toFixed(1)} W` : '—'} />
-          <Field label="Watts / token" value={wattsPerTok != null ? wattsPerTok.toFixed(4) : '—'} />
+          <Field label="Tokens / sec" value={<span className="tnum">{Number(b.tokens_per_second).toFixed(2)}</span>} accent />
+          <Field label="Time to first token" value={ttft != null ? <span className="tnum">{ttft.toFixed(3)} s</span> : '—'} />
+          <Field label="Prompt tokens" value={<span className="tnum">{b.prompt_tokens}</span>} />
+          <Field label="Completion tokens" value={<span className="tnum">{b.completion_tokens}</span>} />
+          <Field label="Test duration" value={<span className="tnum">{Number(b.test_duration_secs).toFixed(1)} s</span>} />
+          <Field label="Total power" value={power != null ? <span className="tnum">{power.toFixed(1)} W</span> : '—'} />
+          <Field label="Watts / token" value={wattsPerTok != null ? <span className="tnum">{wattsPerTok.toFixed(4)}</span> : '—'} />
         </Section>
 
         <Section title="Quality & Value">
-          <Field label="Model quality (MMLU)" value={quality != null ? quality.toFixed(1) : '—'} />
+          <Field label="Model quality (MMLU)" value={quality != null ? <span className="tnum">{quality.toFixed(1)}</span> : '—'} />
           <Field label="Quality source" value={b.quality_source ?? '—'} />
           <Field label="Hardware Efficiency Index" value={b.hei?.toFixed(4) ?? '—'} accent />
-          <Field label="Hardware price" value={price != null ? `$${price.toLocaleString()}` : '—'} />
+          <Field label="Hardware price" value={price != null ? <span className="tnum">${price.toLocaleString()}</span> : '—'} />
         </Section>
 
         <Section title="Hardware">
           <Field label="System" value={b.system_type ?? '—'} />
           <Field label="CPU" value={b.cpu_model} />
-          <Field label="Cores / threads" value={`${b.cpu_cores ?? '?'} / ${b.cpu_threads ?? '?'}`} />
+          <Field label="Cores / threads" value={<span className="tnum">{`${b.cpu_cores ?? '?'} / ${b.cpu_threads ?? '?'}`}</span>} />
           <Field label="Discrete GPU" value={b.gpu_model ?? 'None'} />
           <Field label="Integrated GPU" value={b.igpu_model ?? 'None'} />
           <Field
@@ -184,14 +188,14 @@ export default function BenchmarkDetail() {
           <Field label="Model" value={`${b.model_name}${params != null ? ` · ${params}B` : ''}`} />
           <Field label="Quantization" value={b.quantization} />
           <Field label="Thermal setting" value={b.thermal_setting ?? '—'} />
-          <Field label="Ambient temp" value={ambient != null ? `${ambient.toFixed(1)} °C` : '—'} />
+          <Field label="Ambient temp" value={ambient != null ? <span className="tnum">{ambient.toFixed(1)} °C</span> : '—'} />
           <Field label="Submitted" value={fmtDate(b.submitted_at)} />
-          <Field label="Fingerprint" value={<span className="font-mono text-xs">{b.fingerprint ?? '—'}</span>} />
+          <Field label="Fingerprint" value={<span className="tnum text-xs">{b.fingerprint ?? '—'}</span>} />
         </Section>
       </div>
 
       <div className="text-sm">
-        <Link to={`/compare`} className="text-cyan-400 hover:text-cyan-300">Compare with another system →</Link>
+        <Link to={`/compare`} className="text-accent hover:text-accent-strong transition-colors">Compare with another system →</Link>
       </div>
     </div>
   );

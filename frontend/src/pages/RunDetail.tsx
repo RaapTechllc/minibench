@@ -1,34 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { api } from '../api';
 import type { AgentRunDetail, AgentTaskResult } from '../api';
-
-function fmtCost(v: number | null): string {
-  if (v == null) return '—';
-  // Decimal fields serialize as JSON strings (pydantic), not numbers — coerce
-  // before formatting or .toFixed() throws on a string at render time.
-  const n = Number(v);
-  return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(3)}`;
-}
-
-function fmtPct(v: number | null): string {
-  return v == null ? '—' : `${Number(v).toFixed(1)}%`;
-}
+import {
+  PageHeader, Card, CardHeader, Stat, Badge, ValidityBadge,
+  Skeleton, EmptyState, ErrorState, CIBar,
+} from '../components/ui';
+import { fmtPct, fmtCost } from '../components/chart';
 
 function fmtDate(value: string | null): string {
   if (!value) return '—';
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
-}
-
-function StatCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</div>
-      <div className={`text-xl font-bold tabular-nums ${accent ?? 'text-white'}`}>{value}</div>
-    </div>
-  );
 }
 
 // Grouping tasks by category mirrors LiveBench's per-category breakdown and
@@ -47,32 +31,43 @@ function groupByCategory(results: AgentTaskResult[]): Map<string, AgentTaskResul
 function CategoryPassRate({ results }: { results: AgentTaskResult[] }) {
   const passed = results.filter(r => r.passed).length;
   const pct = (passed / results.length) * 100;
-  const color = pct >= 80 ? 'text-emerald-400' : pct >= 50 ? 'text-amber-400' : 'text-red-400';
+  const tone = pct >= 80 ? 'pass' : pct >= 50 ? 'neutral' : 'fail';
   return (
-    <span className={`font-mono font-semibold ${color}`}>
-      {passed}/{results.length} ({pct.toFixed(0)}%)
-    </span>
+    <Badge tone={tone}>
+      <span className="tnum">{passed}/{results.length} ({pct.toFixed(0)}%)</span>
+    </Badge>
   );
 }
+
+const BackLink = () => (
+  <Link to="/agents" className="inline-flex items-center gap-1.5 text-accent hover:text-accent-strong text-sm">
+    <ArrowLeft className="w-4 h-4" /> Back to leaderboard
+  </Link>
+);
 
 export default function RunDetail() {
   const { runId } = useParams<{ runId: string }>();
   const [run, setRun] = useState<AgentRunDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    if (!runId) return;
+  const load = useCallback(() => {
+    if (!runId) return () => {};
     let active = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+    setError(false);
+    setNotFound(false);
     api
       .getAgentRun(runId)
       .then(r => {
         if (active) setRun(r);
       })
-      .catch(() => {
-        if (active) setNotFound(true);
+      .catch((e: unknown) => {
+        // A 404 is "no such run"; anything else is a transient/load failure.
+        if (!active) return;
+        if (e instanceof Error && e.message.includes('404')) setNotFound(true);
+        else setError(true);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -82,18 +77,35 @@ export default function RunDetail() {
     };
   }, [runId]);
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    const cleanup = load();
+    return cleanup;
+  }, [load]);
+
   if (loading) {
-    return <div className="text-center py-10 text-gray-400">Loading...</div>;
+    return (
+      <div className="space-y-6">
+        <BackLink />
+        <Skeleton rows={7} />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <BackLink />
+        <ErrorState onRetry={load}>Something went wrong loading this run.</ErrorState>
+      </div>
+    );
   }
   if (notFound || !run) {
     return (
-      <div className="space-y-4">
-        <Link to="/agents" className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 text-sm">
-          <ArrowLeft className="w-4 h-4" /> Back to leaderboard
-        </Link>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl text-center py-10 text-gray-500">
-          Run not found.
-        </div>
+      <div className="space-y-6">
+        <BackLink />
+        <EmptyState title="Run not found">
+          This run may have been removed, or the link is incorrect.
+        </EmptyState>
       </div>
     );
   }
@@ -102,123 +114,126 @@ export default function RunDetail() {
   const models = run.moa_config?.models ?? [];
   const selfMoa = run.moa_config?.self_moa ?? false;
   const categories = [...groupByCategory(run.results).entries()].sort(([a], [b]) => a.localeCompare(b));
+  const hasCI = run.ci95_low != null && run.ci95_high != null;
 
   return (
     <div className="space-y-6">
-      <Link to="/agents" className="inline-flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 text-sm">
-        <ArrowLeft className="w-4 h-4" /> Back to leaderboard
-      </Link>
+      <BackLink />
 
-      <div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-3xl font-bold text-white">{configName}</h1>
-          {selfMoa && (
-            <span className="text-xs text-purple-400 bg-purple-400/10 border border-purple-400/25 rounded px-2 py-0.5">
-              Self-MoA
-            </span>
-          )}
-        </div>
-        <p className="text-gray-400 mt-1 text-sm">
-          {run.benchmark_suite} · {run.provider ?? 'unknown provider'} · submitted {fmtDate(run.submitted_at)}
-          {run.model_snapshot_date && ` · snapshot ${run.model_snapshot_date}`}
-        </p>
-        {models.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {models.map(m => (
-              <span
-                key={m}
-                className="text-xs text-gray-300 bg-gray-800 border border-gray-700 rounded px-2 py-0.5 font-mono"
-              >
-                {m}
-              </span>
-            ))}
-          </div>
+      <PageHeader eyebrow={run.benchmark_suite} title={configName}>
+        {run.provider ?? 'unknown provider'} · submitted {fmtDate(run.submitted_at)}
+        {run.model_snapshot_date && ` · snapshot ${run.model_snapshot_date}`}
+      </PageHeader>
+
+      <div className="flex flex-wrap items-center gap-2 animate-rise">
+        <ValidityBadge isPrivate={run.is_private_split} />
+        {run.grader_version && (
+          <Badge tone="neutral" title="Grader version used to score this run.">
+            grader <span className="tnum">{run.grader_version}</span>
+          </Badge>
         )}
+        {selfMoa && (
+          <Badge tone="frontier" title="Self-mixture-of-agents: one model composed with itself.">Self-MoA</Badge>
+        )}
+        {models.map(m => (
+          <Badge key={m} tone="neutral"><span className="font-mono">{m}</span></Badge>
+        ))}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Pass rate" value={fmtPct(run.pass_rate)} accent="text-cyan-400" />
-        <StatCard label="Pass^k" value={fmtPct(run.pass_hat_k)} />
-        <StatCard
-          label="95% CI"
-          value={run.ci95_low != null && run.ci95_high != null
-            ? `${Number(run.ci95_low).toFixed(0)}–${Number(run.ci95_high).toFixed(0)}%`
-            : '—'}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-rise rise-1">
+        <Stat
+          label="Pass rate"
+          accent
+          value={
+            hasCI
+              ? <CIBar value={Number(run.pass_rate)} lo={Number(run.ci95_low)} hi={Number(run.ci95_high)} />
+              : fmtPct(run.pass_rate)
+          }
+          sub={hasCI ? `95% CI ${Number(run.ci95_low).toFixed(0)}–${Number(run.ci95_high).toFixed(0)}%` : undefined}
         />
-        <StatCard label="Cost/task" value={fmtCost(run.cost_usd_per_task)} accent="text-amber-400" />
-        <StatCard
-          label="Latency p50/p95"
+        <Stat label="Pass^k" value={fmtPct(run.pass_hat_k)} />
+        <Stat label="Cost / task" value={fmtCost(run.cost_usd_per_task)} />
+        <Stat
+          label="Latency p50 / p95"
           value={run.latency_p50_ms != null && run.latency_p95_ms != null
             ? `${run.latency_p50_ms} / ${run.latency_p95_ms}ms`
             : '—'}
         />
-        <StatCard label="Tasks × trials" value={`${run.n_tasks} × ${run.n_trials}`} />
-        <StatCard
-          label="Tokens in/out"
+        {run.calibration_brier != null && (
+          <Stat
+            label="Calibration (Brier)"
+            value={Number(run.calibration_brier).toFixed(3)}
+            sub="lower is better"
+          />
+        )}
+        {run.robustness_correct != null && (
+          <Stat
+            label="Robustness"
+            value={fmtPct(Number(run.robustness_correct) * 100)}
+            sub="solved on both sides of a perturbation"
+          />
+        )}
+        <Stat label="Tasks × trials" value={`${run.n_tasks} × ${run.n_trials}`} />
+        <Stat
+          label="Tokens in / out"
           value={run.tokens_in != null && run.tokens_out != null
             ? `${run.tokens_in.toLocaleString()} / ${run.tokens_out.toLocaleString()}`
             : '—'}
         />
-        <StatCard label="Harness" value={run.harness ?? '—'} />
+        <Stat label="Harness" value={run.harness ?? '—'} />
       </div>
 
       {/* Task-by-task breakdown, grouped by category — the drill-down every
           comparable leaderboard (LiveBench, PinchBench) treats as core. */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-white">Task results</h2>
+      <div className="space-y-4 animate-rise rise-2">
+        <h2 className="text-lg font-semibold text-ink">Task results</h2>
         {run.results.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl text-center py-10 text-gray-500">
-            No per-task results recorded for this run.
-          </div>
+          <EmptyState title="No per-task results">
+            No per-task results were recorded for this run.
+          </EmptyState>
         ) : (
           categories.map(([category, results]) => (
-            <div key={category} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800 bg-gray-900/60">
-                <span className="text-sm font-semibold text-white capitalize">{category}</span>
-                <CategoryPassRate results={results} />
-              </div>
-              <table className="w-full text-sm text-left">
-                <thead className="text-gray-500 text-xs">
-                  <tr>
-                    <th className="px-4 py-2 font-medium">Task</th>
-                    <th className="px-4 py-2 font-medium">Trial</th>
-                    <th className="px-4 py-2 font-medium">Result</th>
-                    <th className="px-4 py-2 font-medium">Score</th>
-                    <th className="px-4 py-2 font-medium">Cost</th>
-                    <th className="px-4 py-2 font-medium">Latency</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((r, idx) => (
-                    <tr
-                      key={`${r.task_id}-${r.trial ?? idx}`}
-                      className="border-t border-gray-800/50 hover:bg-gray-800/30"
-                    >
-                      <td className="px-4 py-2 text-gray-300 font-mono text-xs">{r.task_id}</td>
-                      <td className="px-4 py-2 text-gray-500 tabular-nums">{r.trial ?? '—'}</td>
-                      <td className="px-4 py-2">
-                        <span
-                          className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                            r.passed
-                              ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/25'
-                              : 'text-red-400 bg-red-400/10 border border-red-400/25'
-                          }`}
-                        >
-                          {r.passed ? 'PASS' : 'FAIL'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-gray-300 tabular-nums">
-                        {r.score != null ? Number(r.score).toFixed(2) : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-amber-400 tabular-nums">{fmtCost(r.cost_usd)}</td>
-                      <td className="px-4 py-2 text-gray-400 tabular-nums">
-                        {r.latency_ms != null ? `${r.latency_ms}ms` : '—'}
-                      </td>
+            <Card key={category} className="overflow-hidden">
+              <CardHeader
+                title={category.charAt(0).toUpperCase() + category.slice(1)}
+                right={<CategoryPassRate results={results} />}
+              />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-ink-3 text-xs border-y border-line">
+                    <tr>
+                      <th className="px-5 py-2 font-medium">Task</th>
+                      <th className="px-5 py-2 font-medium">Trial</th>
+                      <th className="px-5 py-2 font-medium">Result</th>
+                      <th className="px-5 py-2 font-medium">Score</th>
+                      <th className="px-5 py-2 font-medium">Cost</th>
+                      <th className="px-5 py-2 font-medium">Latency</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {results.map((r, idx) => (
+                      <tr
+                        key={`${r.task_id}-${r.trial ?? idx}`}
+                        className="border-t border-line hover:bg-surface-2"
+                      >
+                        <td className="px-5 py-2 text-ink font-mono text-xs">{r.task_id}</td>
+                        <td className="px-5 py-2 text-ink-3 tnum">{r.trial ?? '—'}</td>
+                        <td className="px-5 py-2">
+                          <Badge tone={r.passed ? 'pass' : 'fail'}>{r.passed ? 'PASS' : 'FAIL'}</Badge>
+                        </td>
+                        <td className="px-5 py-2 text-ink-2 tnum">
+                          {r.score != null ? Number(r.score).toFixed(2) : '—'}
+                        </td>
+                        <td className="px-5 py-2 text-ink-2 tnum">{fmtCost(r.cost_usd)}</td>
+                        <td className="px-5 py-2 text-ink-2 tnum">
+                          {r.latency_ms != null ? `${r.latency_ms}ms` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           ))
         )}
       </div>

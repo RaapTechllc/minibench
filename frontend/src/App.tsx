@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Cpu, BarChart3, GitCompare, Terminal, Database, Bot, Calculator, Trophy } from 'lucide-react';
+import { Gauge, BarChart3, GitCompare, Terminal, Database, Bot, Calculator, Trophy, Menu, X } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Leaderboard from './pages/Leaderboard';
 import Compare from './pages/Compare';
@@ -12,9 +13,9 @@ import MoaCalculator from './pages/MoaCalculator';
 import Models from './pages/Models';
 
 const NAV = [
-  { path: '/', label: 'Dashboard', icon: BarChart3 },
+  { path: '/', label: 'Overview', icon: BarChart3 },
   { path: '/models', label: 'Models', icon: Trophy },
-  { path: '/leaderboard', label: 'Leaderboard', icon: Cpu },
+  { path: '/leaderboard', label: 'Hardware Leaderboard', icon: Gauge },
   { path: '/agents', label: 'Agents', icon: Bot },
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/moa-calculator', label: 'MoA Calculator', icon: Calculator },
@@ -22,37 +23,66 @@ const NAV = [
   { path: '/submit', label: 'Submit', icon: Terminal },
 ];
 
+function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
+  return (
+    <>
+      {NAV.map(({ path, label, icon: Icon }) => {
+        const active = pathname === path;
+        return (
+          <Link
+            key={path}
+            to={path}
+            onClick={onNavigate}
+            aria-current={active ? 'page' : undefined}
+            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+              active ? 'bg-accent-soft text-accent-strong' : 'text-ink-2 hover:text-ink hover:bg-surface-2'
+            }`}
+          >
+            <Icon className="h-4 w-4" strokeWidth={2} />
+            {label}
+          </Link>
+        );
+      })}
+    </>
+  );
+}
+
 export default function App() {
   const { pathname } = useLocation();
+  const [open, setOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
-      <nav className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 flex items-center h-14 gap-6">
-          <Link to="/" className="flex items-center gap-2 font-bold text-lg text-white shrink-0">
-            <Cpu className="w-5 h-5 text-cyan-400" />
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-50 border-b border-line bg-paper/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 lg:px-6">
+          <Link to="/" className="flex shrink-0 items-center gap-2 font-semibold tracking-tight text-ink">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-white">
+              <Gauge className="h-4 w-4" strokeWidth={2.5} />
+            </span>
             MiniBench
           </Link>
-          <div className="flex gap-1 overflow-x-auto">
-            {NAV.map(({ path, label, icon: Icon }) => (
-              <Link
-                key={path}
-                to={path}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
-                  pathname === path
-                    ? 'bg-cyan-500/15 text-cyan-400'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </Link>
-            ))}
-          </div>
+          <nav className="ml-2 hidden items-center gap-0.5 lg:flex">
+            <NavLinks pathname={pathname} />
+          </nav>
+          <button
+            className="ml-auto grid h-9 w-9 place-items-center rounded-lg text-ink-2 hover:bg-surface-2 lg:hidden"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
-      </nav>
+        {open && (
+          <nav className="border-t border-line bg-surface px-3 py-2 lg:hidden">
+            <div className="flex flex-col gap-0.5">
+              <NavLinks pathname={pathname} onNavigate={() => setOpen(false)} />
+            </div>
+          </nav>
+        )}
+      </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
+      <main className="mx-auto max-w-7xl px-4 py-8 lg:px-6 lg:py-10">
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/models" element={<Models />} />
@@ -67,8 +97,10 @@ export default function App() {
         </Routes>
       </main>
 
-      <footer className="border-t border-gray-800 py-4 text-center text-sm text-gray-500">
-        MiniBench by RaapTech LLC — Memory bandwidth is king.
+      <footer className="mx-auto max-w-7xl px-4 py-8 lg:px-6">
+        <div className="border-t border-line pt-6 text-[13px] text-ink-3">
+          MiniBench by RaapTech LLC — deterministic, contamination-resistant model evaluation.
+        </div>
       </footer>
     </div>
   );
