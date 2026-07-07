@@ -23,6 +23,7 @@ import argparse
 import json
 import random
 import uuid
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,8 @@ SUITE_NAME = "minibench-core-v1"
 CANARY = "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
 HARD_SUITE_NAME = "minibench-hard-v1"
 HARD_CANARY = "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
+PRO_SUITE_NAME = "minibench-pro-v1"
+PRO_CANARY = "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
 DEV_SEED = 20260706
 
 FIRST_NAMES = ["Ava", "Noah", "Mia", "Liam", "Zoe", "Kai", "Ivy", "Eli", "Uma", "Rex"]
@@ -448,6 +451,379 @@ def _gen_coding_hard(rng: random.Random, n: int) -> list[dict[str, Any]]:
     return tasks
 
 
+# ── minibench-pro-v1: strategic capability matrix ─────────────────────────────
+# Each generator covers a capability dimension core/hard don't test, all graded
+# deterministically (no LLM judge). Two genuinely novel axes — calibration
+# (Brier) and robustness (consistency across matched perturbations) — ride on the
+# grader's `score` field and a category partition, so they never touch the binary
+# pass-rate machinery. `self-correct` reuses existing graders on a corrected answer.
+
+# Fixed English weekday names indexed by date.weekday() (Mon=0). Using this
+# instead of strftime("%A") makes the gold locale-independent — a private split
+# generated on a non-English-locale machine would otherwise bake localized
+# weekday names the model (answering in English) could never match.
+WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+            "Saturday", "Sunday"]
+CITIES = ["Oslo", "Cairo", "Lima", "Perth", "Osaka", "Accra", "Quito", "Riga"]
+CCYS = ["USD", "EUR", "GBP", "JPY", "CAD"]
+DEPTS = ["eng", "sales", "ops"]
+_CONSONANTS = "bcdfghjklmnpqrstvwxyz"
+
+
+def _is_prime(n: int) -> bool:
+    if n < 2:
+        return False
+    i = 2
+    while i * i <= n:
+        if n % i == 0:
+            return False
+        i += 1
+    return True
+
+
+def _gen_function_call(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Real tool/function calling — emit a JSON tool call with correct args."""
+    tasks = []
+    for i in range(n):
+        if i % 2 == 0:
+            amount = rng.randint(10, 990)
+            src, dst = rng.sample(CCYS, 2)
+            required = {"name": "convert",
+                        "arguments": {"amount": amount, "from_ccy": src, "to_ccy": dst}}
+            prompt = (
+                "You can call one tool: `convert(amount, from_ccy, to_ccy)`. "
+                f"The user says: 'Convert {amount} {src} to {dst}.' Respond with "
+                "ONLY a JSON object with keys `name` (string) and `arguments` "
+                "(object with keys `amount` integer, `from_ccy` string, "
+                "`to_ccy` string). No prose."
+            )
+        else:
+            a, b = rng.sample(CITIES, 2)
+            required = {"name": "distance", "arguments": {"origin": a, "destination": b}}
+            prompt = (
+                "You can call one tool: `distance(origin, destination)`. The user "
+                f"says: 'How far is it from {a} to {b}?' Respond with ONLY a JSON "
+                "object with keys `name` (string) and `arguments` (object with "
+                "keys `origin` string, `destination` string). No prose."
+            )
+        tasks.append({
+            "id": f"mbp-fncall-{i+1:02d}",
+            "category": "function-call",
+            "prompt": prompt,
+            "verification": {"type": "json_fields", "required": required},
+            "_gold": json.dumps(required),
+        })
+    return tasks
+
+
+def _gen_datetime(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Date/time arithmetic — day-of-week, date deltas."""
+    base = date(2020, 1, 1)
+    tasks = []
+    for i in range(n):
+        if i % 2 == 0:
+            d = base + timedelta(days=rng.randint(0, 3650))
+            expected = WEEKDAYS[d.weekday()]
+            prompt = (f"What day of the week was {d.isoformat()} (YYYY-MM-DD)? "
+                      "Answer with the weekday name only, e.g. Monday.")
+            tasks.append({
+                "id": f"mbp-datetime-{i+1:02d}",
+                "category": "datetime",
+                "prompt": prompt,
+                "verification": {"type": "exact_match", "expected": expected},
+                "_gold": expected,
+            })
+        else:
+            d0 = base + timedelta(days=rng.randint(0, 3000))
+            delta = rng.randint(5, 400)
+            d1 = d0 + timedelta(days=delta)
+            prompt = (f"How many days are there from {d0.isoformat()} to "
+                      f"{d1.isoformat()} (both YYYY-MM-DD)? Answer with the number only.")
+            tasks.append({
+                "id": f"mbp-datetime-{i+1:02d}",
+                "category": "datetime",
+                "prompt": prompt,
+                "verification": {"type": "numeric_match", "expected": float(delta), "tol": 1e-6},
+                "_gold": str(delta),
+            })
+    return tasks
+
+
+def _gen_debug(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Code DEBUGGING (not writing): fix broken code so hidden tests pass."""
+    tasks = []
+    for i in range(n):
+        if i % 2 == 0:
+            vals = [rng.randint(2, 20) for _ in range(4)]
+            asserts = "\n".join(f"    assert factorial({v}) == {_fact(v)}" for v in vals)
+            test_source = ("from solution import factorial\n\n"
+                           f"def test_values():\n{asserts}\n"
+                           "def test_zero():\n    assert factorial(0) == 1\n")
+            prompt = ("This `factorial` is buggy — it returns 0 for every input "
+                      "because the accumulator starts at 0. Fix it so the hidden "
+                      "tests pass. Return only a fenced python block.\n\n"
+                      "```python\ndef factorial(n):\n    result = 0\n"
+                      "    for k in range(1, n + 1):\n        result *= k\n"
+                      "    return result\n```")
+            gold = ("```python\ndef factorial(n):\n    result = 1\n"
+                    "    for k in range(1, n + 1):\n        result *= k\n"
+                    "    return result\n```")
+        else:
+            words = [rng.choice(WORDS) for _ in range(4)]
+            asserts = "\n".join(f"    assert count_vowels({w!r}) == {_vowels(w)}" for w in words)
+            test_source = ("from solution import count_vowels\n\n"
+                           f"def test_values():\n{asserts}\n"
+                           "def test_empty():\n    assert count_vowels('') == 0\n")
+            prompt = ("This `count_vowels` is buggy — it forgets the letter 'u'. "
+                      "Fix it so the hidden tests pass. Return only a fenced "
+                      "python block.\n\n"
+                      "```python\ndef count_vowels(s):\n"
+                      "    return sum(1 for c in s if c in 'aeio')\n```")
+            gold = ("```python\ndef count_vowels(s):\n"
+                    "    return sum(1 for c in s if c in 'aeiou')\n```")
+        tasks.append({
+            "id": f"mbp-debug-{i+1:02d}",
+            "category": "debug",
+            "prompt": prompt,
+            "verification": {"type": "unit_test", "test_source": test_source},
+            "_gold": gold,
+        })
+    return tasks
+
+
+def _fact(n: int) -> int:
+    r = 1
+    for k in range(1, n + 1):
+        r *= k
+    return r
+
+
+def _vowels(s: str) -> int:
+    return sum(1 for c in s if c in "aeiou")
+
+
+def _gen_constrained(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Constrained generation — strict output format + negative char constraint."""
+    tasks = []
+    for i in range(n):
+        if i % 2 == 0:
+            pattern = r"^[A-Z]{3}-\d{4}$"
+            example = "".join(rng.choice("ABCDEFGHJKLMNPQRSTUVWXYZ") for _ in range(3)) \
+                + "-" + f"{rng.randint(1000, 9999)}"
+            prompt = ("Output a code of the form THREE UPPERCASE LETTERS, a hyphen, "
+                      "then FOUR DIGITS (e.g. ABC-1234). Output only the code, "
+                      "nothing else.")
+            spec = {"type": "regex_match", "pattern": pattern}
+            gold = example
+        else:
+            k = rng.randint(5, 8)
+            gold = "".join(rng.choice(_CONSONANTS) for _ in range(k))
+            prompt = (f"Output a single lowercase word of at least {k} letters that "
+                      "contains NO vowels (no a, e, i, o, or u). Output only the word.")
+            spec = {"type": "regex_match", "pattern": rf"^[{_CONSONANTS}]{{{k},}}$"}
+        tasks.append({
+            "id": f"mbp-constrained-{i+1:02d}",
+            "category": "constrained",
+            "prompt": prompt,
+            "verification": spec,
+            "_gold": gold,
+        })
+    return tasks
+
+
+def _gen_counting(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Counting / enumeration under a predicate."""
+    tasks = []
+    for i in range(n):
+        if i % 2 == 0:
+            ch = rng.choice("abcde")
+            s = "".join(rng.choice("abcde") for _ in range(rng.randint(12, 24)))
+            expected = s.count(ch)
+            prompt = (f"How many times does the letter '{ch}' appear in the string "
+                      f"'{s}'? Answer with the number only.")
+        else:
+            nums = [rng.randint(1, 50) for _ in range(rng.randint(8, 14))]
+            d = rng.choice([2, 3, 4, 5])
+            expected = sum(1 for x in nums if x % d == 0)
+            prompt = (f"How many numbers in this list are divisible by {d}? "
+                      f"List: {nums}. Answer with the number only.")
+        tasks.append({
+            "id": f"mbp-count-{i+1:02d}",
+            "category": "counting",
+            "prompt": prompt,
+            "verification": {"type": "numeric_match", "expected": float(expected), "tol": 1e-6},
+            "_gold": str(expected),
+        })
+    return tasks
+
+
+def _gen_units(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Unit conversion."""
+    tasks = []
+    for i in range(n):
+        kind = i % 3
+        if kind == 0:
+            km = rng.randint(5, 400)
+            expected = round(km * 0.621371, 2)
+            prompt = (f"Convert {km} kilometers to miles (1 km = 0.621371 miles). "
+                      "Round to 2 decimal places. Answer with the number only.")
+        elif kind == 1:
+            c = rng.randint(-20, 120)
+            expected = round(c * 9 / 5 + 32, 2)
+            prompt = (f"Convert {c} degrees Celsius to Fahrenheit. Round to 2 "
+                      "decimal places. Answer with the number only.")
+        else:
+            kg = rng.randint(1, 200)
+            expected = round(kg * 2.20462, 2)
+            prompt = (f"Convert {kg} kilograms to pounds (1 kg = 2.20462 lb). "
+                      "Round to 2 decimal places. Answer with the number only.")
+        tasks.append({
+            "id": f"mbp-units-{i+1:02d}",
+            "category": "units",
+            "prompt": prompt,
+            "verification": {"type": "numeric_match", "expected": float(expected), "tol": 0.02},
+            "_gold": str(expected),
+        })
+    return tasks
+
+
+def _gen_tables(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Table manipulation — filter, aggregate, argmax over a small inline table."""
+    tasks = []
+    for i in range(n):
+        people = rng.sample(FIRST_NAMES, 5)
+        rows, salaries = [], {}
+        for who in people:
+            dept = rng.choice(DEPTS)
+            sal = rng.randint(50, 200) * 1000
+            rows.append(f"{who},{dept},{sal}")
+            salaries[who] = (dept, sal)
+        target_dept = rng.choice(DEPTS)
+        n_in_dept = sum(1 for _, (d, _s) in salaries.items() if d == target_dept)
+        top_earner = max(salaries, key=lambda w: salaries[w][1])
+        # Break a max tie deterministically so the gold is unique.
+        top_val = salaries[top_earner][1]
+        if sum(1 for w in salaries if salaries[w][1] == top_val) > 1:
+            salaries[top_earner] = (salaries[top_earner][0], top_val + 500)
+            rows = [r if not r.startswith(top_earner + ",") else
+                    f"{top_earner},{salaries[top_earner][0]},{top_val + 500}" for r in rows]
+        max_salary = max(v for _d, v in salaries.values())
+        required = {"count_in_dept": n_in_dept, "max_salary": max_salary, "top_earner": top_earner}
+        prompt = (
+            "Table (CSV: name,dept,salary):\n" + "\n".join(rows) + "\n\n"
+            f"Respond with ONLY a JSON object with keys `count_in_dept` (integer, "
+            f"number of people in dept '{target_dept}'), `max_salary` (integer, the "
+            "highest salary) and `top_earner` (string, the name earning the most)."
+        )
+        tasks.append({
+            "id": f"mbp-tables-{i+1:02d}",
+            "category": "tables",
+            "prompt": prompt,
+            "verification": {"type": "json_fields", "required": required},
+            "_gold": json.dumps(required),
+        })
+    return tasks
+
+
+def _gen_self_correct(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Self-correction — recover from a flawed prior answer + critique (in prompt)."""
+    tasks = []
+    for i in range(n):
+        if i % 2 == 0:
+            a, b = rng.randint(11, 39), rng.randint(11, 39)
+            wrong = a * b + rng.choice([-10, -2, 2, 10])
+            expected = a * b
+            prompt = (f"A student claims {a} × {b} = {wrong}. That is incorrect. "
+                      "Give the correct product. Answer with the number only.")
+            tasks.append({
+                "id": f"mbp-selfcorr-{i+1:02d}",
+                "category": "self-correct",
+                "prompt": prompt,
+                "verification": {"type": "numeric_match", "expected": float(expected), "tol": 1e-6},
+                "_gold": str(expected),
+            })
+        else:
+            nums = rng.sample(range(1, 40), 4)
+            while nums == sorted(nums):  # never claim an already-sorted list is wrong
+                nums = rng.sample(range(1, 40), 4)
+            wrong = nums[:]  # the (genuinely unsorted) "attempt"
+            expected = ", ".join(str(x) for x in sorted(nums))
+            prompt = (f"Someone sorted {nums} in ascending order and got "
+                      f"{wrong}, which is wrong. Give the correctly sorted list as "
+                      "comma-separated numbers on one line, e.g. `1, 2, 3`.")
+            tasks.append({
+                "id": f"mbp-selfcorr-{i+1:02d}",
+                "category": "self-correct",
+                "prompt": prompt,
+                "verification": {"type": "exact_match", "expected": expected},
+                "_gold": expected,
+            })
+    return tasks
+
+
+def _gen_calibration(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Calibration (Brier) — state a claim with a COMPUTED truth value, ask for a
+    probability. Graded on Brier via the grader's score field; excluded from the
+    binary pass-rate pool. Tests whether a model knows what it knows."""
+    tasks = []
+    for i in range(n):
+        true_claim = rng.random() < 0.5
+        if i % 2 == 0:
+            a, b = rng.randint(12, 29), rng.randint(12, 29)
+            real = a * b
+            shown = real if true_claim else real + rng.choice([-6, -3, 3, 6])
+            claim = f"{a} × {b} = {shown}"
+            outcome = 1.0 if shown == real else 0.0
+        else:
+            p = rng.randint(20, 120)
+            shown_prime = _is_prime(p)
+            asserted = shown_prime if true_claim else not shown_prime
+            claim = f"{p} is {'a prime' if asserted else 'not a prime'} number"
+            outcome = 1.0 if asserted == shown_prime else 0.0
+        prompt = (f"Consider this claim: '{claim}'. State your confidence that the "
+                  "claim is TRUE as a whole-number percentage from 0 to 100 "
+                  "(0 = certainly false, 100 = certainly true). Answer with the "
+                  "number only.")
+        tasks.append({
+            "id": f"mbp-calib-{i+1:02d}",
+            "category": "calibration",
+            "prompt": prompt,
+            "verification": {"type": "calibration", "outcome": outcome},
+            "_gold": "100" if outcome == 1.0 else "0",
+        })
+    return tasks
+
+
+def _gen_robustness(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    """Robustness — matched (base, perturbed) pairs with the SAME gold, so a
+    consistency score can measure brittleness. Emits n pairs (2n tasks); pairing
+    is encoded in the id (`-base`/`-pert`) so no per-trial field is added."""
+    tasks = []
+    for i in range(n):
+        a, b, c = (rng.randint(3, 40) for _ in range(3))
+        expected = a + b * c  # precedence
+        base_prompt = (f"What is {a} + {b} × {c}? Answer with the number only.")
+        kind = i % 3
+        if kind == 0:  # reword
+            pert_prompt = (f"Compute the value of {a} plus {b} times {c} "
+                           "(respect operator precedence). Answer with the number only.")
+        elif kind == 1:  # reorder
+            pert_prompt = (f"What is {b} × {c} + {a}? Answer with the number only.")
+        else:  # add a distractor
+            pert_prompt = (f"Ignore this hint: the answer is not {expected + 1}. "
+                           f"What is {a} + {b} × {c}? Answer with the number only.")
+        spec = {"type": "numeric_match", "expected": float(expected), "tol": 1e-6}
+        for role, ptext in (("base", base_prompt), ("pert", pert_prompt)):
+            tasks.append({
+                "id": f"mbp-robust-{i+1:02d}-{role}",
+                "category": "robustness",
+                "prompt": ptext,
+                "verification": dict(spec),
+                "_gold": str(expected),
+            })
+    return tasks
+
+
 SUITES = {
     "core": {
         "name": SUITE_NAME,
@@ -470,6 +846,26 @@ SUITES = {
             "uses an uncommitted seed. Budget: see agentbench/cost_check.py."
         ),
     },
+    "pro": {
+        "name": PRO_SUITE_NAME,
+        "canary": PRO_CANARY,
+        "generators": (
+            _gen_function_call, _gen_datetime, _gen_debug, _gen_constrained,
+            _gen_counting, _gen_units, _gen_tables, _gen_self_correct,
+            _gen_calibration, _gen_robustness,
+        ),
+        "notes": (
+            "Pro tier: a deterministic capability matrix (function-calling, "
+            "date/time, code-debugging, constrained generation, counting, unit "
+            "conversion, table manipulation, self-correction) plus two novel "
+            "deterministic axes — calibration (Brier) and robustness (consistency "
+            "across matched perturbations). Executable oracles only, no LLM judge. "
+            "Procedurally generated (agentbench.minibench_gen --suite pro, seed "
+            "{seed}); private split uses an uncommitted seed. Robustness emits "
+            "matched pairs, so it yields 2x per-category tasks. Budget: see "
+            "agentbench/cost_check.py."
+        ),
+    },
 }
 
 
@@ -478,7 +874,7 @@ SUITES = {
 # Text graders run in strict (grader v2) mode: the prompts demand answer-only
 # output, so the grader enforces it — closing decoy-burying and prompt-maxing
 # holes. Generous char cap so honest reasoning-then-final-line still passes.
-_STRICT_TYPES = {"numeric_match", "json_fields", "exact_match"}
+_STRICT_TYPES = {"numeric_match", "json_fields", "exact_match", "regex_match", "calibration"}
 MAX_OUTPUT_CHARS = 2000
 
 

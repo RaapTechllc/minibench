@@ -2,11 +2,13 @@ import pytest
 
 from agentbench.grading import (
     GRADER_VERSION,
+    calibration,
     check_solution_purity,
     contains_canary,
     exact_match,
     numeric_match,
     json_fields,
+    regex_match,
     unit_test,
     grade,
     extract_code,
@@ -194,6 +196,75 @@ def test_strict_graders_tolerate_reasoning_think_block_consistently():
     assert numeric_match(think + "42", 42, strict=True).passed
     assert json_fields(think + '{"a": 1}', {"a": 1}, strict=True).passed
     assert exact_match(think + "alpha, beta", "alpha, beta", strict=True).passed
+
+
+# ── pro graders: regex_match (constrained gen + negative constraints) ─────────
+
+
+def test_regex_match_constrained_generation():
+    pat = r"^[A-Z]{3}-\d{4}$"
+    assert regex_match("ABC-1234", pat, strict=True).passed
+    assert not regex_match("abc-1234", pat, strict=True).passed
+    assert not regex_match("ABC-12", pat, strict=True).passed
+
+
+def test_regex_match_negative_constraint():
+    # "answer without using the letter e"
+    assert regex_match("solution", r"e", must_match=False, strict=True).passed
+    assert not regex_match("theme", r"e", must_match=False, strict=True).passed
+
+
+def test_regex_match_strict_rejects_burying():
+    # A conforming token buried among prose fails: strict wants a single line.
+    pat = r"^[A-Z]{3}-\d{4}$"
+    sprayed = "Here are options:\nABC-1234\nXYZ-9999"
+    assert not regex_match(sprayed, pat, strict=True).passed
+
+
+def test_regex_match_grade_dispatch():
+    assert grade({"type": "regex_match", "pattern": r"^\d{3}$", "strict": True}, "123").passed
+    assert grade({"type": "regex_match", "pattern": r"z", "must_match": False,
+                  "strict": True}, "abc").passed
+
+
+# ── pro graders: calibration (Brier) ──────────────────────────────────────────
+
+
+def test_calibration_perfect_and_worst():
+    # Perfectly confident and correct → brier 0 → score 1, passed (gold path).
+    assert calibration("100", 1.0, strict=True).passed
+    assert calibration("0", 0.0, strict=True).passed
+    assert abs(calibration("100", 1.0).score - 1.0) < 1e-9
+    # Perfectly confident and WRONG → brier 1 → score 0.
+    assert abs(calibration("100", 0.0).score - 0.0) < 1e-9
+
+
+def test_calibration_percentage_scale_and_clamps():
+    # The prompt mandates 0-100; parsing is percentage-only and monotonic.
+    assert abs(calibration("50", 1.0).score - 0.75) < 1e-9   # hedge → brier 0.25
+    assert abs(calibration("50%", 1.0).score - 0.75) < 1e-9  # % suffix tolerated
+    # A compliant "1" means 1% (under-confident on a true claim), NOT certainty:
+    # brier = (0.01 - 1)^2 ≈ 0.9801, monotonic with "2" (0.02). This is the bug
+    # the review caught — "1" must not collapse to p=1.0.
+    assert calibration("1", 1.0).score < 0.05
+    assert calibration("1", 1.0).score < calibration("2", 1.0).score
+    # Out-of-range clamps rather than crashing.
+    assert 0.0 <= calibration("999", 1.0).score <= 1.0
+
+
+def test_calibration_no_answer_is_maximally_miscalibrated():
+    r = calibration("I'm not sure", 1.0, strict=True)
+    assert not r.passed
+    assert r.score == 0.0  # brier 1.0
+
+
+def test_calibration_tolerates_think_block():
+    assert calibration("<think>hmm, the 7th prime is 17</think>\n100", 1.0, strict=True).passed
+
+
+def test_calibration_grade_dispatch():
+    assert grade({"type": "calibration", "outcome": 1.0, "strict": True}, "100").passed
+    assert grade({"type": "calibration", "outcome": 0.0, "strict": True}, "0").passed
 
 
 # ── active canaries ───────────────────────────────────────────────────────────

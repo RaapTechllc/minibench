@@ -6,13 +6,22 @@ against the most expensive standard-tier model in the committed catalog.
 This module *shows the math* and exits non-zero when a suite breaks its budget,
 so CI catches an expensive suite before anyone pays for it.
 
-Token model (deliberately conservative):
+Token model (deliberately conservative — WORST CASE):
   tokens_in  = prompt_chars / 4 + FIXED_OVERHEAD      (system prompt, wrapping)
-  tokens_out = MAX_TOKENS cap of the single-model preset (worst case)
+  tokens_out = MAX_OUTPUT_TOKENS per call             (the API max_tokens cap)
+
+The guard is intentionally pessimistic: it assumes every call bills the full
+completion cap at the priciest catalog model. That over-states real cost (answers
+are short — graders reject text beyond 2000 chars), but a reasoning model's
+hidden thinking IS billed up to the cap, so the cap is the honest ceiling. Suites
+that need a larger cap (a broader suite = more tasks) declare a larger --budget
+explicitly rather than hiding the cost behind an optimistic per-call estimate.
 
 Usage:
     python -m agentbench.cost_check --tasks agentbench/tasks/minibench-core-v1.json \
         --trials 3
+    python -m agentbench.cost_check --tasks agentbench/tasks/minibench-pro-v1.json \
+        --trials 3 --budget 40     # pro is broader (10 categories); higher ceiling
 """
 from __future__ import annotations
 
@@ -20,15 +29,9 @@ import argparse
 import json
 from pathlib import Path
 
-# The budget guard is a worst-case ceiling: every call assumed to emit
-# MAX_OUTPUT_TOKENS at the priciest catalog model's completion price. That cap
-# is 4096 (reasoning-model headroom, see single_model_config), and reasoning
-# runs genuinely cost more, so the ceiling is set to $15 for a full dev-slice
-# run — still cheap enough to catch a suite that would cost hundreds, which is
-# all the guard is for. Real answer-only runs cost cents.
-BUDGET_USD = 15.00
+BUDGET_USD = 15.00           # core/hard (≈40-task dev slice) default ceiling
 FIXED_OVERHEAD_TOKENS = 60
-MAX_OUTPUT_TOKENS = 4096  # matches single_model_config's max_tokens cap
+MAX_OUTPUT_TOKENS = 4096     # single_model_config's max_tokens cap (worst-case billed output)
 
 CATALOG = Path(__file__).resolve().parents[1] / "backend" / "app" / "data" / "known_models_seed.json"
 

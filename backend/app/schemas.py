@@ -206,6 +206,9 @@ class AgentRunSubmit(BaseModel):
     is_private_split: bool = False
     n_infra_errors: int = Field(0, ge=0)
     n_canary_flags: int = Field(0, ge=0)
+    # minibench-pro-v1 axes (only pro runs populate them).
+    calibration_brier: Optional[Decimal] = None
+    robustness_correct: Optional[Decimal] = None
     results: list[AgentTaskResultSubmit] = Field(default_factory=list)
 
     model_config = ConfigDict(protected_namespaces=())
@@ -240,6 +243,8 @@ class AgentRunResponse(BaseModel):
     is_private_split: Optional[bool] = None
     n_infra_errors: Optional[int] = None
     n_canary_flags: Optional[int] = None
+    calibration_brier: Optional[Decimal] = None
+    robustness_consistency: Optional[Decimal] = None
 
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
@@ -298,6 +303,9 @@ class ModelLeaderboardEntry(BaseModel):
     # private-split scores are "official".
     is_private_split: Optional[bool] = None
     grader_version: Optional[str] = None
+    # minibench-pro-v1 axes (present only for pro runs).
+    calibration_brier: Optional[Decimal] = None
+    robustness_correct: Optional[Decimal] = None
 
     model_config = ConfigDict(protected_namespaces=())
 

@@ -140,6 +140,10 @@ export interface AgentRunDetail {
   latency_p95_ms: number | null;
   tokens_in: number | null;
   tokens_out: number | null;
+  is_private_split: boolean | null;
+  grader_version: string | null;
+  calibration_brier: number | null;
+  robustness_correct: number | null;
   results: AgentTaskResult[];
 }
 
@@ -181,6 +185,12 @@ export interface ModelLeaderboardEntry {
   submitted_at: string;
   category_pass_rates: Record<string, number>;
   on_pareto_frontier: boolean;
+  // Validity signals (served by the backend; surfaced as badges).
+  is_private_split: boolean | null;
+  grader_version: string | null;
+  // minibench-pro-v1 axes (present only for pro runs).
+  calibration_brier: number | null;
+  robustness_correct: number | null;
 }
 
 export interface ReferenceProfile {

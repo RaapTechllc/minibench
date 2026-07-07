@@ -111,6 +111,30 @@ def mcnemar_exact(b: int, c: int) -> float:
     return min(1.0, 2 * tail)
 
 
+def mean_brier(scores: list[float]) -> float:
+    """Mean Brier score from calibration graders' ``score`` values.
+
+    The ``calibration`` grader reports ``score = 1 - brier`` (higher better), so
+    ``brier = 1 - score``. Lower mean Brier = better calibration. 0.25 is the
+    always-guess-0.5 baseline; below that means the model's confidence tracks
+    truth. Returns 1.0 (worst) for an empty set so a no-answer run can't look
+    perfectly calibrated.
+    """
+    if not scores:
+        return 1.0
+    return sum(1.0 - s for s in scores) / len(scores)
+
+
+def consistency(pairs: list[tuple[bool, bool]]) -> float:
+    """Fraction of matched (base, perturbed) pair-trials where the model's
+    correctness AGREES (both right or both wrong) — i.e. 1 − flip rate. A
+    robust model is not swayed by rewording/reordering/distractors, so it
+    agrees with itself regardless of whether it was right. Empty → 1.0."""
+    if not pairs:
+        return 1.0
+    return sum(1 for base, pert in pairs if base == pert) / len(pairs)
+
+
 def indistinguishable(a: tuple[float, float], b: tuple[float, float]) -> bool:
     """Two configs are 'indistinguishable' if their CIs overlap — not a winner."""
     lo_a, hi_a = a

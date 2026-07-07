@@ -88,6 +88,8 @@ async def submit_agent_run(data: AgentRunSubmit, db: AsyncSession = Depends(get_
         is_private_split=data.is_private_split,
         n_infra_errors=data.n_infra_errors,
         n_canary_flags=data.n_canary_flags,
+        calibration_brier=data.calibration_brier,
+        robustness_correct=data.robustness_correct,
     )
     db.add(run)
     await db.flush()  # assign run.run_id before inserting child rows
@@ -284,6 +286,8 @@ async def model_leaderboard(
                 on_pareto_frontier=i in frontier,
                 is_private_split=r.is_private_split,
                 grader_version=r.grader_version,
+                calibration_brier=r.calibration_brier,
+                robustness_correct=r.robustness_correct,
             )
         )
     return entries

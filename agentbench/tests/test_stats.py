@@ -1,6 +1,8 @@
 from agentbench.stats import (
     bootstrap_ci_by_task,
+    consistency,
     mcnemar_exact,
+    mean_brier,
     pass_rate,
     pass_hat_k,
     wilson_ci,
@@ -83,3 +85,22 @@ def test_bootstrap_ci_wider_than_pooled_wilson_when_tasks_cluster():
     b_lo, b_hi = bootstrap_ci_by_task(fracs)
     w_lo, w_hi = wilson_ci(25, 50)
     assert (b_hi - b_lo) > (w_hi - w_lo)
+
+
+# ── pro axes: calibration (Brier) + robustness (consistency) ──────────────────
+
+
+def test_mean_brier():
+    # score = 1 - brier; perfect (score 1.0) → brier 0, worst (score 0.0) → 1.
+    assert mean_brier([1.0, 1.0]) == 0.0
+    assert mean_brier([0.0, 0.0]) == 1.0
+    assert abs(mean_brier([0.75, 0.75]) - 0.25) < 1e-9  # always-0.5 baseline
+    assert mean_brier([]) == 1.0  # empty is maximally miscalibrated, not perfect
+
+
+def test_consistency():
+    # Agreement fraction (1 - flip rate).
+    assert consistency([(True, True), (False, False)]) == 1.0   # never flips
+    assert consistency([(True, False), (False, True)]) == 0.0   # always flips
+    assert consistency([(True, True), (True, False)]) == 0.5
+    assert consistency([]) == 1.0

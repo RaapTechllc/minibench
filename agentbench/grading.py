@@ -362,6 +362,99 @@ def unit_test(
     return GradeResult(passed, 1.0 if passed else 0.0, detail.strip())
 
 
+def _strict_single_line(output: str, max_output_chars: int | None) -> tuple[str | None, GradeResult | None]:
+    """Shared strict-mode reduction: verbosity cap, strip a leading <think>
+    block, then require exactly one non-empty line (unwrapping a lone fence).
+    Returns (candidate, None) on success or (None, failing GradeResult)."""
+    long = _too_long(output, max_output_chars)
+    if long:
+        return None, long
+    text = _strip_think(output)
+    candidate = extract_code(text) if "```" in text else text
+    lines = [ln for ln in candidate.strip().splitlines() if ln.strip()]
+    if len(lines) != 1:
+        return None, GradeResult(False, 0.0, f"expected a single-line answer, got {len(lines)} lines")
+    return lines[0], None
+
+
+def regex_match(
+    output: str,
+    pattern: str,
+    *,
+    must_match: bool = True,
+    flags: int = 0,
+    strict: bool = False,
+    max_output_chars: int | None = None,
+) -> GradeResult:
+    """Constrained generation / negative constraints.
+
+    ``must_match=True``  → the answer MUST satisfy ``pattern`` (e.g. a required
+    format ``^[A-Z]{3}-\\d{4}$``). ``must_match=False`` → the answer must NOT
+    contain ``pattern`` (negative constraint, e.g. "without the letter e").
+    Strict mode reduces to a single answer line first, so a model can't bury a
+    conforming token among prose.
+    """
+    if strict:
+        candidate, fail = _strict_single_line(output, max_output_chars)
+        if fail:
+            return fail
+    else:
+        candidate = output
+    try:
+        hit = re.search(pattern, candidate, flags) is not None
+    except re.error as e:
+        return GradeResult(False, 0.0, f"bad pattern: {e}")
+    ok = hit == must_match
+    detail = "match" if ok else (
+        f"must match {pattern!r} but did not" if must_match
+        else f"must NOT match {pattern!r} but did"
+    )
+    return GradeResult(ok, 1.0 if ok else 0.0, detail)
+
+
+def calibration(
+    output: str,
+    outcome: float,
+    *,
+    tol: float = 1e-9,
+    strict: bool = False,
+    max_output_chars: int | None = None,
+) -> GradeResult:
+    """Calibration via Brier score (novel deterministic axis).
+
+    The prompt states a claim with a COMPUTED truth value and asks for a single
+    confidence AS A PERCENTAGE FROM 0 TO 100 that the claim is true. ``outcome``
+    is the ground truth (1.0 or 0.0). We parse one isolated number, interpret it
+    on the 0-100 percentage scale the prompt mandates (``p = value / 100``,
+    clamped to [0,1]), compute ``brier = (p - outcome)**2`` and report
+    ``score = 1 - brier`` (higher is better, stays in [0,1]).
+
+    Percentage-only parsing is deliberate: a dual "0-1 or 0-100" heuristic is
+    non-monotonic at the boundary (it would read a compliant "1" — i.e. 1% — as
+    certainty 1.0, identical to "100"), corrupting the axis. The prompt is
+    explicit, so grading matches the instruction.
+
+    ``passed`` marks a (near-)perfect probability — it exists only so the gold
+    self-check gate accepts the gold answer; the real signal is the mean Brier
+    reported as a suite-level axis, and calibration is EXCLUDED from the binary
+    pass-rate pool. Empty/unparseable → Brier 1.0 (rule zero: a non-answer is
+    maximally miscalibrated)."""
+    if strict:
+        long = _too_long(output, max_output_chars)
+        if long:
+            return long
+        output = _strip_think(output)
+    value = _parse_isolated_number(output)
+    if value is None:
+        lines = [ln for ln in output.strip().splitlines() if ln.strip()]
+        value = _parse_isolated_number(lines[-1]) if lines else None
+    if value is None:
+        return GradeResult(False, 0.0, "no probability given (brier=1.0)")
+    p = min(1.0, max(0.0, value / 100.0))  # prompt mandates a 0-100 percentage
+    brier = (p - outcome) ** 2
+    return GradeResult(brier <= tol, 1.0 - brier, f"p={p} outcome={outcome} brier={brier:.4f}")
+
+
 def grade(spec: dict[str, Any], output: str) -> GradeResult:
     """Dispatch a task's verification ``spec`` to the matching executable grader."""
     vtype = spec.get("type")
@@ -396,5 +489,21 @@ def grade(spec: dict[str, Any], output: str) -> GradeResult:
             spec["test_source"],
             entry_filename=spec.get("entry_filename", "solution.py"),
             timeout_s=int(spec.get("timeout_s", 30)),
+        )
+    if vtype == "regex_match":
+        return regex_match(
+            output,
+            spec["pattern"],
+            must_match=bool(spec.get("must_match", True)),
+            flags=re.IGNORECASE if spec.get("ignorecase") else 0,
+            strict=strict,
+            max_output_chars=max_chars,
+        )
+    if vtype == "calibration":
+        return calibration(
+            output,
+            float(spec["outcome"]),
+            strict=strict,
+            max_output_chars=max_chars,
         )
     return GradeResult(False, 0.0, f"unknown grader type: {vtype!r}")

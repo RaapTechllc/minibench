@@ -67,12 +67,19 @@ def check_comparable(runs: list[dict[str, Any]]) -> None:
             )
 
 
+# Axis-only categories excluded from binary/McNemar ranking: calibration is
+# continuous (Brier), and robustness base/pert are correlated near-duplicates
+# that would double-weight one capability and violate McNemar's independent-pair
+# assumption. Both are scored on their own axes instead.
+_AXIS_ONLY = {"calibration", "robustness"}
+
+
 def _outcomes(run: dict[str, Any]) -> dict[tuple[str, int], bool]:
-    """Paired outcomes keyed by (task_id, trial); infra trials excluded."""
+    """Paired binary outcomes keyed by (task_id, trial); infra + axis-only excluded."""
     return {
         (t["task_id"], t["trial"]): bool(t["passed"])
         for t in run["trials"]
-        if not t.get("infra_error")
+        if not t.get("infra_error") and t.get("category") not in _AXIS_ONLY
     }
 
 

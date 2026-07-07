@@ -30,7 +30,9 @@ from agentbench.config import load_moa_config, single_model_config, MoAConfig
 from agentbench.client import InfraError, OpenAICompatClient
 from agentbench.grading import GRADER_VERSION, contains_canary, grade
 from agentbench.moa import MoAModel, MoAResult
-from agentbench.stats import bootstrap_ci_by_task, pass_rate, pass_hat_k, wilson_ci, percentile
+from agentbench.stats import (
+    bootstrap_ci_by_task, consistency, mean_brier, pass_rate, pass_hat_k, wilson_ci, percentile,
+)
 from agentbench.resources import RESULTS_DIR
 from agentbench import minibench_gen
 
@@ -163,21 +165,89 @@ def run_suite(
     return results
 
 
+def _calibration_axis(scored: list[TrialResult]) -> dict[str, Any]:
+    """Suite-level calibration axis (Brier) when the run has calibration items.
+    Calibration is CONTINUOUS (graded on score, not passed), so it is excluded
+    from the binary pool and reported separately — a lower mean Brier is better."""
+    calib = [r for r in scored if r.category == "calibration"]
+    if not calib:
+        return {}
+    return {
+        "calibration_brier": round(mean_brier([r.score for r in calib]), 4),
+        "n_calibration_trials": len(calib),
+    }
+
+
+def _robustness_axis(scored: list[TrialResult]) -> dict[str, Any]:
+    """Suite-level robustness axis when the run has matched (base, pert) pairs.
+    Consistency = fraction of pair-trials where correctness agrees (1 − flip
+    rate); robustness_correct = fraction where BOTH are correct. Pairing is
+    read from the id convention ``...-<pid>-base`` / ``...-<pid>-pert``; trial
+    numbers are intersected so an infra-dropped side never fabricates a flip."""
+    robust = [r for r in scored if r.category == "robustness"]
+    if not robust:
+        return {}
+    pairs: dict[str, dict[str, dict[int, bool]]] = {}
+    for r in robust:
+        pid, _, role = r.task_id.rpartition("-")
+        pairs.setdefault(pid, {"base": {}, "pert": {}}).setdefault(role, {})[r.trial] = r.passed
+    pair_trials: list[tuple[bool, bool]] = []
+    both_correct = 0
+    covered_pairs = 0  # pairs that actually contribute a scored (base, pert) trial
+    for d in pairs.values():
+        overlap = set(d.get("base", {})) & set(d.get("pert", {}))
+        if overlap:
+            covered_pairs += 1
+        for j in overlap:
+            b, p = d["base"][j], d["pert"][j]
+            pair_trials.append((b, p))
+            both_correct += b and p
+    if not pair_trials:
+        return {}
+    return {
+        # PRIMARY axis: fraction of perturbation pairs solved correctly on BOTH
+        # sides. Unlike bare consistency, this can't be gamed by answering every
+        # prompt with the same WRONG value (both-wrong agrees but isn't correct).
+        "robustness_correct": round(both_correct / len(pair_trials), 4),
+        # Diagnostics (stability regardless of correctness). Kept local, NOT
+        # published as the leaderboard headline — consistency alone is 1.0 for a
+        # uniformly-wrong model.
+        "robustness_consistency": round(consistency(pair_trials), 4),
+        "robustness_flip_rate": round(1 - consistency(pair_trials), 4),
+        # Count only pairs that actually backed the numbers (an all-infra side
+        # contributes nothing and must not inflate the reported coverage).
+        "n_robust_pairs": covered_pairs,
+    }
+
+
 def summarize(config: MoAConfig, suite: str, trials: int, results: list[TrialResult]) -> dict[str, Any]:
     # Infra-error trials are excluded from EVERY capability denominator: they
     # measure the provider, not the model. They are still counted and reported
     # so a run with any of them can be blocked from publishing.
     scored = [r for r in results if not r.infra_error]
-    total = len(scored)
-    passes = sum(1 for r in scored if r.passed)
+    # Two categories ride on their own axes and are EXCLUDED from the binary pool
+    # so they can't distort pass_rate, pass^k, the CIs, or McNemar ranking:
+    #   • calibration — continuous (graded on Brier, not pass/fail).
+    #   • robustness  — matched base/pert PAIRS with the same gold; counting both
+    #     sides would double-weight one capability with correlated near-duplicates
+    #     and narrow the task-bootstrap CI on non-independent items. Its signal is
+    #     the consistency axis, not the headline pass rate.
+    # Suites without these categories leave `binary == scored`, so core/hard
+    # summaries are byte-identical to pre-pro runs.
+    _axis_only = {"calibration", "robustness"}
+    binary = [r for r in scored if r.category not in _axis_only]
+    total = len(binary)
+    passes = sum(1 for r in binary if r.passed)
     # Per-task pass counts for pass^k.
     by_task: dict[str, list[TrialResult]] = {}
-    for r in scored:
+    for r in binary:
         by_task.setdefault(r.task_id, []).append(r)
     per_task_passes = [sum(1 for r in rs if r.passed) for rs in by_task.values()]
     per_task_trials = [len(rs) for rs in by_task.values()]
     per_task_fracs = [p / n for p, n in zip(per_task_passes, per_task_trials) if n > 0]
 
+    # Cost/latency count EVERY non-infra call (calibration calls cost money too).
+    n_all_tasks = len({r.task_id for r in scored})
     latencies = [float(r.latency_ms) for r in scored]
     costs = [r.cost_usd for r in scored if r.cost_usd is not None]
     total_cost = sum(costs) if costs else None
@@ -189,7 +259,7 @@ def summarize(config: MoAConfig, suite: str, trials: int, results: list[TrialRes
     effective_k = min([trials, *per_task_trials]) if per_task_trials else trials
 
     proposer = config.proposers[0]
-    return {
+    summary = {
         "suite": suite,
         "moa_config": {
             "name": config.name,
@@ -218,10 +288,15 @@ def summarize(config: MoAConfig, suite: str, trials: int, results: list[TrialRes
         "pass_rate_ci95_boot": [round(boot_lo, 4), round(boot_hi, 4)],
         "pass_hat_k": round(pass_hat_k(per_task_passes, per_task_trials, k=effective_k), 4),
         "cost_usd_total": round(total_cost, 6) if total_cost is not None else None,
-        "cost_usd_per_task": round(total_cost / len(by_task), 6) if total_cost is not None and by_task else None,
+        "cost_usd_per_task": round(total_cost / n_all_tasks, 6) if total_cost is not None and n_all_tasks else None,
         "latency_p50_ms": round(percentile(latencies, 50), 1),
         "latency_p95_ms": round(percentile(latencies, 95), 1),
     }
+    # Novel axes: present ONLY when the run contains those items, so core/hard
+    # summaries are unchanged.
+    summary.update(_calibration_axis(scored))
+    summary.update(_robustness_axis(scored))
+    return summary
 
 
 def to_agent_run_submit(
@@ -262,6 +337,11 @@ def to_agent_run_submit(
         "cost_usd_per_task": summary.get("cost_usd_per_task"),
         "latency_p50_ms": int(summary["latency_p50_ms"]) if summary.get("latency_p50_ms") is not None else None,
         "latency_p95_ms": int(summary["latency_p95_ms"]) if summary.get("latency_p95_ms") is not None else None,
+        # Novel pro axes (None unless the run had those items). robustness_correct
+        # (both-sides-correct) is the leaderboard headline — bare consistency is
+        # gameable by uniform wrongness, so it is not published.
+        "calibration_brier": summary.get("calibration_brier"),
+        "robustness_correct": summary.get("robustness_correct"),
         "tokens_in": tokens_in,
         "tokens_out": tokens_out,
         "results": [

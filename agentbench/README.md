@@ -14,6 +14,49 @@ wrote "live results" to `/tmp` that were never committed. `agentbench` fixes all
 three: **executable oracles**, **config validated at load**, and **committed
 result artifacts**.
 
+## Suites: core → hard → pro
+
+Three procedurally-generated capability suites, all deterministically graded
+(no LLM judge), all cost-bounded:
+
+- **`minibench-core-v1`** (4 categories) — the fundamentals: math reasoning,
+  structured extraction, format adherence, code writing.
+- **`minibench-hard-v1`** (4 categories) — compositional variants (search,
+  aggregation, chained transforms, a no-`eval` parser) to separate frontier
+  models that saturate core.
+- **`minibench-pro-v1`** (10 categories) — a strategic capability MATRIX plus
+  two axes almost no cheap benchmark grades deterministically.
+
+### Why minibench-pro-v1 is different
+
+Most public evals either grade a narrow slice or lean on an LLM judge (slow,
+non-deterministic, gameable). Pro tests the dimensions models are actually used
+for — **function-calling, date/time arithmetic, code *debugging*, constrained
+generation (format + negative constraints), counting, unit conversion, table
+manipulation, self-correction** — every one with an *executable oracle*. On top
+of the capability grid it adds two axes that are novel for a cheap, deterministic
+benchmark:
+
+- **Calibration (Brier).** Each item states a claim with a *computed* truth
+  value and asks for a probability; graded by Brier score `(p − outcome)²`.
+  Reported as a suite-level `calibration_brier` (lower is better; 0.25 is the
+  always-guess-0.5 baseline). It measures whether a model *knows what it knows* —
+  and it's excluded from the binary pass-rate pool so it never distorts it.
+- **Robustness (consistency).** Matched `(base, perturbed)` task pairs — reworded,
+  reordered, or with an added distractor — share one gold. `robustness_consistency`
+  is the fraction of pair-trials where the model's correctness *agrees* (1 − flip
+  rate): it exposes brittleness that raw accuracy hides.
+
+`self-correct` items embed a flawed prior answer plus a critique and require the
+corrected result — testing recovery, graded by the existing oracles.
+
+Everything stays cheap: prompts are short and answers are a number, a token, a
+small JSON object, or a short code fix. The budget guard (`cost_check.py`) is
+deliberately worst-case (every call billed at the full completion cap on the
+priciest catalog model); pro is a broader suite (10 categories, ~55-task dev
+slice), so its guard runs against an explicit higher `--budget 40` ceiling.
+Real spend on a normal run is a few dollars at most.
+
 ## Layout
 
 | File | Purpose |
@@ -21,15 +64,17 @@ result artifacts**.
 | `config.py` | MoA config schema + YAML loader (proposers, aggregator, layers, Self-MoA). Validates at load. |
 | `client.py` | One OpenAI-compatible client for OpenRouter + Ollama. Real `usage.cost`. Network boundary is injectable. |
 | `moa.py` | `MoAModel.generate(prompt)` — fans out proposers → aggregator, rolls up cost/latency/tokens. |
-| `grading.py` | Executable graders: `exact_match`, `numeric_match`, `json_fields`, `unit_test`. Each fails a bad answer. |
+| `grading.py` | Executable graders: `exact_match`, `numeric_match`, `json_fields`, `unit_test`, `regex_match`, `calibration`. Each fails a bad answer. |
 | `stats.py` | `pass_rate`, `pass_hat_k`, Wilson CI, percentiles — the trials-and-CIs guardrail. |
 | `tracker.py` | Poll OpenRouter `/models`, diff against known ids → detect new launches. |
 | `run.py` | CLI: run a config against a task suite with N trials, grade, summarize, write a committable artifact. |
 | `presets/` | MoA configs: `moa-v1` (production), `moa-dev` (cheap testing), Self-MoA baselines. |
 | `tasks/` | `coding-v1` (smoke/CI), `coding-v2` (harder eval), `minibench-core-v1` (canonical capability dev slice). |
-| `minibench_gen.py` | Procedural generator for `minibench-*` suites — computed gold, canary, committed dev slice (seed 20260706); private split regenerated with an uncommitted seed. |
+| `minibench_gen.py` | Procedural generator for `minibench-*` suites (core/hard/pro) — computed gold, canary, committed dev slice (seed 20260706); private split regenerated with an uncommitted seed. |
+| `compare.py` | Pairwise significance (exact McNemar + task-bootstrap CIs) across a sweep; refuses ordering claims without p<0.05. Calibration excluded from ranking. |
+| `item_stats.py` | Item-discrimination audit (point-biserial); prunes by discrimination only. Calibration excluded (continuous). |
 | `catalog.py` | Master model catalog: joins the strategic-family list against the live OpenRouter feed → `backend/app/data/known_models_seed.json`. |
-| `cost_check.py` | Budget guard: tasks x trials x tokens x price against the priciest catalog model must stay ≤ $5 (CI-enforced). |
+| `cost_check.py` | Budget guard: tasks x trials x tokens x price against the priciest catalog model. Worst-case (full completion cap). Core/hard ≤ $15; pro ≤ $40 (broader suite). CI-enforced, all three suites. |
 
 ## Running
 

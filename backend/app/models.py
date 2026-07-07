@@ -174,6 +174,9 @@ class AgentRun(Base):
     is_private_split = Column(Boolean, nullable=False, default=False)
     n_infra_errors = Column(Integer, nullable=False, default=0)
     n_canary_flags = Column(Integer, nullable=False, default=0)
+    # minibench-pro-v1 axes (nullable; only pro runs populate them).
+    calibration_brier = Column(Numeric(6, 4))    # lower is better (Brier)
+    robustness_correct = Column(Numeric(6, 4))   # frac of perturbation pairs solved on both sides
 
 
 class AgentTaskResult(Base):

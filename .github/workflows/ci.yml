@@ -78,12 +78,20 @@ jobs:
             --tasks agentbench/tasks/minibench-core-v1.json --trials 3
           python -m agentbench.cost_check \
             --tasks agentbench/tasks/minibench-hard-v1.json --trials 3
+          python -m agentbench.cost_check \
+            --tasks agentbench/tasks/minibench-pro-v1.json --trials 3 --budget 40
       - name: Minibench hard-suite dry-run smoke
         run: |
           python -m agentbench.run \
             --model openrouter/moonshotai/kimi-k2.7-code \
             --tasks agentbench/tasks/minibench-hard-v1.json \
             --trials 1 --dry-run --out /tmp/mbh-dryrun.json
+      - name: Minibench pro-suite dry-run smoke
+        run: |
+          python -m agentbench.run \
+            --model openrouter/moonshotai/kimi-k2.7-code \
+            --tasks agentbench/tasks/minibench-pro-v1.json \
+            --trials 1 --dry-run --out /tmp/mbp-dryrun.json
       - name: benchmarks/ preset-drift guard
         run: |
           pip install pyyaml pytest

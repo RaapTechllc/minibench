@@ -41,9 +41,19 @@ def test_deliberately_bad_answers_fail(suite):
         "json_fields": '{"wrong_key": true}',
         "exact_match": "zz not the answer zz",
         "unit_test": "```python\npass\n```",
+        # constrained: prose that satisfies no format and violates the vowel ban.
+        "regex_match": "here is my answer: aeiou please",
+        # calibration: a confident answer in the WRONG direction. For a TRUE
+        # claim (outcome 1.0) "0" is maximally miscalibrated → not passed; for a
+        # FALSE claim (outcome 0.0) "100" is. Pick the opposite of the gold.
+        "calibration": None,
     }
     for task in generate_tasks(DEV_SEED, suite=suite):
-        bad = bad_by_type[task["verification"]["type"]]
+        vtype = task["verification"]["type"]
+        if vtype == "calibration":
+            bad = "0" if task["verification"]["outcome"] == 1.0 else "100"
+        else:
+            bad = bad_by_type[vtype]
         result = grade(task["verification"], bad)
         assert not result.passed, f"{task['id']}: grader accepted a bad answer"
 
@@ -68,6 +78,7 @@ def test_committed_dev_slice_matches_generator(tmp_path):
 @pytest.mark.parametrize("suite,filename", [
     ("core", "minibench-core-v1.json"),
     ("hard", "minibench-hard-v1.json"),
+    ("pro", "minibench-pro-v1.json"),
 ])
 def test_repo_suite_file_is_current(suite, filename):
     """The committed suite must equal what the generator produces for its seed —

@@ -30,11 +30,17 @@ def _model_name(run: dict[str, Any]) -> str:
     return models[0] if len(models) == 1 else run["summary"]["moa_config"]["name"]
 
 
+# Axis-only categories are excluded from the pass-based discrimination audit:
+# calibration is continuous (all-floor on `passed`), and robustness base/pert are
+# correlated near-duplicates. Their signal lives in the Brier / consistency axes.
+_AXIS_ONLY = {"calibration", "robustness"}
+
+
 def _item_scores(run: dict[str, Any]) -> dict[str, float]:
-    """Per-task pass fraction for one model (infra trials excluded)."""
+    """Per-task pass fraction for one model (infra + axis-only excluded)."""
     by_task: dict[str, list[bool]] = {}
     for t in run["trials"]:
-        if t.get("infra_error"):
+        if t.get("infra_error") or t.get("category") in _AXIS_ONLY:
             continue
         by_task.setdefault(t["task_id"], []).append(bool(t["passed"]))
     return {task: sum(v) / len(v) for task, v in by_task.items() if v}

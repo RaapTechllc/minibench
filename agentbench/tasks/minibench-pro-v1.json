@@ -1,0 +1,736 @@
+{
+  "suite": "minibench-pro-v1",
+  "notes": "Pro tier: a deterministic capability matrix (function-calling, date/time, code-debugging, constrained generation, counting, unit conversion, table manipulation, self-correction) plus two novel deterministic axes \u2014 calibration (Brier) and robustness (consistency across matched perturbations). Executable oracles only, no LLM judge. Procedurally generated (agentbench.minibench_gen --suite pro, seed 20260706); private split uses an uncommitted seed. Robustness emits matched pairs, so it yields 2x per-category tasks. Budget: see agentbench/cost_check.py.",
+  "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN",
+  "generator_seed": 20260706,
+  "tasks": [
+    {
+      "id": "mbp-fncall-01",
+      "category": "function-call",
+      "prompt": "You can call one tool: `convert(amount, from_ccy, to_ccy)`. The user says: 'Convert 33 JPY to EUR.' Respond with ONLY a JSON object with keys `name` (string) and `arguments` (object with keys `amount` integer, `from_ccy` string, `to_ccy` string). No prose.",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "name": "convert",
+          "arguments": {
+            "amount": 33,
+            "from_ccy": "JPY",
+            "to_ccy": "EUR"
+          }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-fncall-02",
+      "category": "function-call",
+      "prompt": "You can call one tool: `distance(origin, destination)`. The user says: 'How far is it from Lima to Quito?' Respond with ONLY a JSON object with keys `name` (string) and `arguments` (object with keys `origin` string, `destination` string). No prose.",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "name": "distance",
+          "arguments": {
+            "origin": "Lima",
+            "destination": "Quito"
+          }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-fncall-03",
+      "category": "function-call",
+      "prompt": "You can call one tool: `convert(amount, from_ccy, to_ccy)`. The user says: 'Convert 802 USD to CAD.' Respond with ONLY a JSON object with keys `name` (string) and `arguments` (object with keys `amount` integer, `from_ccy` string, `to_ccy` string). No prose.",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "name": "convert",
+          "arguments": {
+            "amount": 802,
+            "from_ccy": "USD",
+            "to_ccy": "CAD"
+          }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-fncall-04",
+      "category": "function-call",
+      "prompt": "You can call one tool: `distance(origin, destination)`. The user says: 'How far is it from Perth to Cairo?' Respond with ONLY a JSON object with keys `name` (string) and `arguments` (object with keys `origin` string, `destination` string). No prose.",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "name": "distance",
+          "arguments": {
+            "origin": "Perth",
+            "destination": "Cairo"
+          }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-fncall-05",
+      "category": "function-call",
+      "prompt": "You can call one tool: `convert(amount, from_ccy, to_ccy)`. The user says: 'Convert 62 GBP to USD.' Respond with ONLY a JSON object with keys `name` (string) and `arguments` (object with keys `amount` integer, `from_ccy` string, `to_ccy` string). No prose.",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "name": "convert",
+          "arguments": {
+            "amount": 62,
+            "from_ccy": "GBP",
+            "to_ccy": "USD"
+          }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-datetime-01",
+      "category": "datetime",
+      "prompt": "What day of the week was 2028-06-29 (YYYY-MM-DD)? Answer with the weekday name only, e.g. Monday.",
+      "verification": {
+        "type": "exact_match",
+        "expected": "Thursday",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-datetime-02",
+      "category": "datetime",
+      "prompt": "How many days are there from 2025-05-20 to 2025-07-30 (both YYYY-MM-DD)? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 71.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-datetime-03",
+      "category": "datetime",
+      "prompt": "What day of the week was 2020-06-24 (YYYY-MM-DD)? Answer with the weekday name only, e.g. Monday.",
+      "verification": {
+        "type": "exact_match",
+        "expected": "Wednesday",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-datetime-04",
+      "category": "datetime",
+      "prompt": "How many days are there from 2022-07-03 to 2022-10-10 (both YYYY-MM-DD)? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 99.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-datetime-05",
+      "category": "datetime",
+      "prompt": "What day of the week was 2029-06-17 (YYYY-MM-DD)? Answer with the weekday name only, e.g. Monday.",
+      "verification": {
+        "type": "exact_match",
+        "expected": "Sunday",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-debug-01",
+      "category": "debug",
+      "prompt": "This `factorial` is buggy \u2014 it returns 0 for every input because the accumulator starts at 0. Fix it so the hidden tests pass. Return only a fenced python block.\n\n```python\ndef factorial(n):\n    result = 0\n    for k in range(1, n + 1):\n        result *= k\n    return result\n```",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import factorial\n\ndef test_values():\n    assert factorial(4) == 24\n    assert factorial(4) == 24\n    assert factorial(18) == 6402373705728000\n    assert factorial(20) == 2432902008176640000\ndef test_zero():\n    assert factorial(0) == 1\n"
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-debug-02",
+      "category": "debug",
+      "prompt": "This `count_vowels` is buggy \u2014 it forgets the letter 'u'. Fix it so the hidden tests pass. Return only a fenced python block.\n\n```python\ndef count_vowels(s):\n    return sum(1 for c in s if c in 'aeio')\n```",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import count_vowels\n\ndef test_values():\n    assert count_vowels('indigo') == 3\n    assert count_vowels('harbor') == 2\n    assert count_vowels('violet') == 3\n    assert count_vowels('harbor') == 2\ndef test_empty():\n    assert count_vowels('') == 0\n"
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-debug-03",
+      "category": "debug",
+      "prompt": "This `factorial` is buggy \u2014 it returns 0 for every input because the accumulator starts at 0. Fix it so the hidden tests pass. Return only a fenced python block.\n\n```python\ndef factorial(n):\n    result = 0\n    for k in range(1, n + 1):\n        result *= k\n    return result\n```",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import factorial\n\ndef test_values():\n    assert factorial(3) == 6\n    assert factorial(17) == 355687428096000\n    assert factorial(20) == 2432902008176640000\n    assert factorial(14) == 87178291200\ndef test_zero():\n    assert factorial(0) == 1\n"
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-debug-04",
+      "category": "debug",
+      "prompt": "This `count_vowels` is buggy \u2014 it forgets the letter 'u'. Fix it so the hidden tests pass. Return only a fenced python block.\n\n```python\ndef count_vowels(s):\n    return sum(1 for c in s if c in 'aeio')\n```",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import count_vowels\n\ndef test_values():\n    assert count_vowels('indigo') == 3\n    assert count_vowels('signal') == 2\n    assert count_vowels('willow') == 2\n    assert count_vowels('thunder') == 2\ndef test_empty():\n    assert count_vowels('') == 0\n"
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-debug-05",
+      "category": "debug",
+      "prompt": "This `factorial` is buggy \u2014 it returns 0 for every input because the accumulator starts at 0. Fix it so the hidden tests pass. Return only a fenced python block.\n\n```python\ndef factorial(n):\n    result = 0\n    for k in range(1, n + 1):\n        result *= k\n    return result\n```",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import factorial\n\ndef test_values():\n    assert factorial(8) == 40320\n    assert factorial(8) == 40320\n    assert factorial(11) == 39916800\n    assert factorial(10) == 3628800\ndef test_zero():\n    assert factorial(0) == 1\n"
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-constrained-01",
+      "category": "constrained",
+      "prompt": "Output a code of the form THREE UPPERCASE LETTERS, a hyphen, then FOUR DIGITS (e.g. ABC-1234). Output only the code, nothing else.",
+      "verification": {
+        "type": "regex_match",
+        "pattern": "^[A-Z]{3}-\\d{4}$",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-constrained-02",
+      "category": "constrained",
+      "prompt": "Output a single lowercase word of at least 7 letters that contains NO vowels (no a, e, i, o, or u). Output only the word.",
+      "verification": {
+        "type": "regex_match",
+        "pattern": "^[bcdfghjklmnpqrstvwxyz]{7,}$",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-constrained-03",
+      "category": "constrained",
+      "prompt": "Output a code of the form THREE UPPERCASE LETTERS, a hyphen, then FOUR DIGITS (e.g. ABC-1234). Output only the code, nothing else.",
+      "verification": {
+        "type": "regex_match",
+        "pattern": "^[A-Z]{3}-\\d{4}$",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-constrained-04",
+      "category": "constrained",
+      "prompt": "Output a single lowercase word of at least 8 letters that contains NO vowels (no a, e, i, o, or u). Output only the word.",
+      "verification": {
+        "type": "regex_match",
+        "pattern": "^[bcdfghjklmnpqrstvwxyz]{8,}$",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-constrained-05",
+      "category": "constrained",
+      "prompt": "Output a code of the form THREE UPPERCASE LETTERS, a hyphen, then FOUR DIGITS (e.g. ABC-1234). Output only the code, nothing else.",
+      "verification": {
+        "type": "regex_match",
+        "pattern": "^[A-Z]{3}-\\d{4}$",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-count-01",
+      "category": "counting",
+      "prompt": "How many times does the letter 'e' appear in the string 'eadecacdbcecceabadac'? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 4.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-count-02",
+      "category": "counting",
+      "prompt": "How many numbers in this list are divisible by 3? List: [29, 30, 11, 28, 44, 34, 40, 29, 44, 13, 17, 41, 8]. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 1.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-count-03",
+      "category": "counting",
+      "prompt": "How many times does the letter 'a' appear in the string 'cacebcedcdedc'? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 1.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-count-04",
+      "category": "counting",
+      "prompt": "How many numbers in this list are divisible by 3? List: [27, 39, 43, 46, 35, 47, 28, 4, 35]. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 2.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-count-05",
+      "category": "counting",
+      "prompt": "How many times does the letter 'c' appear in the string 'acabecbdcdccd'? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 5.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-units-01",
+      "category": "units",
+      "prompt": "Convert 285 kilometers to miles (1 km = 0.621371 miles). Round to 2 decimal places. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 177.09,
+        "tol": 0.02,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-units-02",
+      "category": "units",
+      "prompt": "Convert -19 degrees Celsius to Fahrenheit. Round to 2 decimal places. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": -2.2,
+        "tol": 0.02,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-units-03",
+      "category": "units",
+      "prompt": "Convert 10 kilograms to pounds (1 kg = 2.20462 lb). Round to 2 decimal places. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 22.05,
+        "tol": 0.02,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-units-04",
+      "category": "units",
+      "prompt": "Convert 192 kilometers to miles (1 km = 0.621371 miles). Round to 2 decimal places. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 119.3,
+        "tol": 0.02,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-units-05",
+      "category": "units",
+      "prompt": "Convert 13 degrees Celsius to Fahrenheit. Round to 2 decimal places. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 55.4,
+        "tol": 0.02,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-tables-01",
+      "category": "tables",
+      "prompt": "Table (CSV: name,dept,salary):\nKai,eng,157000\nRex,sales,189000\nEli,eng,75000\nNoah,ops,84000\nLiam,ops,110000\n\nRespond with ONLY a JSON object with keys `count_in_dept` (integer, number of people in dept 'eng'), `max_salary` (integer, the highest salary) and `top_earner` (string, the name earning the most).",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "count_in_dept": 2,
+          "max_salary": 189000,
+          "top_earner": "Rex"
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-tables-02",
+      "category": "tables",
+      "prompt": "Table (CSV: name,dept,salary):\nKai,eng,94000\nNoah,ops,89000\nZoe,ops,131000\nIvy,eng,95000\nMia,eng,56000\n\nRespond with ONLY a JSON object with keys `count_in_dept` (integer, number of people in dept 'eng'), `max_salary` (integer, the highest salary) and `top_earner` (string, the name earning the most).",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "count_in_dept": 3,
+          "max_salary": 131000,
+          "top_earner": "Zoe"
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-tables-03",
+      "category": "tables",
+      "prompt": "Table (CSV: name,dept,salary):\nNoah,eng,177000\nUma,sales,77000\nLiam,sales,183000\nEli,ops,112000\nIvy,ops,75000\n\nRespond with ONLY a JSON object with keys `count_in_dept` (integer, number of people in dept 'ops'), `max_salary` (integer, the highest salary) and `top_earner` (string, the name earning the most).",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "count_in_dept": 2,
+          "max_salary": 183000,
+          "top_earner": "Liam"
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-tables-04",
+      "category": "tables",
+      "prompt": "Table (CSV: name,dept,salary):\nUma,sales,147000\nAva,ops,81000\nMia,sales,68000\nKai,sales,177000\nEli,eng,128000\n\nRespond with ONLY a JSON object with keys `count_in_dept` (integer, number of people in dept 'sales'), `max_salary` (integer, the highest salary) and `top_earner` (string, the name earning the most).",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "count_in_dept": 3,
+          "max_salary": 177000,
+          "top_earner": "Kai"
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-tables-05",
+      "category": "tables",
+      "prompt": "Table (CSV: name,dept,salary):\nLiam,sales,167000\nRex,eng,128000\nKai,eng,57000\nMia,eng,52000\nUma,eng,120000\n\nRespond with ONLY a JSON object with keys `count_in_dept` (integer, number of people in dept 'ops'), `max_salary` (integer, the highest salary) and `top_earner` (string, the name earning the most).",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "count_in_dept": 0,
+          "max_salary": 167000,
+          "top_earner": "Liam"
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-selfcorr-01",
+      "category": "self-correct",
+      "prompt": "A student claims 16 \u00d7 22 = 362. That is incorrect. Give the correct product. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 352.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-selfcorr-02",
+      "category": "self-correct",
+      "prompt": "Someone sorted [25, 14, 2, 26] in ascending order and got [25, 14, 2, 26], which is wrong. Give the correctly sorted list as comma-separated numbers on one line, e.g. `1, 2, 3`.",
+      "verification": {
+        "type": "exact_match",
+        "expected": "2, 14, 25, 26",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-selfcorr-03",
+      "category": "self-correct",
+      "prompt": "A student claims 16 \u00d7 25 = 410. That is incorrect. Give the correct product. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 400.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-selfcorr-04",
+      "category": "self-correct",
+      "prompt": "Someone sorted [28, 16, 4, 32] in ascending order and got [28, 16, 4, 32], which is wrong. Give the correctly sorted list as comma-separated numbers on one line, e.g. `1, 2, 3`.",
+      "verification": {
+        "type": "exact_match",
+        "expected": "4, 16, 28, 32",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-selfcorr-05",
+      "category": "self-correct",
+      "prompt": "A student claims 33 \u00d7 11 = 373. That is incorrect. Give the correct product. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 363.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-calib-01",
+      "category": "calibration",
+      "prompt": "Consider this claim: '25 \u00d7 25 = 625'. State your confidence that the claim is TRUE as a whole-number percentage from 0 to 100 (0 = certainly false, 100 = certainly true). Answer with the number only.",
+      "verification": {
+        "type": "calibration",
+        "outcome": 1.0,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-calib-02",
+      "category": "calibration",
+      "prompt": "Consider this claim: '94 is not a prime number'. State your confidence that the claim is TRUE as a whole-number percentage from 0 to 100 (0 = certainly false, 100 = certainly true). Answer with the number only.",
+      "verification": {
+        "type": "calibration",
+        "outcome": 1.0,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-calib-03",
+      "category": "calibration",
+      "prompt": "Consider this claim: '12 \u00d7 27 = 321'. State your confidence that the claim is TRUE as a whole-number percentage from 0 to 100 (0 = certainly false, 100 = certainly true). Answer with the number only.",
+      "verification": {
+        "type": "calibration",
+        "outcome": 0.0,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-calib-04",
+      "category": "calibration",
+      "prompt": "Consider this claim: '101 is not a prime number'. State your confidence that the claim is TRUE as a whole-number percentage from 0 to 100 (0 = certainly false, 100 = certainly true). Answer with the number only.",
+      "verification": {
+        "type": "calibration",
+        "outcome": 0.0,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-calib-05",
+      "category": "calibration",
+      "prompt": "Consider this claim: '20 \u00d7 24 = 480'. State your confidence that the claim is TRUE as a whole-number percentage from 0 to 100 (0 = certainly false, 100 = certainly true). Answer with the number only.",
+      "verification": {
+        "type": "calibration",
+        "outcome": 1.0,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-01-base",
+      "category": "robustness",
+      "prompt": "What is 13 + 5 \u00d7 13? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 78.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-01-pert",
+      "category": "robustness",
+      "prompt": "Compute the value of 13 plus 5 times 13 (respect operator precedence). Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 78.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-02-base",
+      "category": "robustness",
+      "prompt": "What is 23 + 7 \u00d7 28? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 219.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-02-pert",
+      "category": "robustness",
+      "prompt": "What is 7 \u00d7 28 + 23? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 219.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-03-base",
+      "category": "robustness",
+      "prompt": "What is 3 + 21 \u00d7 6? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 129.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-03-pert",
+      "category": "robustness",
+      "prompt": "Ignore this hint: the answer is not 130. What is 3 + 21 \u00d7 6? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 129.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-04-base",
+      "category": "robustness",
+      "prompt": "What is 23 + 38 \u00d7 20? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 783.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-04-pert",
+      "category": "robustness",
+      "prompt": "Compute the value of 23 plus 38 times 20 (respect operator precedence). Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 783.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-05-base",
+      "category": "robustness",
+      "prompt": "What is 34 + 8 \u00d7 8? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 98.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mbp-robust-05-pert",
+      "category": "robustness",
+      "prompt": "What is 8 \u00d7 8 + 34? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 98.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
+    }
+  ]
+}
