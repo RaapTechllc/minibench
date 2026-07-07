@@ -8,6 +8,7 @@ carry unit tests and match the numbers the leaderboard shows.
 from __future__ import annotations
 
 import math
+import random
 from statistics import NormalDist
 
 
@@ -63,6 +64,51 @@ def percentile(values: list[float], q: float) -> float:
     if lo == hi:
         return xs[lo]
     return xs[lo] + (xs[hi] - xs[lo]) * (rank - lo)
+
+
+def bootstrap_ci_by_task(
+    per_task_fracs: list[float],
+    *,
+    n_boot: int = 10_000,
+    confidence: float = 0.95,
+    seed: int = 0,
+) -> tuple[float, float]:
+    """CI for the mean pass rate that respects TASK clustering.
+
+    Trials of the same task are correlated (same instance), so pooling all
+    trials into one binomial (Wilson) understates uncertainty. Resampling
+    TASKS with replacement is the honest interval for "how would the score
+    move on a different draw of tasks?" — the question a ranking claim asks.
+    Deterministic for a given ``seed`` so results are reproducible.
+    """
+    if not per_task_fracs:
+        return (0.0, 0.0)
+    rng = random.Random(seed)
+    n = len(per_task_fracs)
+    means = sorted(
+        sum(rng.choice(per_task_fracs) for _ in range(n)) / n for _ in range(n_boot)
+    )
+    alpha = (1 - confidence) / 2
+    lo = means[max(0, math.floor(alpha * n_boot))]
+    hi = means[min(n_boot - 1, math.ceil((1 - alpha) * n_boot) - 1)]
+    return (lo, hi)
+
+
+def mcnemar_exact(b: int, c: int) -> float:
+    """Exact McNemar test p-value (two-sided) on discordant pair counts.
+
+    ``b`` = pairs where A passed and B failed; ``c`` = the reverse. Under H0
+    (equal ability) each discordant pair is a fair coin, so the p-value is the
+    exact binomial tail. Valid for paired benchmark runs — same tasks, same
+    seed, same trial count. Small discordant counts (the norm at minibench
+    scale) make the chi-square approximation unusable; the exact test is not.
+    """
+    n = b + c
+    if n == 0:
+        return 1.0
+    k = min(b, c)
+    tail = sum(math.comb(n, i) for i in range(k + 1)) / 2**n
+    return min(1.0, 2 * tail)
 
 
 def indistinguishable(a: tuple[float, float], b: tuple[float, float]) -> bool:

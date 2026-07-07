@@ -42,6 +42,7 @@ SYSTEM_PROMPTS = {
 class ProposerConfig:
     model: str
     temperature: float = 0.7
+    top_p: float = 1.0
     max_tokens: int = 2048
 
     @staticmethod
@@ -51,6 +52,7 @@ class ProposerConfig:
         return ProposerConfig(
             model=str(d["model"]),
             temperature=float(d.get("temperature", 0.7)),
+            top_p=float(d.get("top_p", 1.0)),
             max_tokens=int(d.get("max_tokens", 2048)),
         )
 
@@ -168,15 +170,31 @@ class MoAConfig:
         )
 
 
-def single_model_config(model: str, *, temperature: float = 0.2, max_tokens: int = 1024) -> MoAConfig:
-    """Build the one-call config that scores ``model`` as one model string."""
+def single_model_config(
+    model: str, *, temperature: float = 0.0, top_p: float = 1.0, max_tokens: int = 4096
+) -> MoAConfig:
+    """Build the one-call config that scores ``model`` as one model string.
+
+    Decoding is PINNED (greedy-equivalent temperature=0.0, top_p=1.0) so no
+    model gets a sampling advantage; only rows with identical decoding params
+    and grader_version are comparable on the leaderboard.
+
+    max_tokens is 4096, NOT the ~500 tokens a bare answer needs: reasoning
+    ("thinking") models spend the same token budget on hidden reasoning before
+    emitting ``message.content``, so a tight cap would truncate their answer to
+    empty and score a frontier model as a total failure. The graders still cap
+    the *gradable* text at 2000 chars, so the larger budget buys reasoning
+    headroom without letting verbosity game the score. Non-reasoning models are
+    unaffected (they stop well before the cap).
+    """
     slug = model.split("/")[-1]
     return MoAConfig.from_dict(
         {
             "name": f"single-{slug}",
             "single": True,
             "proposers": [
-                {"model": model, "temperature": temperature, "max_tokens": max_tokens}
+                {"model": model, "temperature": temperature, "top_p": top_p,
+                 "max_tokens": max_tokens}
             ],
         }
     )

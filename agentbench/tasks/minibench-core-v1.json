@@ -11,8 +11,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 134,
-        "tol": 1e-06
-      }
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-reason-02",
@@ -21,8 +24,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 158.76,
-        "tol": 0.011
-      }
+        "tol": 0.011,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-reason-03",
@@ -31,8 +37,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 69,
-        "tol": 1e-06
-      }
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-reason-04",
@@ -41,8 +50,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 363,
-        "tol": 1e-06
-      }
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-reason-05",
@@ -51,8 +63,11 @@
       "verification": {
         "type": "numeric_match",
         "expected": 72.35,
-        "tol": 0.011
-      }
+        "tol": 0.011,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-struct-01",
@@ -64,8 +79,11 @@
           "order_id": "A1700",
           "qty": 16,
           "total": 255.68
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-struct-02",
@@ -77,8 +95,11 @@
           "level": "ERROR",
           "service": "inventory",
           "code": 548
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-struct-03",
@@ -90,8 +111,11 @@
           "order_id": "A7946",
           "qty": 17,
           "total": 86.19
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-struct-04",
@@ -103,8 +127,11 @@
           "level": "INFO",
           "service": "search",
           "code": 472
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-struct-05",
@@ -116,8 +143,11 @@
           "order_id": "A8485",
           "qty": 14,
           "total": 807.8
-        }
-      }
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-format-01",
@@ -125,8 +155,11 @@
       "prompt": "Sort these words alphabetically and output them comma-separated (single line, lowercase, exactly `word, word, ...`), and nothing else: maple copper ember signal falcon quartz willow",
       "verification": {
         "type": "exact_match",
-        "expected": "copper, ember, falcon, maple, quartz, signal, willow"
-      }
+        "expected": "copper, ember, falcon, maple, quartz, signal, willow",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-format-02",
@@ -134,8 +167,11 @@
       "prompt": "Remove duplicate words, keeping the FIRST occurrence of each, preserving order. Output the result as a single space-separated line and nothing else: violet thunder falcon meadow maple python harbor harbor maple violet",
       "verification": {
         "type": "exact_match",
-        "expected": "violet thunder falcon meadow maple python harbor"
-      }
+        "expected": "violet thunder falcon meadow maple python harbor",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-format-03",
@@ -143,8 +179,11 @@
       "prompt": "Sort these words alphabetically and output them comma-separated (single line, lowercase, exactly `word, word, ...`), and nothing else: violet python signal ember maple basil thunder quartz",
       "verification": {
         "type": "exact_match",
-        "expected": "basil, ember, maple, python, quartz, signal, thunder, violet"
-      }
+        "expected": "basil, ember, maple, python, quartz, signal, thunder, violet",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-format-04",
@@ -152,8 +191,11 @@
       "prompt": "Remove duplicate words, keeping the FIRST occurrence of each, preserving order. Output the result as a single space-separated line and nothing else: basil willow maple falcon indigo quartz thunder indigo maple basil",
       "verification": {
         "type": "exact_match",
-        "expected": "basil willow maple falcon indigo quartz thunder"
-      }
+        "expected": "basil willow maple falcon indigo quartz thunder",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-format-05",
@@ -161,8 +203,11 @@
       "prompt": "Sort these words alphabetically and output them comma-separated (single line, lowercase, exactly `word, word, ...`), and nothing else: thunder indigo python willow copper signal ember",
       "verification": {
         "type": "exact_match",
-        "expected": "copper, ember, indigo, python, signal, thunder, willow"
-      }
+        "expected": "copper, ember, indigo, python, signal, thunder, willow",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-code-01",
@@ -171,7 +216,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "from solution import digit_sum\n\ndef test_values():\n    assert digit_sum(536477) == 32\n    assert digit_sum(116981) == 26\n    assert digit_sum(179295) == 33\n    assert digit_sum(65379) == 30\ndef test_negative():\n    assert digit_sum(-536477) == 32\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-code-02",
@@ -180,7 +226,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "from solution import rle\n\ndef test_values():\n    assert rle('bcacccbcbb') == 'b1c1a1c3b1c1b2'\n    assert rle('bcccb') == 'b1c3b1'\n    assert rle('abcacaaab') == 'a1b1c1a1c1a3b1'\n    assert rle('cbca') == 'c1b1c1a1'\ndef test_empty():\n    assert rle('') == ''\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-code-03",
@@ -189,7 +236,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "from solution import digit_sum\n\ndef test_values():\n    assert digit_sum(297739) == 37\n    assert digit_sum(813946) == 31\n    assert digit_sum(554468) == 32\n    assert digit_sum(865282) == 31\ndef test_negative():\n    assert digit_sum(-297739) == 37\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-code-04",
@@ -198,7 +246,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "from solution import rle\n\ndef test_values():\n    assert rle('cbbcbba') == 'c1b2c1b2a1'\n    assert rle('cccccba') == 'c5b1a1'\n    assert rle('abaabaca') == 'a1b1a2b1a1c1a1'\n    assert rle('bcabbbbb') == 'b1c1a1b5'\ndef test_empty():\n    assert rle('') == ''\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     },
     {
       "id": "mb-code-05",
@@ -207,7 +256,8 @@
       "verification": {
         "type": "unit_test",
         "test_source": "from solution import digit_sum\n\ndef test_values():\n    assert digit_sum(421560) == 18\n    assert digit_sum(574075) == 28\n    assert digit_sum(4664) == 20\n    assert digit_sum(846700) == 25\ndef test_negative():\n    assert digit_sum(-421560) == 18\n"
-      }
+      },
+      "canary": "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
     }
   ]
 }

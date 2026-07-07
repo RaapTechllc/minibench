@@ -75,6 +75,71 @@ Tests:
 cd agentbench && pip install -r requirements-dev.txt && pytest
 ```
 
+## Anti-gaming hardening (grader v2)
+
+Scores must reflect capability, not prompt-maxing. The defenses, and what each
+one closes:
+
+| Threat | Defense |
+|---|---|
+| Training contamination of the public dev slice | Private-seed splits (`--generate`), per-task canary strings, grade-time canary echo detection, dev-vs-private seed-delta comparison |
+| Decoy-burying / answer-spraying | Strict graders (`grader_version 2`): only an isolated final answer counts; 2000-char verbosity cap |
+| Test-file peeking in coding tasks | AST purity check before the solution touches disk, randomized test filename, minimal subprocess env |
+| Provider luck scored as capability | Retry/backoff on 429/5xx/timeouts; exhausted retries recorded as `infra_error` and EXCLUDED from every denominator; publish refused while any exist |
+| Sampling/prompt advantages | Pinned decoding (temperature 0.0, top_p 1.0, max_tokens 1024), no system prompt, MoA configs rejected for `minibench-*` suites |
+| Noise sold as ranking | Task-level bootstrap CIs, exact McNemar pairwise tests (`compare.py`); no p < 0.05, no ordering claim |
+| Benchmark tuned to a desired ranking | Items pruned by discrimination only (`item_stats.py`); expected orderings are checked LAST, as a sanity signal |
+
+## Legitimacy sweep protocol
+
+1. **Freeze.** Commit everything; `git status --porcelain` must be empty.
+2. **Seed.** Generate a secret HIGH-ENTROPY seed and set it ONLY in the sweep
+   shell: `MINIBENCH_SEED` from `python -c "import secrets; print(secrets.randbits(63))"`.
+   Use ≥ 2⁶³ — a small seed (e.g. 2³¹) is brute-forceable in minutes against
+   the published `seed_sha256`, which would reveal the private split. Never
+   echo the seed into a committed file or published log. One seed per sweep,
+   the SAME seed for every model (comparability); rotate next sweep.
+3. **Budget + pre-flight.**
+   `python -m agentbench.cost_check --generate core --per-category 10 --trials 5 --budget 12`
+   (worst-case tokens against the priciest catalog model — real answer-only
+   runs cost cents), then a dry-run smoke:
+   `python -m agentbench.run --model x/y --generate core --dry-run` — which
+   also exercises the **gold self-check gate** (every generated task must
+   grade its own gold answer as a pass, catching generator/grader drift on a
+   fresh seed).
+4. **Run every model with identical flags**, same seed, same window:
+   `python -m agentbench.run --model <m> --generate core --per-category 10 --trials 5`
+   then `--generate hard`. Results land in `agentbench/results/` under a
+   seed-hash + timestamp filename (never overwrites a previous sweep).
+5. **Mechanical validity gates** (ordering-blind, per run):
+   - `n_infra_errors == 0` — otherwise rerun; publishing is refused.
+   - `n_canary_flags == 0` — otherwise the model echoed a benchmark canary:
+     quarantine the run as contaminated; publishing is refused.
+   - `seed_sha256`, `grader_version`, `decoding` identical across the sweep
+     (`compare.py` refuses to compare otherwise).
+6. **Contamination probe.** Also run each model on the committed dev slice
+   (`--tasks agentbench/tasks/minibench-core-v1.json`) and compare dev vs
+   private pass rates. A fleet-relative positive outlier on the public slice
+   is flagged contaminated/overfit — an asterisk, never a score edit.
+7. **Ranking claims only via**
+   `python -m agentbench.compare results/<a>.json results/<b>.json ...` —
+   A > B requires McNemar p < 0.05; everything else is reported as
+   **indistinguishable**. Ceiling ties on hard-v1 are ties (the signal to
+   design hard-v2, not to tweak graders).
+8. **Last, sanity only:** compare against expectations. If the ordering
+   surprises you, the allowed responses are (a) run
+   `python -m agentbench.item_stats results/*.json`, inspect flagged items,
+   and fix a broken ITEM for all models, or (b) accept the result. Never
+   re-grade, re-seed, or selectively rerun to move one model.
+
+Every results JSON records `seed_sha256` (proves same-sweep without revealing
+the seed), `generator_sha256`, `git_commit`, `is_private_split`,
+`grader_version`, and the pinned decoding params. The backend stores all of
+these; leaderboards exclude runs with canary flags or infra errors, and a
+model's private-split run always supersedes its dev-slice run. (Backend note:
+no migration framework — adding the provenance columns to an existing database
+needs a recreate or manual `ALTER TABLE agent_runs ADD COLUMN ...`.)
+
 ## Reproducibility notes (from the brief — verify before a real run)
 
 - **Pin dated model snapshots**, not floating aliases. On OpenRouter also pin

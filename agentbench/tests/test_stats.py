@@ -1,4 +1,6 @@
 from agentbench.stats import (
+    bootstrap_ci_by_task,
+    mcnemar_exact,
     pass_rate,
     pass_hat_k,
     wilson_ci,
@@ -47,3 +49,37 @@ def test_percentile_p50_p95():
 def test_indistinguishable_overlap():
     assert indistinguishable((0.4, 0.7), (0.6, 0.9))
     assert not indistinguishable((0.1, 0.3), (0.6, 0.9))
+
+
+def test_mcnemar_exact_known_values():
+    assert mcnemar_exact(0, 0) == 1.0
+    # b=5, c=0: two-sided exact binomial -> 2 * (1/2)^5 = 0.0625
+    assert abs(mcnemar_exact(5, 0) - 0.0625) < 1e-9
+    # Symmetric discordance is maximally insignificant.
+    assert mcnemar_exact(3, 3) == 1.0
+    # Big asymmetry is significant.
+    assert mcnemar_exact(15, 1) < 0.001
+    # Symmetric in its arguments.
+    assert mcnemar_exact(2, 9) == mcnemar_exact(9, 2)
+
+
+def test_bootstrap_ci_by_task():
+    assert bootstrap_ci_by_task([]) == (0.0, 0.0)
+    # Degenerate: identical fractions -> zero-width interval at that value.
+    lo, hi = bootstrap_ci_by_task([1.0, 1.0, 1.0])
+    assert lo == hi == 1.0
+    # Mixed fractions -> interval containing the mean, wider than a point.
+    lo, hi = bootstrap_ci_by_task([1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0])
+    assert lo < 0.5 < hi
+    # Deterministic for the same seed.
+    assert bootstrap_ci_by_task([0.2, 0.8, 0.5]) == bootstrap_ci_by_task([0.2, 0.8, 0.5])
+
+
+def test_bootstrap_ci_wider_than_pooled_wilson_when_tasks_cluster():
+    # 10 tasks, 5 trials each, all-or-nothing per task (max clustering):
+    # pooled Wilson sees 25/50 independent trials; the task bootstrap must not
+    # pretend those 50 are independent.
+    fracs = [1.0] * 5 + [0.0] * 5
+    b_lo, b_hi = bootstrap_ci_by_task(fracs)
+    w_lo, w_hi = wilson_ci(25, 50)
+    assert (b_hi - b_lo) > (w_hi - w_lo)

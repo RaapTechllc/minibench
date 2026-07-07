@@ -163,6 +163,18 @@ class AgentRun(Base):
     tokens_in = Column(BigInteger)
     tokens_out = Column(BigInteger)
 
+    # Provenance / validity (agentbench anti-gaming protocol). Rows are only
+    # comparable when grader_version, decoding and seed_sha256 all match; runs
+    # with canary flags are contaminated and never ranked.
+    grader_version = Column(String(8))
+    decoding = Column(JSONB)              # {temperature, top_p, max_tokens, system_prompt}
+    seed_sha256 = Column(String(64))      # proves same-sweep without revealing the seed
+    generator_sha256 = Column(String(64))
+    git_commit = Column(String(64))
+    is_private_split = Column(Boolean, nullable=False, default=False)
+    n_infra_errors = Column(Integer, nullable=False, default=0)
+    n_canary_flags = Column(Integer, nullable=False, default=0)
+
 
 class AgentTaskResult(Base):
     """Per-task (optionally per-trial) result for an :class:`AgentRun`."""
