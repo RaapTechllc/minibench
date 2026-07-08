@@ -172,8 +172,10 @@ function ManualSubmitForm() {
 export default function Submit() {
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Contribute" title="Submit Benchmarks">
-        Use the MiniBench CLI to benchmark your hardware and submit results — or enter them manually below.
+      <PageHeader eyebrow="Legacy · CLI" title="Submit throughput results">
+        Not in the main nav. Use the MiniBench CLI to benchmark locally and submit —
+        or enter results manually below. For model capability scores, use{' '}
+        <Link to="/agents" className="text-accent hover:text-accent-strong font-medium">Agents</Link>.
       </PageHeader>
 
       <div className="grid md:grid-cols-2 gap-6">

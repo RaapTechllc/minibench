@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -181,7 +182,7 @@ def test_generate_runs_gold_self_check_and_records_provenance(monkeypatch, tmp_p
     assert prov["seed_sha256"] == hashlib.sha256(b"987654321").hexdigest()
     assert prov["is_private_split"] is True
     assert prov["generator_sha256"]
-    assert payload["summary"]["grader_version"] == "2"
+    assert payload["summary"]["grader_version"] == "3"
     assert payload["summary"]["decoding"]["temperature"] == 0.0
     assert payload["summary"]["decoding"]["top_p"] == 1.0
     # The raw seed must never appear anywhere in the artifact.
@@ -201,6 +202,18 @@ def test_minibench_suite_rejects_moa_configs(monkeypatch, tmp_path):
     rc = main(["--config", MOA_V1, "--generate", "core", "--dry-run",
                "--out", str(tmp_path / "r.json")])
     assert rc == 2  # MoA/system-prompt configs are not comparable on minibench
+
+
+def test_moa_lite_suite_accepts_moa_configs(monkeypatch, tmp_path):
+    """moa-lite-v1 is MoA-native — prefix is not minibench-*, so configs load."""
+    monkeypatch.setattr("agentbench.run._load_env_files", lambda: None)
+    tasks = Path(__file__).resolve().parents[1] / "tasks" / "moa-lite-v1.json"
+    out = tmp_path / "r.json"
+    rc = main(["--config", MOA_V1, "--tasks", str(tasks), "--trials", "1",
+               "--dry-run", "--out", str(out)])
+    assert rc == 0
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["summary"]["suite"] == "moa-lite-v1"
 
 
 def test_provenance_seed_hash_none_without_seed():
@@ -281,3 +294,21 @@ def test_core_summary_has_no_pro_axes():
     assert "calibration_brier" not in s
     assert "robustness_consistency" not in s
     assert "robustness_correct" not in s
+
+
+def test_summarize_reports_dual_capability_and_format():
+    config = single_model_config("openrouter/qwen/qwen-2.5-7b-instruct")
+    results = [
+        TrialResult(
+            "t1", "reasoning", 1, True, 1.0, 0.0, 10, 1, 1,
+            detail="match", passed_format=False, format_detail="not isolated",
+        ),
+        TrialResult(
+            "t2", "instruction", 1, False, 0.0, 0.0, 10, 1, 1,
+            detail="expected x", passed_format=False, format_detail="multiline",
+        ),
+    ]
+    s = summarize(config, "minibench-v2", 1, results)
+    assert s["grader_version"] == "3"
+    assert s["pass_rate"] == s["pass_capability"] == 0.5
+    assert s["pass_format"] == 0.0

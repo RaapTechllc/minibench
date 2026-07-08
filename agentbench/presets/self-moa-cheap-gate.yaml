@@ -1,0 +1,19 @@
+# Matched-cost Self-MoA: 3 samples of deepseek-v4-flash + same aggregator.
+# Compare against moa-cheap-gate at matched call pattern (3 proposals + 1 agg).
+#
+# Preferred suite: moa-lite-v1 (same as moa-cheap-gate.yaml).
+#   python -m agentbench.run --config agentbench/presets/self-moa-cheap-gate.yaml \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --dry-run
+#   python -m agentbench.run --config agentbench/presets/self-moa-cheap-gate.yaml \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --provider openrouter
+moa:
+  name: self-moa-cheap-gate
+  self_moa: true
+  self_moa_samples: 3
+  proposers:
+    - {model: openrouter/deepseek/deepseek-v4-flash, temperature: 0.7, max_tokens: 1024}
+  aggregator:
+    model: openrouter/deepseek/deepseek-v4-flash
+    temperature: 0.3
+    max_tokens: 1024
+    system_prompt: aggregate_and_synthesize

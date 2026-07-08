@@ -79,8 +79,8 @@ def test_grade_dispatch():
 # ── grader v2: strict mode (anti decoy-burying / anti prompt-maxing) ──────────
 
 
-def test_grader_version_is_2():
-    assert GRADER_VERSION == "2"
+def test_grader_version_is_3():
+    assert GRADER_VERSION == "3"
 
 
 def test_strict_numeric_accepts_isolated_final_answers():
@@ -107,6 +107,43 @@ def test_strict_numeric_verbosity_guard():
     r = numeric_match(long_output, 42, strict=True)
     assert not r.passed
     assert "verbosity" in r.detail
+
+
+def test_json_fields_numeric_tolerance():
+    gold = {"net_revenue": 679.8, "n_lines": 6}
+    # Careful solvers often emit unrounded-then-round → 679.79
+    assert json_fields('{"net_revenue": 679.79, "n_lines": 6}', gold, tol=0.01).passed
+    assert not json_fields('{"net_revenue": 679.79, "n_lines": 6}', gold, tol=None).passed
+    assert not json_fields('{"net_revenue": 670.0, "n_lines": 6}', gold, tol=0.01).passed
+
+
+def test_dual_grade_capability_vs_format_json():
+    # Prose + correct JSON: capability passes (extractable), format fails (strict).
+    out = 'Sure! Here you go: {"a": 1}'
+    r = grade({"type": "json_fields", "required": {"a": 1}, "strict": True}, out)
+    assert r.passed
+    assert r.passed_format is False
+    assert "json" in (r.format_detail or "").lower()
+
+
+def test_dual_grade_capability_vs_format_exact():
+    out = "Here is the answer:\nalpha, beta"
+    r = grade({"type": "exact_match", "expected": "alpha, beta", "strict": True}, out)
+    assert r.passed  # capability: answer line present
+    assert r.passed_format is False  # format: not single-line-only
+
+
+def test_dual_grade_capability_vs_format_numeric():
+    out = "I think carefully.\nThe journey is 42 minutes."
+    r = grade({"type": "numeric_match", "expected": 42, "strict": True}, out)
+    assert r.passed  # last number extractable
+    assert r.passed_format is False  # not isolated
+
+
+def test_empty_exact_match_gold_banned():
+    r = grade({"type": "exact_match", "expected": "", "strict": True}, "")
+    assert not r.passed
+    assert "banned" in r.detail
 
 
 def test_strict_json_requires_object_only_output():

@@ -24,16 +24,26 @@ import json
 import random
 import uuid
 from datetime import date, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
+
+
+def _money(x: Decimal | float | int | str) -> float:
+    """Round half-up to 2 decimal places via Decimal (deterministic gold)."""
+    return float(Decimal(str(x)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
 
 SUITE_NAME = "minibench-core-v1"
 CANARY = "AGENTBENCH-CANARY-4d9e7b1a-DO-NOT-TRAIN"
 HARD_SUITE_NAME = "minibench-hard-v1"
 HARD_CANARY = "AGENTBENCH-CANARY-b27f0c93-DO-NOT-TRAIN"
+V2_SUITE_NAME = "minibench-v2"
+V2_CANARY = "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
 PRO_SUITE_NAME = "minibench-pro-v1"
 PRO_CANARY = "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
 DEV_SEED = 20260706
+V2_DEV_SEED = 20260707
 
 FIRST_NAMES = ["Ava", "Noah", "Mia", "Liam", "Zoe", "Kai", "Ivy", "Eli", "Uma", "Rex"]
 SERVICES = ["checkout", "auth", "billing", "search", "inventory", "gateway"]
@@ -451,6 +461,334 @@ def _gen_coding_hard(rng: random.Random, n: int) -> list[dict[str, Any]]:
     return tasks
 
 
+# ── minibench-v2: frontier tier — hard compositional + adversarial distractors ──
+# core-v1 saturates at 100% for frontier models; hard-v1 still tops out ~87%.
+# v2 chains multiple operations per task, adds misleading context, and tightens
+# format constraints while keeping the same four categories + executable oracles.
+
+def _smallest_with_digit_sum_and_divisors(digit_sum: int, divisors: list[int]) -> int:
+    x = 1
+    while True:
+        if sum(int(c) for c in str(x)) == digit_sum and all(x % d == 0 for d in divisors):
+            return x
+        x += 1
+
+
+def _gen_reasoning_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    tasks = []
+    for i in range(n):
+        kind = i % 5
+        if kind == 0:
+            d1, d2 = rng.sample([7, 11, 13, 17], 2)
+            digit_sum = rng.randint(18, 26)
+            expected = float(_smallest_with_digit_sum_and_divisors(digit_sum, [d1, d2]))
+            prompt = (
+                f"What is the smallest positive integer divisible by both {d1} and {d2} "
+                f"whose decimal digits sum to exactly {digit_sum}? Answer with the number only."
+            )
+            tol = 1e-6
+        elif kind == 1:
+            principal = rng.randint(800, 2500)
+            rate = rng.choice([4, 5, 6, 8])
+            years = rng.randint(4, 7)
+            deposit = rng.randint(150, 450)
+            balance = float(principal)
+            for _ in range(years):
+                balance = balance * (1 + rate / 100) + deposit
+            expected = round(balance, 2)
+            prompt = (
+                f"An account starts with ${principal}, earns {rate}% compound interest "
+                f"annually, and you deposit ${deposit} at the end of each year (after "
+                f"interest). What is the balance after {years} years, rounded to 2 decimal "
+                "places? Answer with the number only."
+            )
+            tol = 0.011
+        elif kind == 2:
+            fill_a, fill_b = rng.randint(18, 50), rng.randint(18, 50)
+            drain = rng.randint(70, 200)
+            initial_pct = rng.choice([15, 20, 25]) / 100
+            rate = 1 / fill_a + 1 / fill_b - 1 / drain
+            expected = round((1 - initial_pct) / rate, 1)
+            prompt = (
+                f"A tank is {int(initial_pct * 100)}% full. Pipe A fills it in {fill_a} min, "
+                f"pipe B in {fill_b} min, and a drain empties a full tank in {drain} min. "
+                "With all three open, how many minutes until the tank is full? Round to 1 "
+                "decimal. Answer with the number only."
+            )
+            tol = 0.06
+        elif kind == 3:
+            a, b, m = rng.randint(2, 9), rng.randint(4, 9), rng.choice([17, 19, 23, 29])
+            expected = float(pow(a, b, m))
+            prompt = (
+                f"What is {a}^{b} mod {m}? (The remainder when {a} raised to the {b}th power "
+                f"is divided by {m}.) Answer with the number only."
+            )
+            tol = 1e-6
+        else:
+            k = rng.choice([12, 15, 18, 20])
+            start = 1
+            while (start * (start + 1) * (start + 2)) % k != 0:
+                start += 1
+            expected = float(start)
+            prompt = (
+                f"What is the smallest positive integer n such that n × (n+1) × (n+2) is "
+                f"divisible by {k}? Answer with n only."
+            )
+            tol = 1e-6
+        tasks.append({
+            "id": f"mb2-reason-{i+1:02d}",
+            "category": "reasoning",
+            "prompt": prompt,
+            "verification": {"type": "numeric_match", "expected": expected, "tol": tol},
+            "_gold": str(expected),
+        })
+    return tasks
+
+
+def _gen_structured_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    tasks = []
+    for i in range(n):
+        if i % 2 == 0:
+            customers = rng.sample(FIRST_NAMES, 4)
+            lines, net_by_customer = [], {}
+            total_net = Decimal("0.00")
+            for j in range(6):
+                who = customers[j % 4]
+                qty = rng.randint(1, 8)
+                unit = _money(rng.uniform(3, 45))
+                disc = rng.choice([0, 5, 10, 15, 20])
+                # Explicit rule (also in the prompt): ROUND each line to 2 dp, THEN sum.
+                gross = Decimal(str(qty)) * Decimal(str(unit))
+                net = _money(gross * (Decimal("1") - Decimal(disc) / Decimal("100")))
+                net_d = Decimal(str(net))
+                prev = Decimal(str(net_by_customer.get(who, 0.0)))
+                net_by_customer[who] = _money(prev + net_d)
+                total_net = Decimal(str(_money(total_net + net_d)))
+                lines.append(f"{who}: {qty} x ${unit:.2f} ({disc}% off)")
+            top = max(net_by_customer, key=lambda c: net_by_customer[c])
+            ranked = sorted(net_by_customer.values())
+            if len(ranked) >= 2 and ranked[-1] == ranked[-2]:
+                net_by_customer[top] = _money(Decimal(str(net_by_customer[top])) + Decimal("2.01"))
+                total_net = Decimal(str(_money(total_net + Decimal("2.01"))))
+                lines.append(f"{top}: 1 x $2.01 (0% off)")
+            required = {
+                "n_lines": len(lines),
+                "net_revenue": float(total_net),
+                "top_customer": top,
+            }
+            prompt = (
+                "Apply each line's percent discount to that line's gross (qty x unit). "
+                "Round EACH discounted line total to 2 decimal places (half-up), THEN sum "
+                "those rounded line totals for net_revenue (do not sum unrounded values and "
+                "round once at the end). Respond with ONLY a JSON object with keys "
+                "`n_lines` (integer), `net_revenue` (number, 2 decimals) and "
+                "`top_customer` (string, highest net spend). Lines: " + "; ".join(lines)
+            )
+            verification: dict[str, Any] = {
+                "type": "json_fields",
+                "required": required,
+                # Accept adjacent 2dp interpretations (binary float / off-by-one-cent).
+                "tol": 0.01,
+            }
+        else:
+            services = rng.sample(SERVICES, 3)
+            worst = services[0]
+            entries, err_codes = [], []
+            for j in range(8):
+                svc = worst if j < 4 else services[1 + j % 2]
+                level = "ERROR" if (svc == worst and j != 7) or j == 5 else "WARN"
+                code = rng.randint(400, 599)
+                if level == "ERROR":
+                    err_codes.append(code)
+                entries.append(f"[{level}] {svc} status={code}")
+            median_err = sorted(err_codes)[len(err_codes) // 2] if err_codes else 0
+            required = {
+                "n_errors": len(err_codes),
+                "worst_service": worst,
+                "median_error_code": median_err,
+            }
+            prompt = (
+                "Analyze this log batch. Respond with ONLY a JSON object with keys "
+                "`n_errors` (integer ERROR count), `worst_service` (string, most ERROR lines) "
+                "and `median_error_code` (integer median of ERROR status codes only). "
+                "Logs: " + " | ".join(entries)
+            )
+            verification = {"type": "json_fields", "required": required}
+        tasks.append({
+            "id": f"mb2-struct-{i+1:02d}",
+            "category": "tool-use",
+            "prompt": prompt,
+            "verification": verification,
+            "_gold": json.dumps(required),
+        })
+    return tasks
+
+
+def _gen_format_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    tasks = []
+    for i in range(n):
+        words = rng.sample(WORDS, rng.randint(7, 10))
+        if i % 3 == 0:
+            expected = ";".join(sorted(words, key=lambda w: (-len(w), w)))
+            prompt = (
+                "Sort these words by length (longest first), breaking ties alphabetically. "
+                "Output them joined by semicolons with no spaces, single line only: "
+                + " ".join(words)
+            )
+        elif i % 3 == 1:
+            vowel_words = sorted(w for w in words if w[0] in "aeiou")
+            if not vowel_words:
+                # Ban empty exact_match gold without consuming extra RNG (coding
+                # tasks share this Random stream and must stay reproducible).
+                inject = next(w for w in sorted(WORDS) if w[0] in "aeiou")
+                words = list(words)[:-1] + [inject]
+                vowel_words = sorted(w for w in words if w[0] in "aeiou")
+            expected = ",".join(vowel_words)
+            prompt = (
+                "From this list, output only words that START with a vowel (a,e,i,o,u), "
+                "sorted alphabetically, comma-separated, no spaces, single line: "
+                + " ".join(words)
+            )
+        else:
+            shift = rng.randint(3, 11)
+
+            def _caesar(w: str) -> str:
+                return "".join(chr((ord(c) - 97 + shift) % 26 + 97) for c in w)
+
+            transformed = [_caesar(w) for w in reversed(words)]
+            expected = " ".join(transformed)
+            prompt = (
+                f"Reverse the word order, then apply Caesar shift +{shift} to each word "
+                "(lowercase a-z, wrap). Output space-separated, single line only: "
+                + " ".join(words)
+            )
+        if not str(expected).strip():
+            raise RuntimeError(f"empty exact_match gold for format index {i}")
+        tasks.append({
+            "id": f"mb2-format-{i+1:02d}",
+            "category": "instruction",
+            "prompt": prompt,
+            "verification": {"type": "exact_match", "expected": expected},
+            "_gold": expected,
+        })
+    return tasks
+
+
+def _gen_coding_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
+    tasks = []
+    for i in range(n):
+        if i % 4 == 0:
+            cases = []
+            for _ in range(4):
+                nums = [rng.randint(-20, 40) for _ in range(rng.randint(5, 9))]
+                k = rng.randint(1, len(nums))
+                gold = sorted(nums, reverse=True)[k - 1]
+                cases.append((nums, k, gold))
+            asserts = "\n".join(
+                f"    assert kth_largest({nums!r}, {k}) == {gold}" for nums, k, gold in cases
+            )
+            test_source = ("from solution import kth_largest\n\n"
+                           f"def test_values():\n{asserts}\n")
+            prompt = (
+                "Write `kth_largest(nums, k)` returning the k-th largest element (1-indexed; "
+                "duplicates count). Return only a fenced python block."
+            )
+            gold = ("```python\ndef kth_largest(nums, k):\n"
+                    "    return sorted(nums, reverse=True)[k - 1]\n```")
+        elif i % 4 == 1:
+            pairs = ["()", "[]", "{}", "(]", "([)]", "({[]})"]
+            valid = ["()", "[]", "{}", "({[]})"]
+            asserts = "\n".join(
+                f"    assert is_valid({s!r}) == {s in valid}" for s in pairs
+            )
+            test_source = ("from solution import is_valid\n\n"
+                           f"def test_brackets():\n{asserts}\n")
+            prompt = (
+                "Write `is_valid(s)` returning True iff `s` has balanced (), [], {} "
+                "brackets. Return only a fenced python block."
+            )
+            gold = ("```python\ndef is_valid(s):\n"
+                    "    stack, match = [], {')': '(', ']': '[', '}': '{'}\n"
+                    "    for ch in s:\n"
+                    "        if ch in '([{':\n"
+                    "            stack.append(ch)\n"
+                    "        elif not stack or stack[-1] != match[ch]:\n"
+                    "            return False\n"
+                    "        else:\n"
+                    "            stack.pop()\n"
+                    "    return not stack\n```")
+        elif i % 4 == 2:
+            cases = [
+                ("3[a]2[bc]", "aaabcbc"),
+                ("3[a2[c]]", "accaccacc"),
+                ("2[abc]3[cd]ef", "abcabccdcdcdef"),
+            ]
+            asserts = "\n".join(f"    assert decode_string({inp!r}) == {out!r}" for inp, out in cases)
+            test_source = ("from solution import decode_string\n\n"
+                           f"def test_decode():\n{asserts}\n")
+            prompt = (
+                "Write `decode_string(s)` decoding patterns like `3[a]2[bc]` → `aaabcbc` "
+                "(digits = repeat count, brackets = repeat group). Return only a fenced "
+                "python block."
+            )
+            gold = ("```python\ndef decode_string(s):\n"
+                    "    stack, cur, num = [], '', 0\n"
+                    "    for ch in s:\n"
+                    "        if ch.isdigit():\n"
+                    "            num = num * 10 + int(ch)\n"
+                    "        elif ch == '[':\n"
+                    "            stack.append((cur, num))\n"
+                    "            cur, num = '', 0\n"
+                    "        elif ch == ']':\n"
+                    "            prev, n = stack.pop()\n"
+                    "            cur = prev + cur * n\n"
+                    "        else:\n"
+                    "            cur += ch\n"
+                    "    return cur\n```")
+        else:
+            cases = []
+            for _ in range(3):
+                nums = [rng.randint(1, 9) for _ in range(rng.randint(4, 6))]
+                out = []
+                left = 1
+                for j in range(len(nums)):
+                    out.append(left)
+                    left *= nums[j]
+                right = 1
+                for j in range(len(nums) - 1, -1, -1):
+                    out[j] *= right
+                    right *= nums[j]
+                cases.append((nums, out))
+            asserts = "\n".join(
+                f"    assert product_except_self({nums!r}) == {out!r}" for nums, out in cases
+            )
+            test_source = ("from solution import product_except_self\n\n"
+                           f"def test_product():\n{asserts}\n")
+            prompt = (
+                "Write `product_except_self(nums)` returning an array where output[i] is "
+                "the product of all elements except nums[i] (no division). Return only a "
+                "fenced python block."
+            )
+            gold = ("```python\ndef product_except_self(nums):\n"
+                    "    n, out, left = len(nums), [1] * len(nums), 1\n"
+                    "    for i in range(n):\n"
+                    "        out[i] = left\n"
+                    "        left *= nums[i]\n"
+                    "    right = 1\n"
+                    "    for i in range(n - 1, -1, -1):\n"
+                    "        out[i] *= right\n"
+                    "        right *= nums[i]\n"
+                    "    return out\n```")
+        tasks.append({
+            "id": f"mb2-code-{i+1:02d}",
+            "category": "coding",
+            "prompt": prompt,
+            "verification": {"type": "unit_test", "test_source": test_source},
+            "_gold": gold,
+        })
+    return tasks
+
+
 # ── minibench-pro-v1: strategic capability matrix ─────────────────────────────
 # Each generator covers a capability dimension core/hard don't test, all graded
 # deterministically (no LLM judge). Two genuinely novel axes — calibration
@@ -846,6 +1184,18 @@ SUITES = {
             "uses an uncommitted seed. Budget: see agentbench/cost_check.py."
         ),
     },
+    "v2": {
+        "name": V2_SUITE_NAME,
+        "canary": V2_CANARY,
+        "generators": (_gen_reasoning_v2, _gen_structured_v2, _gen_format_v2, _gen_coding_v2),
+        "notes": (
+            "Frontier tier (v2): multi-step composition, adversarial distractors, and "
+            "stricter transforms beyond hard-v1 — designed to break the ~87% ceiling "
+            "when core-v1 clusters at 100%. Procedurally generated "
+            "(agentbench.minibench_gen --suite v2, seed {seed}); private split uses an "
+            "uncommitted seed. Budget: see agentbench/cost_check.py."
+        ),
+    },
     "pro": {
         "name": PRO_SUITE_NAME,
         "canary": PRO_CANARY,
@@ -890,6 +1240,11 @@ def generate_tasks(seed: int, per_category: int = 5, suite: str = "core") -> lis
         if spec["type"] in _STRICT_TYPES:
             spec["strict"] = True
             spec["max_output_chars"] = MAX_OUTPUT_CHARS
+        # Gold hygiene: empty exact_match has no positive oracle (grades 0 on itself).
+        if spec["type"] == "exact_match" and not str(spec.get("expected", "")).strip():
+            raise ValueError(
+                f"{task['id']}: empty exact_match gold is banned — resample or change template"
+            )
     return tasks
 
 

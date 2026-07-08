@@ -21,8 +21,8 @@ function fmtDate(value: string): string {
 
 function BackLink() {
   return (
-    <Link to="/leaderboard" className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-strong transition-colors">
-      <ArrowLeft className="w-4 h-4" /> Back to leaderboard
+    <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-accent hover:text-accent-strong transition-colors">
+      <ArrowLeft className="w-4 h-4" /> Back to overview
     </Link>
   );
 }
@@ -192,10 +192,6 @@ export default function BenchmarkDetail() {
           <Field label="Submitted" value={fmtDate(b.submitted_at)} />
           <Field label="Fingerprint" value={<span className="tnum text-xs">{b.fingerprint ?? '—'}</span>} />
         </Section>
-      </div>
-
-      <div className="text-sm">
-        <Link to={`/compare`} className="text-accent hover:text-accent-strong transition-colors">Compare with another system →</Link>
       </div>
     </div>
   );

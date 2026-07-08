@@ -154,3 +154,14 @@ def test_top_p_sent_when_set():
     client.chat("m", [ChatMessage("user", "hi")], top_p=1.0, temperature=0.0)
     assert transport.requests[-1]["top_p"] == 1.0
     assert transport.requests[-1]["temperature"] == 0.0
+
+
+def test_extract_text_falls_back_to_reasoning_content():
+    from agentbench.client import _extract_text
+
+    body = {"choices": [{"message": {"content": "", "reasoning_content": "Answer: 42"}}]}
+    assert _extract_text(body) == "Answer: 42"
+    body2 = {"choices": [{"message": {"content": "visible", "reasoning_content": "hidden"}}]}
+    assert _extract_text(body2) == "visible"
+    body3 = {"choices": [{"message": {"content": [{"type": "text", "text": "part"}]}}]}
+    assert _extract_text(body3) == "part"

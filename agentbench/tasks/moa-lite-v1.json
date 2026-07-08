@@ -1,0 +1,209 @@
+{
+  "suite": "moa-lite-v1",
+  "notes": "MoA-native light suite (disagreement / multi-constraint / evidence-gap / proposal arbitration). NOT a minibench-* suite \u2014 MoA and Self-MoA configs are allowed. Procedurally generated (agentbench.moa_lite_gen, seed 20260708). Target: cheap single ~40\u201360% capability; MoA should have room vs Self-MoA. Executable oracles only.",
+  "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN",
+  "generator_seed": 20260708,
+  "tasks": [
+    {
+      "id": "moal-doc-01",
+      "category": "doc-conflict",
+      "prompt": "Resolve authoritative `retention_days`.\nRole tags in brackets are authoritative: [STD]=policy, [M]=memo, [D]=draft, [T]=ticket. Order: STD > M > D > T. Later date wins only within the same tag. Lines without a tag are noise.\nRespond with ONLY JSON keys `value` (int), `source` (policy|memo|draft|ticket mapped from the tag you used; STD\u2192policy), `trusts_majority` (bool: true iff you used the most common cited number among tagged lines).\nDocuments:\n- (2026-01-02) Noah: retention_days should be 14\n- (2026-03-28) thread consensus: retention_days=14\n- [STD 2026-03-15] published retention_days=28\n- [M 2026-03-27] Zoe: temporary retention_days=14\n- (2026-03-29) trial note: retention_days=27\n- (2026-01-03) Mia: retention_days should be 14\n- (2026-01-01) Ava: retention_days should be 14",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "value": 28,
+          "source": "policy",
+          "trusts_majority": false
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-doc-02",
+      "category": "doc-conflict",
+      "prompt": "Resolve authoritative `max_retries`.\nRole tags in brackets are authoritative: [STD]=policy, [M]=memo, [D]=draft, [T]=ticket. Order: STD > M > D > T. Later date wins only within the same tag. Lines without a tag are noise.\nRespond with ONLY JSON keys `value` (int), `source` (policy|memo|draft|ticket mapped from the tag you used; STD\u2192policy), `trusts_majority` (bool: true iff you used the most common cited number among tagged lines).\nDocuments:\n- [T 2026-04-18] agrees 131\n- [M 2026-02-01] Ava: max_retries=131\n- (2026-04-21) 'policy sync' chat: everyone 131\n- [M 2026-04-10] Noah: max_retries=176\n- (2026-04-22) changelog default=131\n- [D 2026-04-20] max_retries=131\n- (2026-04-23 STD?) rumor max_retries=131\n- [D 2026-04-19] max_retries=131",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "value": 176,
+          "source": "memo",
+          "trusts_majority": false
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-doc-03",
+      "category": "doc-conflict",
+      "prompt": "Resolve authoritative `retention_days`.\nRole tags in brackets are authoritative: [STD]=policy, [M]=memo, [D]=draft, [T]=ticket. Order: STD > M > D > T. Later date wins only within the same tag. Lines without a tag are noise.\nRespond with ONLY JSON keys `value` (int), `source` (policy|memo|draft|ticket mapped from the tag you used; STD\u2192policy), `trusts_majority` (bool: true iff you used the most common cited number among tagged lines).\nDocuments:\n- [T 2026-05-31] configured=4\n- [STD 2026-05-01] \u00a73.2 now retention_days=7; 2025-11-01 \u00a73.2 withdrawn\n- [M 2026-05-28] prod still 4\n- [STD 2025-11-01] EFFECTIVE IMMEDIATELY: retention_days=4\n- [M 2026-05-29] lobby 9\n- (2026-06-01) all-hands slide still shows 4\n- [D 2026-05-30] restore 4",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "value": 7,
+          "source": "policy",
+          "trusts_majority": false
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-constraint-01",
+      "category": "constraint-pack",
+      "prompt": "Budget $110. SKUs: A@$8 (banned), B@$13, C@$14. Must buy a MIX: \u22651 B and \u22651 C, A forbidden, total units \u2264 4, spend divisible by 3, residual divisible by 4. Maximize spend; then minimize units; then maximize qty_b. Respond with ONLY JSON keys `qty_b`, `qty_c` (ints), `spend`, `residual` (numbers, 2 decimals).",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "qty_b": 2,
+          "qty_c": 2,
+          "spend": 54.0,
+          "residual": 56.0
+        },
+        "tol": 0.01,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-constraint-02",
+      "category": "constraint-pack",
+      "prompt": "Pack exactly $115 with alpha@$5, beta@$7. Need \u22651 each, exact spend, qty_alpha % 4 == 0, qty_beta \u2264 6; minimize units then maximize alpha. Respond with ONLY JSON keys `qty_alpha`, `qty_beta`, `spend`.",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "qty_alpha": 16,
+          "qty_beta": 5,
+          "spend": 115.0
+        },
+        "tol": 0.01,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-constraint-03",
+      "category": "constraint-pack",
+      "prompt": "Workers A/B capacity 11. Jobs: J0=7, J1=6, J2=3, J3=7. B cannot take duration \u2265 7. A cannot take uniquely shortest job J2. LPT; lighter worker then A; skip illegal. Impossible \u2192 reject with loads 0. Respond with ONLY JSON keys `status` ('ok'|'reject'), `load_a`, `load_b`.",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "status": "reject",
+          "load_a": 0,
+          "load_b": 0
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-evidence-01",
+      "category": "evidence-gap",
+      "prompt": "Triage. ONLY JSON: `service`, `root_cause` (deploy|dependency|unknown), `needs_more_data`, `page_now`.\nUse live facts only. deploy if post-deploy live error_rate_pct>5 and deps OK; dependency if a dependency is currently DOWN; else unknown. page_now only for those actionable live cases.\nTelemetry:\n- [checkout] deploy d222 shipped 35m ago\n- [checkout] p95=1559ms\n- [checkout] error_rate_scraper status=timeout\n- [checkout] deps=OK\n- [checkout] yesterday_error_rate_pct=7.1\n- [pager] suspected_cause=deploy",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "service": "checkout",
+          "root_cause": "unknown",
+          "needs_more_data": true,
+          "page_now": false
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-evidence-02",
+      "category": "evidence-gap",
+      "prompt": "Triage. ONLY JSON: `service`, `root_cause` (deploy|dependency|unknown), `needs_more_data`, `page_now`.\nUse live facts only. deploy if post-deploy live error_rate_pct>5 and deps OK; dependency if a dependency is currently DOWN; else unknown. page_now only for those actionable live cases.\nTelemetry:\n- [billing] deploy d933 shipped 10m ago\n- [billing] error_rate_pct=8.8 meta=pre_deploy_window\n- [billing] deps=OK\n- [billing] rollback=ready\n- [ops] rollback now \u2014 it's the deploy",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "service": "billing",
+          "root_cause": "unknown",
+          "needs_more_data": true,
+          "page_now": false
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-evidence-03",
+      "category": "evidence-gap",
+      "prompt": "Triage. ONLY JSON: `service`, `root_cause` (deploy|dependency|unknown), `needs_more_data`, `page_now`.\nUse live facts only. deploy if post-deploy live error_rate_pct>5 and deps OK; dependency if a dependency is currently DOWN; else unknown. page_now only for those actionable live cases.\nTelemetry:\n- [auth] deploy d792 shipped 50m ago\n- [auth] error_rate_pct=5.5 meta=sparse_n=3\n- [auth] deps=DEGRADED payments-api\n- [auth] history: redis DOWN\u2192OK 4h ago\n- [draft-PM] cause=deploy",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "service": "auth",
+          "root_cause": "unknown",
+          "needs_more_data": true,
+          "page_now": false
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-arbitrate-01",
+      "category": "proposal-arbitrate",
+      "prompt": "A trip is 60 mi @ 60 mph then 90 mi @ 30 mph. Average trip speed (mph)?\nProposal A: 37.5\nProposal B: 45.0\nONLY JSON: `winner` (A|B|neither), `answer` (number), `reject_reason` (arithmetic_mean|constraint_violation|calc_error|none).",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "winner": "A",
+          "answer": 37.5,
+          "reject_reason": "arithmetic_mean"
+        },
+        "tol": 0.01,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-arbitrate-02",
+      "category": "proposal-arbitrate",
+      "prompt": "Price $151; take 20% off the price, then add $12 fee (fee not discounted). Final $, 2 decimals.\nProposal A: 132.8\nProposal B: 130.4\nONLY JSON: `winner` (A|B|neither), `answer` (number), `reject_reason` (arithmetic_mean|constraint_violation|calc_error|none).",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "winner": "A",
+          "answer": 132.8,
+          "reject_reason": "calc_error"
+        },
+        "tol": 0.01,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    },
+    {
+      "id": "moal-arbitrate-03",
+      "category": "proposal-arbitrate",
+      "prompt": "Item@$35, budget $100, \u22642 units; max legal spend.\nProposal A: qty=3 spend=100\nProposal B: qty=2 spend=105.0\nONLY JSON: `winner` (A|B|neither), `answer` (correct spend), `reject_reason` (arithmetic_mean|constraint_violation|calc_error|none).",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "winner": "neither",
+          "answer": 70.0,
+          "reject_reason": "constraint_violation"
+        },
+        "tol": 0.01,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-moa-lite-a7c2e91f-DO-NOT-TRAIN"
+    }
+  ]
+}

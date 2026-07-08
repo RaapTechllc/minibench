@@ -58,7 +58,7 @@ export default function Hardware() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Test rigs" title="Hardware & Reference Profiles" />
+        <PageHeader eyebrow="Reference rigs" title="Test Rigs & Profiles" />
         <Skeleton rows={8} />
       </div>
     );
@@ -67,7 +67,7 @@ export default function Hardware() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="Test rigs" title="Hardware & Reference Profiles" />
+        <PageHeader eyebrow="Reference rigs" title="Test Rigs & Profiles" />
         <ErrorState onRetry={load}>Hardware specs couldn't be fetched. Check your connection and try again.</ErrorState>
       </div>
     );
@@ -75,8 +75,8 @@ export default function Hardware() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Test rigs" title="Hardware & Reference Profiles">
-        Hardware is the test rig, not the competition: models are benchmarked on a fixed reference profile so capability numbers are comparable.
+        <PageHeader eyebrow="Reference rigs" title="Test Rigs & Profiles">
+        How models are run on pinned configurations. Hardware documents the rig; capability scores live on Models.
       </PageHeader>
 
       {profiles.length > 0 && (

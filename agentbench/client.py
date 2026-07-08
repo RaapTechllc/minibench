@@ -257,11 +257,43 @@ class OpenAICompatClient:
 
 
 def _extract_text(body: dict[str, Any]) -> str:
+    """Pull the graded answer text from a chat-completions body.
+
+    Prefer ``message.content``. When content is empty (common on some reasoning
+    models that park the answer in ``reasoning_content`` / ``reasoning``), fall
+    back to those fields so empty-content is diagnosed as a content failure for
+    the grader rather than a silent blank string. List-of-parts content is
+    flattened to text.
+    """
     choices = body.get("choices") or []
     if not choices:
         return ""
     message = choices[0].get("message") or {}
-    return message.get("content") or ""
+
+    def _as_text(value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        if isinstance(value, list):
+            parts: list[str] = []
+            for p in value:
+                if isinstance(p, str):
+                    parts.append(p)
+                elif isinstance(p, dict):
+                    parts.append(str(p.get("text") or p.get("content") or ""))
+            return "".join(parts)
+        return str(value)
+
+    content = _as_text(message.get("content")).strip()
+    if content:
+        return content
+    # Reasoning-only / empty-content fallbacks (OpenRouter / DeepSeek-style).
+    for key in ("reasoning_content", "reasoning"):
+        alt = _as_text(message.get(key)).strip()
+        if alt:
+            return alt
+    return ""
 
 
 def _monotonic_ns() -> int:

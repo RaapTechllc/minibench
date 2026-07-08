@@ -14,9 +14,9 @@ wrote "live results" to `/tmp` that were never committed. `agentbench` fixes all
 three: **executable oracles**, **config validated at load**, and **committed
 result artifacts**.
 
-## Suites: core → hard → pro
+## Suites: core → hard → v2 → pro (+ moa-lite)
 
-Three procedurally-generated capability suites, all deterministically graded
+Four procedurally-generated capability suites, all deterministically graded
 (no LLM judge), all cost-bounded:
 
 - **`minibench-core-v1`** (4 categories) — the fundamentals: math reasoning,
@@ -24,8 +24,14 @@ Three procedurally-generated capability suites, all deterministically graded
 - **`minibench-hard-v1`** (4 categories) — compositional variants (search,
   aggregation, chained transforms, a no-`eval` parser) to separate frontier
   models that saturate core.
+- **`minibench-v2`** (4 categories) — frontier tier: multi-step composition,
+  adversarial distractors, and stricter transforms when hard-v1 still tops out
+  ~87%. Featured on the Models leaderboard.
 - **`minibench-pro-v1`** (10 categories) — a strategic capability MATRIX plus
   two axes almost no cheap benchmark grades deterministically.
+- **`moa-lite-v1`** (4 categories, 12 tasks) — MoA-native disagreement slice
+  (doc-conflict, constraint-pack, evidence-gap, proposal-arbitrate). Not under
+  the `minibench-*` prefix, so cheap MoA / Self-MoA gates are allowed.
 
 ### Why minibench-pro-v1 is different
 
@@ -69,8 +75,9 @@ Real spend on a normal run is a few dollars at most.
 | `tracker.py` | Poll OpenRouter `/models`, diff against known ids → detect new launches. |
 | `run.py` | CLI: run a config against a task suite with N trials, grade, summarize, write a committable artifact. |
 | `presets/` | MoA configs: `moa-v1` (production), `moa-dev` (cheap testing), Self-MoA baselines. |
-| `tasks/` | `coding-v1` (smoke/CI), `coding-v2` (harder eval), `minibench-core-v1` (canonical capability dev slice). |
+| `tasks/` | `coding-v1` (smoke/CI), `coding-v2` (harder eval), `minibench-core-v1` (canonical capability), `moa-lite-v1` (MoA-native disagreement slice). |
 | `minibench_gen.py` | Procedural generator for `minibench-*` suites (core/hard/pro) — computed gold, canary, committed dev slice (seed 20260706); private split regenerated with an uncommitted seed. |
+| `moa_lite_gen.py` | MoA-native light suite (`moa-lite-v1`): doc-conflict, constraint-pack, evidence-gap, proposal-arbitrate. Name is not `minibench-*`, so MoA configs are allowed. |
 | `compare.py` | Pairwise significance (exact McNemar + task-bootstrap CIs) across a sweep; refuses ordering claims without p<0.05. Calibration excluded from ranking. |
 | `item_stats.py` | Item-discrimination audit (point-biserial); prunes by discrimination only. Calibration excluded (continuous). |
 | `catalog.py` | Master model catalog: joins the strategic-family list against the live OpenRouter feed → `backend/app/data/known_models_seed.json`. |
@@ -120,7 +127,7 @@ Tests:
 cd agentbench && pip install -r requirements-dev.txt && pytest
 ```
 
-## Anti-gaming hardening (grader v2)
+## Anti-gaming hardening (grader v3)
 
 Scores must reflect capability, not prompt-maxing. The defenses, and what each
 one closes:
@@ -128,12 +135,19 @@ one closes:
 | Threat | Defense |
 |---|---|
 | Training contamination of the public dev slice | Private-seed splits (`--generate`), per-task canary strings, grade-time canary echo detection, dev-vs-private seed-delta comparison |
-| Decoy-burying / answer-spraying | Strict graders (`grader_version 2`): only an isolated final answer counts; 2000-char verbosity cap |
+| Decoy-burying / answer-spraying | Strict *format* channel (`pass_format`): isolated final answer + 2000-char verbosity cap |
+| Format pedantry scored as intelligence | Dual metrics (`grader_version 3`): `pass_rate` / `pass_capability` = extractable answer; `pass_format` = strict channel. Rank capability, diagnose format separately |
+| Ambiguous float gold / empty exact_match | Decimal line-then-sum + `json_fields` `tol`; generator bans empty exact_match |
 | Test-file peeking in coding tasks | AST purity check before the solution touches disk, randomized test filename, minimal subprocess env |
 | Provider luck scored as capability | Retry/backoff on 429/5xx/timeouts; exhausted retries recorded as `infra_error` and EXCLUDED from every denominator; publish refused while any exist |
 | Sampling/prompt advantages | Pinned decoding (temperature 0.0, top_p 1.0, max_tokens 1024), no system prompt, MoA configs rejected for `minibench-*` suites |
 | Noise sold as ranking | Task-level bootstrap CIs, exact McNemar pairwise tests (`compare.py`); no p < 0.05, no ordering claim |
 | Benchmark tuned to a desired ranking | Items pruned by discrimination only (`item_stats.py`); expected orderings are checked LAST, as a sanity signal |
+
+v2-scored rows are not comparable to v3. Cheap validation gate: see
+`agentbench/presets/cheap-gate-roster.yaml` (flash/small singles on minibench-v2;
+MoA / Self-MoA on `moa-lite-v1` via `moa-cheap-gate` / `self-moa-cheap-gate`).
+Do not burn frontier tokens until that gate passes.
 
 ## Legitimacy sweep protocol
 

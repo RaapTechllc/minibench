@@ -18,7 +18,7 @@ def _run(model: str, outcomes: dict[str, list[bool]], *, seed_hash: str = "abc",
         "provenance": {"seed_sha256": seed_hash},
         "summary": {
             "suite": suite,
-            "grader_version": "2",
+            "grader_version": "3",
             "decoding": {"temperature": 0.0, "top_p": 1.0, "max_tokens": 2048},
             "moa_config": {"name": f"single-{model}", "models": [model]},
             "pass_rate": round(passes / n, 4) if n else 0.0,

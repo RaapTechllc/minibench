@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../api';
 import type { Benchmark } from '../api';
 import {
@@ -43,10 +44,17 @@ export default function Compare() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Head to head" title="Compare Hardware">
-        Side-by-side comparison of two benchmark runs. Each metric is charted on
-        its own scale — unlike units are never stacked on one axis.
+      <PageHeader eyebrow="Legacy" title="Compare submissions">
+        Side-by-side view of two legacy throughput runs. Not linked in the main nav —
+        rows are rarely comparable because hardware, engine, and quantization all vary.
       </PageHeader>
+
+      <Card className="px-5 py-4 border-line bg-surface-2/60">
+        <p className="text-[13px] text-ink-2">
+          Official rankings live on <Link to="/models" className="text-accent hover:text-accent-strong font-medium">Models</Link>.
+          Reference rig documentation is on <Link to="/hardware" className="text-accent hover:text-accent-strong font-medium">Test Rigs</Link>.
+        </p>
+      </Card>
 
       {/* Pickers */}
       <div className="animate-rise rise-1 flex flex-wrap items-center gap-4">

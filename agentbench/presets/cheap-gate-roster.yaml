@@ -1,0 +1,67 @@
+# Cheap 5-model validation gate (post-harness-fix). No Fable/Opus/GPT-5.5.
+# Run AFTER regenerating minibench-v2 and bumping GRADER_VERSION to 3.
+#
+# Roster (flash / small instruct — keep cost low):
+#   - qwen/qwen3.6-flash
+#   - z-ai/glm-4.7-flash
+#   - minimax/minimax-m2.7
+#   - meta-llama/llama-3.1-8b-instruct
+#   - deepseek/deepseek-v4-flash   (swap to qwen/qwen2.5-7b-instruct if unavailable)
+#
+# ── Offline smoke (always safe) ──────────────────────────────────────────────
+#   python -m agentbench.run --model openrouter/qwen/qwen3.6-flash \
+#       --tasks agentbench/tasks/minibench-v2.json --trials 1 --dry-run
+#
+# ── Single-model live gate (1 cheap model first) ─────────────────────────────
+#   python -m agentbench.run --model openrouter/qwen/qwen3.6-flash \
+#       --tasks agentbench/tasks/minibench-v2.json --trials 1 --provider openrouter
+#
+# ── Full 5 singles (only after one-model smoke looks sane) ───────────────────
+#   foreach $m in @(
+#     "openrouter/qwen/qwen3.6-flash",
+#     "openrouter/z-ai/glm-4.7-flash",
+#     "openrouter/minimax/minimax-m2.7",
+#     "openrouter/meta-llama/llama-3.1-8b-instruct",
+#     "openrouter/deepseek/deepseek-v4-flash"
+#   ) {
+#     python -m agentbench.run --model $m `
+#       --tasks agentbench/tasks/minibench-v2.json --trials 1 --provider openrouter
+#   }
+#
+# ── Light MoA / Self-MoA on moa-lite-v1 (MoA-native; NOT minibench-* — those
+#    suites reject MoA by contract). Prefer cheap-gate presets over moa-dev. ──
+# Offline:
+#   python -m agentbench.run --config agentbench/presets/moa-cheap-gate.yaml \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --dry-run
+#   python -m agentbench.run --config agentbench/presets/self-moa-cheap-gate.yaml \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --dry-run
+# Single baseline (same suite):
+#   python -m agentbench.run --model openrouter/deepseek/deepseek-v4-flash \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --dry-run
+#
+# Live cheap MoA triangle (optional, needs OPENROUTER_API_KEY; no frontier):
+#   python -m agentbench.run --model openrouter/deepseek/deepseek-v4-flash \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --provider openrouter
+#   python -m agentbench.run --config agentbench/presets/self-moa-cheap-gate.yaml \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --provider openrouter
+#   python -m agentbench.run --config agentbench/presets/moa-cheap-gate.yaml \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --provider openrouter
+#
+# Go / no-go: compare summary.pass_capability vs summary.pass_format; format-only
+# collapses must not drive frontier ranking. Do NOT burn Fable/Opus until then.
+# Calibration hope: cheap single ~40–60%; MoA > Self-MoA on disagreement items.
+
+gate:
+  name: cheap-gate-v1
+  suite: agentbench/tasks/minibench-v2.json
+  grader_version: "3"
+  models:
+    - openrouter/qwen/qwen3.6-flash
+    - openrouter/z-ai/glm-4.7-flash
+    - openrouter/minimax/minimax-m2.7
+    - openrouter/meta-llama/llama-3.1-8b-instruct
+    - openrouter/deepseek/deepseek-v4-flash
+  moa_presets:
+    - agentbench/presets/moa-cheap-gate.yaml
+    - agentbench/presets/self-moa-cheap-gate.yaml
+  moa_tasks: agentbench/tasks/moa-lite-v1.json

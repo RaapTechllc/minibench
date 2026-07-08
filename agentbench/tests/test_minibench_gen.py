@@ -78,6 +78,7 @@ def test_committed_dev_slice_matches_generator(tmp_path):
 @pytest.mark.parametrize("suite,filename", [
     ("core", "minibench-core-v1.json"),
     ("hard", "minibench-hard-v1.json"),
+    ("v2", "minibench-v2.json"),
     ("pro", "minibench-pro-v1.json"),
 ])
 def test_repo_suite_file_is_current(suite, filename):
@@ -98,3 +99,18 @@ def test_repo_suite_file_is_current(suite, filename):
     for t in committed["tasks"]:
         if t["verification"]["type"] != "unit_test":
             assert t["verification"]["strict"] is True
+        # Empty exact_match gold is banned (no positive oracle).
+        if t["verification"]["type"] == "exact_match":
+            assert str(t["verification"]["expected"]).strip(), t["id"]
+
+
+def test_v2_format_tasks_never_empty_and_struct_has_tol():
+    from agentbench.minibench_gen import V2_DEV_SEED
+
+    tasks = generate_tasks(V2_DEV_SEED, suite="v2")
+    for t in tasks:
+        if t["id"].startswith("mb2-format-"):
+            assert t["verification"]["expected"].strip()
+        if t["id"].startswith("mb2-struct-") and "net_revenue" in t["verification"].get("required", {}):
+            assert t["verification"].get("tol") == 0.01
+            assert "Round EACH" in t["prompt"] or "round EACH" in t["prompt"].lower()

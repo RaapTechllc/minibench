@@ -275,15 +275,17 @@ export default function Dashboard() {
       {/* Hero — a thesis, not a tile */}
       <section className="animate-rise max-w-3xl pt-2">
         <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent mb-3">
-          Local inference, measured
+          Model capability, measured
         </div>
         <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-ink leading-[1.05]">
-          Deterministic benchmarks for models and the machines that run them.
+          Deterministic minibenchmarks for frontier and open-weight models.
         </h1>
         <p className="mt-4 text-[17px] leading-relaxed text-ink-2">
-          {best
-            ? <>Crowdsourced throughput across real hardware. <span className="text-ink">{best.system_type}</span> currently leads at <span className="tnum text-ink">{Number(best.tokens_per_second).toFixed(1)}</span> t/s — one number, reproducibly measured.</>
-            : 'Crowdsourced throughput across real hardware — one number, reproducibly measured.'}
+          Controlled suites with executable oracles — pass rates, cost per task, and confidence
+          intervals on pinned reference profiles.{' '}
+          <Link to="/models" className="text-accent hover:text-accent-strong font-medium">
+            See model rankings →
+          </Link>
         </p>
       </section>
 
@@ -291,21 +293,21 @@ export default function Dashboard() {
       {stats && (
         <div className="animate-rise rise-1 grid grid-cols-2 gap-4 md:grid-cols-4">
           <Stat
-            label="Top performer"
+            label="Legacy top t/s"
             accent
             value={<>{best ? Number(best.tokens_per_second).toFixed(1) : '—'}<span className="text-lg text-ink-3 font-normal"> t/s</span></>}
             sub={best ? `${truncate(best.system_type ?? '—', 20)} · ${best.quantization}` : undefined}
           />
           <Stat
-            label="Submissions"
+            label="Legacy submissions"
             value={stats.total_submissions}
             sub={`${stats.unique_systems} systems · ${stats.unique_models} models`}
           />
           <Stat
-            label="Best HEI"
+            label="Legacy best HEI"
             accent
             value={bestHei ? bestHei.toFixed(2) : '—'}
-            sub="efficiency · value · speed"
+            sub="uncontrolled matrix"
           />
           <Stat
             label="Peak throughput"
@@ -316,10 +318,11 @@ export default function Dashboard() {
       )}
 
       {/* Efficiency Frontier */}
+      {/* Legacy community throughput — retained for reference, not ranked */}
       <Card className="animate-rise rise-2">
         <CardHeader
           title="Efficiency Frontier"
-          sub="Speed (t/s) vs. quality (MMLU). The gold line traces the Pareto-optimal systems — best quality at each speed tier."
+          sub="Legacy community submissions — uncontrolled matrix of hardware × engine × model. Not comparable across rows; see Models for official capability scores."
           right={<span className="text-[11px] text-ink-3">dot size = RAM (GB)</span>}
         />
         <div className="px-2 pb-4">
@@ -425,9 +428,10 @@ export default function Dashboard() {
       <Card className="animate-rise rise-2">
         <CardHeader
           title="Recent submissions"
+          sub="Legacy crowdsourced throughput data — each row mixes different hardware, engines, and quantizations."
           right={
-            <Link to="/leaderboard" className="text-[13px] font-medium text-accent hover:text-accent-strong transition-colors">
-              Full leaderboard →
+            <Link to="/hardware" className="text-[13px] font-medium text-accent hover:text-accent-strong transition-colors">
+              Test rig profiles →
             </Link>
           }
         />

@@ -1,0 +1,30 @@
+# Cheap heterogeneous MoA gate — strong flash proposers only (no llama-3.1-8b).
+# Aggregator = deepseek-v4-flash.
+#
+# Preferred suite: moa-lite-v1 (MoA-native disagreement slice; NOT minibench-*).
+# coding-v2 is near-saturated for cheap flash (single ≈ Self-MoA ≈ 87.5%).
+#
+# Offline smoke:
+#   python -m agentbench.run --config agentbench/presets/moa-cheap-gate.yaml \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --dry-run
+#
+# Live cheap gate (needs OPENROUTER_API_KEY; no Fable/Opus/GPT-5.5):
+#   python -m agentbench.run --config agentbench/presets/moa-cheap-gate.yaml \
+#       --tasks agentbench/tasks/moa-lite-v1.json --trials 1 --provider openrouter
+#
+# Legacy saturated slice (diagnostic only):
+#   python -m agentbench.run --config agentbench/presets/moa-cheap-gate.yaml \
+#       --tasks agentbench/tasks/coding-v2.json --trials 1 --provider openrouter
+moa:
+  name: moa-cheap-gate
+  layers: 1
+  parallel: true
+  proposers:
+    - {model: openrouter/deepseek/deepseek-v4-flash, temperature: 0.7, max_tokens: 1024}
+    - {model: openrouter/qwen/qwen3.6-flash, temperature: 0.7, max_tokens: 1024}
+    - {model: openrouter/minimax/minimax-m2.7, temperature: 0.7, max_tokens: 1024}
+  aggregator:
+    model: openrouter/deepseek/deepseek-v4-flash
+    temperature: 0.3
+    max_tokens: 1024
+    system_prompt: aggregate_and_synthesize

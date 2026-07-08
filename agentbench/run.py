@@ -53,7 +53,7 @@ class TrialResult:
     task_id: str
     category: str
     trial: int
-    passed: bool
+    passed: bool  # capability (grader v3 primary)
     score: float
     cost_usd: float | None
     latency_ms: int
@@ -66,6 +66,13 @@ class TrialResult:
     # True when the model output echoed a benchmark canary string — a hard
     # training-contamination signal; the run must be quarantined.
     canary_flag: bool = False
+    # Format-channel verdict (strict text specs). None → same as capability
+    # (unit_test / non-strict). Summary reports pass_format_rate separately so
+    # instruction pedantry is never confused with extractable-answer capability.
+    passed_format: bool | None = None
+    format_detail: str = ""
+    # Truncated model output on failures — harness debugging only (public splits).
+    output_snippet: str = ""
 
 
 class StubModel:
@@ -147,6 +154,11 @@ def run_suite(
                 )
                 continue
             g = grade(task["verification"], out.text)
+            snippet = ""
+            if not g.passed or (g.passed_format is False):
+                # Keep enough to diagnose empty-content / format vs capability;
+                # never store full multi-kB dumps in the artifact.
+                snippet = (out.text or "")[:400]
             results.append(
                 TrialResult(
                     task_id=task["id"],
@@ -160,6 +172,9 @@ def run_suite(
                     tokens_out=out.completion_tokens,
                     detail=g.detail,
                     canary_flag=contains_canary(out.text),
+                    passed_format=g.passed_format if g.passed_format is not None else g.passed,
+                    format_detail=g.format_detail or "",
+                    output_snippet=snippet,
                 )
             )
     return results
@@ -238,6 +253,11 @@ def summarize(config: MoAConfig, suite: str, trials: int, results: list[TrialRes
     binary = [r for r in scored if r.category not in _axis_only]
     total = len(binary)
     passes = sum(1 for r in binary if r.passed)
+    # Format channel: treat None as capability (non-dual graders).
+    format_passes = sum(
+        1 for r in binary
+        if (r.passed_format if r.passed_format is not None else r.passed)
+    )
     # Per-task pass counts for pass^k.
     by_task: dict[str, list[TrialResult]] = {}
     for r in binary:
@@ -281,7 +301,11 @@ def summarize(config: MoAConfig, suite: str, trials: int, results: list[TrialRes
         "pass_hat_k_effective_k": effective_k,
         "n_infra_errors": sum(1 for r in results if r.infra_error),
         "n_canary_flags": sum(1 for r in results if r.canary_flag),
+        # pass_rate == pass_capability (grader v3); keep the historical key so
+        # downstream leaders/compare keep working unchanged.
         "pass_rate": round(pass_rate(passes, total), 4),
+        "pass_capability": round(pass_rate(passes, total), 4),
+        "pass_format": round(pass_rate(format_passes, total), 4),
         "pass_rate_ci95": [round(ci_lo, 4), round(ci_hi, 4)],
         # Task-level bootstrap CI: trials cluster within tasks, so the pooled
         # Wilson interval is too narrow — this one is honest about ranking noise.
@@ -499,6 +523,8 @@ def main(argv: list[str] | None = None) -> int:
         # pass/score fields are all a private-run artifact needs.
         for tr in results:
             tr.detail = "pass" if tr.passed else ("infra" if tr.infra_error else "fail")
+            tr.format_detail = ""
+            tr.output_snippet = ""  # private split: never persist model text
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dry_run": args.dry_run,

@@ -142,6 +142,33 @@ export function ErrorState({ onRetry, children }: { onRetry?: () => void; childr
 /* ── Confidence-interval range bar — the instrument signature. Renders a 95%
    CI as a hairline track with a filled point, so a reader sees the estimate
    AND its uncertainty at a glance. ─────────────────────────────────────────── */
+/* Clickable table header for client-side sort. */
+export function SortableTh({
+  label, active, dir, onClick, className = '',
+}: {
+  label: string;
+  active: boolean;
+  dir: 'asc' | 'desc';
+  onClick: () => void;
+  className?: string;
+}) {
+  const arrow = active ? (dir === 'asc' ? ' ↑' : ' ↓') : '';
+  return (
+    <th className={className}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex items-center gap-0.5 font-semibold capitalize transition-colors hover:text-ink ${
+          active ? 'text-accent' : 'text-ink-3'
+        }`}
+      >
+        {label}
+        <span className="tnum text-[10px]">{arrow}</span>
+      </button>
+    </th>
+  );
+}
+
 export function CIBar({ lo, hi, value }: { lo: number | null; hi: number | null; value: number }) {
   const pct = (x: number) => `${Math.max(0, Math.min(100, x))}%`;
   const hasCI = lo !== null && hi !== null;

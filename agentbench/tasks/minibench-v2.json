@@ -1,0 +1,266 @@
+{
+  "suite": "minibench-v2",
+  "notes": "Frontier tier (v2): multi-step composition, adversarial distractors, and stricter transforms beyond hard-v1 \u2014 designed to break the ~87% ceiling when core-v1 clusters at 100%. Procedurally generated (agentbench.minibench_gen --suite v2, seed 20260707); private split uses an uncommitted seed. Budget: see agentbench/cost_check.py.",
+  "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN",
+  "generator_seed": 20260707,
+  "tasks": [
+    {
+      "id": "mb2-reason-01",
+      "category": "reasoning",
+      "prompt": "What is the smallest positive integer divisible by both 17 and 11 whose decimal digits sum to exactly 21? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 3927.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-reason-02",
+      "category": "reasoning",
+      "prompt": "An account starts with $869, earns 4% compound interest annually, and you deposit $165 at the end of each year (after interest). What is the balance after 4 years, rounded to 2 decimal places? Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 1717.27,
+        "tol": 0.011,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-reason-03",
+      "category": "reasoning",
+      "prompt": "A tank is 25% full. Pipe A fills it in 27 min, pipe B in 47 min, and a drain empties a full tank in 74 min. With all three open, how many minutes until the tank is full? Round to 1 decimal. Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 16.7,
+        "tol": 0.06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-reason-04",
+      "category": "reasoning",
+      "prompt": "What is 2^8 mod 23? (The remainder when 2 raised to the 8th power is divided by 23.) Answer with the number only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 3.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-reason-05",
+      "category": "reasoning",
+      "prompt": "What is the smallest positive integer n such that n \u00d7 (n+1) \u00d7 (n+2) is divisible by 20? Answer with n only.",
+      "verification": {
+        "type": "numeric_match",
+        "expected": 3.0,
+        "tol": 1e-06,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-struct-01",
+      "category": "tool-use",
+      "prompt": "Apply each line's percent discount to that line's gross (qty x unit). Round EACH discounted line total to 2 decimal places (half-up), THEN sum those rounded line totals for net_revenue (do not sum unrounded values and round once at the end). Respond with ONLY a JSON object with keys `n_lines` (integer), `net_revenue` (number, 2 decimals) and `top_customer` (string, highest net spend). Lines: Mia: 1 x $20.68 (5% off); Uma: 7 x $41.13 (10% off); Zoe: 1 x $26.24 (5% off); Liam: 7 x $19.28 (10% off); Mia: 5 x $36.47 (20% off); Uma: 4 x $30.21 (10% off)",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "n_lines": 6,
+          "net_revenue": 679.8,
+          "top_customer": "Uma"
+        },
+        "tol": 0.01,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-struct-02",
+      "category": "tool-use",
+      "prompt": "Analyze this log batch. Respond with ONLY a JSON object with keys `n_errors` (integer ERROR count), `worst_service` (string, most ERROR lines) and `median_error_code` (integer median of ERROR status codes only). Logs: [ERROR] search status=441 | [ERROR] search status=517 | [ERROR] search status=474 | [ERROR] search status=576 | [WARN] billing status=463 | [ERROR] inventory status=521 | [WARN] billing status=492 | [WARN] inventory status=425",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "n_errors": 5,
+          "worst_service": "search",
+          "median_error_code": 517
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-struct-03",
+      "category": "tool-use",
+      "prompt": "Apply each line's percent discount to that line's gross (qty x unit). Round EACH discounted line total to 2 decimal places (half-up), THEN sum those rounded line totals for net_revenue (do not sum unrounded values and round once at the end). Respond with ONLY a JSON object with keys `n_lines` (integer), `net_revenue` (number, 2 decimals) and `top_customer` (string, highest net spend). Lines: Liam: 5 x $35.31 (5% off); Ivy: 1 x $3.86 (15% off); Zoe: 7 x $18.82 (10% off); Noah: 6 x $13.87 (10% off); Liam: 3 x $30.43 (5% off); Ivy: 6 x $38.91 (5% off)",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "n_lines": 6,
+          "net_revenue": 672.99,
+          "top_customer": "Liam"
+        },
+        "tol": 0.01,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-struct-04",
+      "category": "tool-use",
+      "prompt": "Analyze this log batch. Respond with ONLY a JSON object with keys `n_errors` (integer ERROR count), `worst_service` (string, most ERROR lines) and `median_error_code` (integer median of ERROR status codes only). Logs: [ERROR] search status=412 | [ERROR] search status=400 | [ERROR] search status=514 | [ERROR] search status=414 | [WARN] checkout status=590 | [ERROR] billing status=468 | [WARN] checkout status=523 | [WARN] billing status=463",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "n_errors": 5,
+          "worst_service": "search",
+          "median_error_code": 414
+        },
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-struct-05",
+      "category": "tool-use",
+      "prompt": "Apply each line's percent discount to that line's gross (qty x unit). Round EACH discounted line total to 2 decimal places (half-up), THEN sum those rounded line totals for net_revenue (do not sum unrounded values and round once at the end). Respond with ONLY a JSON object with keys `n_lines` (integer), `net_revenue` (number, 2 decimals) and `top_customer` (string, highest net spend). Lines: Zoe: 7 x $16.51 (10% off); Liam: 5 x $27.87 (0% off); Noah: 1 x $28.37 (0% off); Mia: 8 x $21.43 (10% off); Zoe: 4 x $29.20 (0% off); Liam: 6 x $15.09 (5% off)",
+      "verification": {
+        "type": "json_fields",
+        "required": {
+          "n_lines": 6,
+          "net_revenue": 628.84,
+          "top_customer": "Liam"
+        },
+        "tol": 0.01,
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-format-01",
+      "category": "instruction",
+      "prompt": "Sort these words by length (longest first), breaking ties alphabetically. Output them joined by semicolons with no spaces, single line only: ember willow meadow maple copper indigo python",
+      "verification": {
+        "type": "exact_match",
+        "expected": "copper;indigo;meadow;python;willow;ember;maple",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-format-02",
+      "category": "instruction",
+      "prompt": "From this list, output only words that START with a vowel (a,e,i,o,u), sorted alphabetically, comma-separated, no spaces, single line: ember thunder maple falcon copper willow quartz harbor basil",
+      "verification": {
+        "type": "exact_match",
+        "expected": "ember",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-format-03",
+      "category": "instruction",
+      "prompt": "Reverse the word order, then apply Caesar shift +3 to each word (lowercase a-z, wrap). Output space-separated, single line only: maple thunder meadow willow python copper basil falcon signal",
+      "verification": {
+        "type": "exact_match",
+        "expected": "vljqdo idofrq edvlo frsshu sbwkrq zloorz phdgrz wkxqghu pdsoh",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-format-04",
+      "category": "instruction",
+      "prompt": "Sort these words by length (longest first), breaking ties alphabetically. Output them joined by semicolons with no spaces, single line only: ember indigo violet python falcon maple copper basil",
+      "verification": {
+        "type": "exact_match",
+        "expected": "copper;falcon;indigo;python;violet;basil;ember;maple",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-format-05",
+      "category": "instruction",
+      "prompt": "From this list, output only words that START with a vowel (a,e,i,o,u), sorted alphabetically, comma-separated, no spaces, single line: thunder harbor basil quartz python falcon ember",
+      "verification": {
+        "type": "exact_match",
+        "expected": "ember",
+        "strict": true,
+        "max_output_chars": 2000
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-code-01",
+      "category": "coding",
+      "prompt": "Write `kth_largest(nums, k)` returning the k-th largest element (1-indexed; duplicates count). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import kth_largest\n\ndef test_values():\n    assert kth_largest([17, 13, 40, 27, -15], 1) == 40\n    assert kth_largest([0, 22, 35, 4, -1, 0, -11, -5], 5) == 0\n    assert kth_largest([1, 32, 6, 37, -4, -12, 9, 24, -14], 6) == 1\n    assert kth_largest([4, -16, 32, -7, -20], 4) == -16\n"
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-code-02",
+      "category": "coding",
+      "prompt": "Write `is_valid(s)` returning True iff `s` has balanced (), [], {} brackets. Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import is_valid\n\ndef test_brackets():\n    assert is_valid('()') == True\n    assert is_valid('[]') == True\n    assert is_valid('{}') == True\n    assert is_valid('(]') == False\n    assert is_valid('([)]') == False\n    assert is_valid('({[]})') == True\n"
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-code-03",
+      "category": "coding",
+      "prompt": "Write `decode_string(s)` decoding patterns like `3[a]2[bc]` \u2192 `aaabcbc` (digits = repeat count, brackets = repeat group). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import decode_string\n\ndef test_decode():\n    assert decode_string('3[a]2[bc]') == 'aaabcbc'\n    assert decode_string('3[a2[c]]') == 'accaccacc'\n    assert decode_string('2[abc]3[cd]ef') == 'abcabccdcdcdef'\n"
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-code-04",
+      "category": "coding",
+      "prompt": "Write `product_except_self(nums)` returning an array where output[i] is the product of all elements except nums[i] (no division). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import product_except_self\n\ndef test_product():\n    assert product_except_self([8, 1, 6, 4]) == [24, 192, 32, 48]\n    assert product_except_self([1, 8, 7, 1, 7, 6]) == [2352, 294, 336, 2352, 336, 392]\n    assert product_except_self([5, 5, 3, 5]) == [75, 75, 125, 75]\n"
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    },
+    {
+      "id": "mb2-code-05",
+      "category": "coding",
+      "prompt": "Write `kth_largest(nums, k)` returning the k-th largest element (1-indexed; duplicates count). Return only a fenced python block.",
+      "verification": {
+        "type": "unit_test",
+        "test_source": "from solution import kth_largest\n\ndef test_values():\n    assert kth_largest([13, -20, 39, 18, -14, 22, -18, 37], 8) == -20\n    assert kth_largest([39, 19, 14, 28, 40, 16, 27], 2) == 39\n    assert kth_largest([-7, -6, 38, 24, -15, 2], 5) == -7\n    assert kth_largest([-8, 30, 28, 36, -12, -19], 4) == -8\n"
+      },
+      "canary": "AGENTBENCH-CANARY-c8f3a2d1-DO-NOT-TRAIN"
+    }
+  ]
+}

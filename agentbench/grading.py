@@ -30,6 +30,12 @@ check (file/network/process/introspection access), because the model's code
 executes at import time in the same directory as the hidden test file and could
 otherwise read the asserts and special-case them.
 
+Grader v3 (capability vs format): strict specs still produce a format verdict
+(answer-channel compliance), but the primary ``passed`` / ``pass_rate`` signal
+is *capability* — whether an extractable answer matches gold (legacy extraction
++ float tolerance on ``json_fields``). Summary also reports ``pass_format_rate``.
+Rows from grader_version < 3 are not comparable to v3.
+
 Results produced with these graders must record ``GRADER_VERSION``; rows graded
 under different versions are not comparable.
 """
@@ -48,7 +54,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-GRADER_VERSION = "2"
+GRADER_VERSION = "3"
 
 # Contamination tripwire: published suite files embed canary strings with this
 # prefix. A model that emits it saw the benchmark file in training.
@@ -59,9 +65,12 @@ DEFAULT_MAX_OUTPUT_CHARS = 2000
 
 @dataclass(frozen=True)
 class GradeResult:
-    passed: bool
-    score: float  # 0.0–1.0
+    passed: bool  # capability (v3 primary); equals format for non-strict / unit_test
+    score: float  # 0.0–1.0 capability score
     detail: str
+    # Format-channel verdict (strict specs only). None = N/A (same as capability).
+    passed_format: bool | None = None
+    format_detail: str = ""
 
 
 _CODE_FENCE = re.compile(r"```(?:[\w+-]*)\n(.*?)```", re.DOTALL)
@@ -189,14 +198,28 @@ def _strict_json_candidate(output: str) -> tuple[str | None, str]:
     return None, "output is not a JSON object (strict)"
 
 
+def _json_values_equal(got: Any, want: Any, tol: float | None) -> bool:
+    """Equality with optional absolute tolerance when both sides are numeric."""
+    if tol is not None and isinstance(want, (int, float)) and not isinstance(want, bool):
+        if isinstance(got, (int, float)) and not isinstance(got, bool):
+            return abs(float(got) - float(want)) <= tol
+    return got == want
+
+
 def json_fields(
     output: str,
     required: dict[str, Any],
     *,
     strict: bool = False,
     max_output_chars: int | None = None,
+    tol: float | None = None,
 ) -> GradeResult:
-    """Require a JSON object whose fields equal the required *values* (not just keys)."""
+    """Require a JSON object whose fields equal the required *values* (not just keys).
+
+    ``tol`` (when set) allows absolute error on numeric field values — needed for
+    binary-JSON / rounding-order noise (e.g. 679.79 vs 679.8). Non-numeric fields
+    still require exact equality.
+    """
     if strict:
         long = _too_long(output, max_output_chars)
         if long:
@@ -223,10 +246,37 @@ def json_fields(
     for key, want in required.items():
         if key not in obj:
             wrong.append(f"missing {key}")
-        elif obj[key] != want:
+        elif not _json_values_equal(obj[key], want, tol):
             wrong.append(f"{key}={obj[key]!r} != {want!r}")
     score = (len(required) - len(wrong)) / len(required) if required else 1.0
     return GradeResult(not wrong, score, "ok" if not wrong else "; ".join(wrong))
+
+
+def exact_match_capability(
+    output: str,
+    expected: str,
+    *,
+    max_output_chars: int | None = None,
+) -> GradeResult:
+    """Capability channel for exact_match: any non-empty line may be the answer.
+
+    Still enforces the verbosity cap (anti spray) but does not require a single-line
+    whole-output contract — that is the format channel's job.
+    """
+    long = _too_long(output, max_output_chars)
+    if long:
+        return long
+    text = _strip_think(output)
+    candidate = extract_code(text) if "```" in text else text
+    want = _normalize(expected)
+    if not want:
+        return GradeResult(False, 0.0, "empty exact_match gold is banned")
+    lines = [ln for ln in candidate.strip().splitlines() if ln.strip()]
+    if any(_normalize(ln) == want for ln in lines):
+        return GradeResult(True, 1.0, "match")
+    if _normalize(candidate) == want:
+        return GradeResult(True, 1.0, "match")
+    return GradeResult(False, 0.0, f"expected {expected!r}")
 
 
 # ── unit_test sandbox ─────────────────────────────────────────────────────────
@@ -455,33 +505,80 @@ def calibration(
     return GradeResult(brier <= tol, 1.0 - brier, f"p={p} outcome={outcome} brier={brier:.4f}")
 
 
+def _dual(
+    cap: GradeResult,
+    fmt: GradeResult,
+) -> GradeResult:
+    """Combine capability + format channels. Primary ``passed`` is capability."""
+    return GradeResult(
+        passed=cap.passed,
+        score=cap.score,
+        detail=cap.detail,
+        passed_format=fmt.passed,
+        format_detail=fmt.detail,
+    )
+
+
 def grade(spec: dict[str, Any], output: str) -> GradeResult:
-    """Dispatch a task's verification ``spec`` to the matching executable grader."""
+    """Dispatch a task's verification ``spec`` to the matching executable grader.
+
+    For ``strict`` text specs, returns a dual result: ``passed`` / ``score`` are
+    *capability* (extractable answer matches gold); ``passed_format`` is the
+    strict answer-channel contract. Non-strict and ``unit_test`` leave
+    ``passed_format`` as None (same signal as capability).
+    """
     vtype = spec.get("type")
     strict = bool(spec.get("strict", False))
     max_chars = spec.get("max_output_chars")
     if vtype == "exact_match":
+        expected = spec["expected"]
+        if not str(expected).strip():
+            return GradeResult(False, 0.0, "empty exact_match gold is banned")
+        if strict:
+            cap = exact_match_capability(output, expected, max_output_chars=max_chars)
+            fmt = exact_match(
+                output,
+                expected,
+                strip_fence=spec.get("strip_fence", False),
+                strict=True,
+                max_output_chars=max_chars,
+            )
+            return _dual(cap, fmt)
         return exact_match(
             output,
-            spec["expected"],
+            expected,
             strip_fence=spec.get("strip_fence", False),
-            strict=strict,
+            strict=False,
             max_output_chars=max_chars,
         )
     if vtype == "numeric_match":
+        expected = float(spec["expected"])
+        tol = float(spec.get("tol", 1e-6))
+        if strict:
+            # Capability = legacy last-number extraction (anti-gaming still via
+            # canaries + verbosity on the format channel). Format = isolated answer.
+            cap = numeric_match(output, expected, tol=tol, strict=False)
+            fmt = numeric_match(
+                output, expected, tol=tol, strict=True, max_output_chars=max_chars,
+            )
+            return _dual(cap, fmt)
         return numeric_match(
-            output,
-            float(spec["expected"]),
-            tol=float(spec.get("tol", 1e-6)),
-            strict=strict,
-            max_output_chars=max_chars,
+            output, expected, tol=tol, strict=False, max_output_chars=max_chars,
         )
     if vtype == "json_fields":
+        required = spec.get("required", {})
+        # Spec may set tol; default 1e-2 for currency-style floats when omitted
+        # under strict suites (set explicitly by the generator). None disables.
+        raw_tol = spec.get("tol", None)
+        tol = float(raw_tol) if raw_tol is not None else None
+        if strict:
+            cap = json_fields(output, required, strict=False, tol=tol)
+            fmt = json_fields(
+                output, required, strict=True, max_output_chars=max_chars, tol=tol,
+            )
+            return _dual(cap, fmt)
         return json_fields(
-            output,
-            spec.get("required", {}),
-            strict=strict,
-            max_output_chars=max_chars,
+            output, required, strict=False, max_output_chars=max_chars, tol=tol,
         )
     if vtype == "unit_test":
         return unit_test(
@@ -491,19 +588,27 @@ def grade(spec: dict[str, Any], output: str) -> GradeResult:
             timeout_s=int(spec.get("timeout_s", 30)),
         )
     if vtype == "regex_match":
+        # Capability for regex = non-strict search over full text; format = strict.
+        pat = spec["pattern"]
+        must = bool(spec.get("must_match", True))
+        flags = re.IGNORECASE if spec.get("ignorecase") else 0
+        if strict:
+            cap = regex_match(output, pat, must_match=must, flags=flags, strict=False)
+            fmt = regex_match(
+                output, pat, must_match=must, flags=flags,
+                strict=True, max_output_chars=max_chars,
+            )
+            return _dual(cap, fmt)
         return regex_match(
-            output,
-            spec["pattern"],
-            must_match=bool(spec.get("must_match", True)),
-            flags=re.IGNORECASE if spec.get("ignorecase") else 0,
-            strict=strict,
-            max_output_chars=max_chars,
+            output, pat, must_match=must, flags=flags,
+            strict=False, max_output_chars=max_chars,
         )
     if vtype == "calibration":
-        return calibration(
-            output,
-            float(spec["outcome"]),
-            strict=strict,
-            max_output_chars=max_chars,
-        )
+        # Calibration stays continuous; format channel still records strict parse.
+        outcome = float(spec["outcome"])
+        if strict:
+            cap = calibration(output, outcome, strict=False)
+            fmt = calibration(output, outcome, strict=True, max_output_chars=max_chars)
+            return _dual(cap, fmt)
+        return calibration(output, outcome, strict=False, max_output_chars=max_chars)
     return GradeResult(False, 0.0, f"unknown grader type: {vtype!r}")

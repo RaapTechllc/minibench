@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Gauge, BarChart3, GitCompare, Terminal, Database, Bot, Calculator, Trophy, Menu, X } from 'lucide-react';
+import { Gauge, BarChart3, Database, Bot, Calculator, Trophy, Menu, X } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
-import Leaderboard from './pages/Leaderboard';
 import Compare from './pages/Compare';
 import Submit from './pages/Submit';
 import Hardware from './pages/Hardware';
+import LegacyLeaderboardRedirect from './pages/LegacyLeaderboardRedirect';
 import BenchmarkDetail from './pages/BenchmarkDetail';
 import Agents from './pages/Agents';
 import RunDetail from './pages/RunDetail';
@@ -15,12 +15,9 @@ import Models from './pages/Models';
 const NAV = [
   { path: '/', label: 'Overview', icon: BarChart3 },
   { path: '/models', label: 'Models', icon: Trophy },
-  { path: '/leaderboard', label: 'Hardware Leaderboard', icon: Gauge },
   { path: '/agents', label: 'Agents', icon: Bot },
-  { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/moa-calculator', label: 'MoA Calculator', icon: Calculator },
-  { path: '/hardware', label: 'Hardware', icon: Database },
-  { path: '/submit', label: 'Submit', icon: Terminal },
+  { path: '/hardware', label: 'Test Rigs', icon: Database },
 ];
 
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
@@ -86,7 +83,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/models" element={<Models />} />
-          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/leaderboard" element={<LegacyLeaderboardRedirect />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/agents/runs/:runId" element={<RunDetail />} />
           <Route path="/benchmarks/:id" element={<BenchmarkDetail />} />
