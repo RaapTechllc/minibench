@@ -8,7 +8,15 @@ import json
 import pytest
 
 from agentbench.grading import grade
-from agentbench.minibench_gen import CANARY, DEV_SEED, SUITES, generate_tasks, write_suite
+from agentbench.minibench_gen import (
+    CANARY,
+    DEV_SEED,
+    SCENARIO_TYPES,
+    SUITES,
+    generate_tasks,
+    scenario_type_for_task,
+    write_suite,
+)
 
 ALL_SUITES = sorted(SUITES)
 
@@ -81,17 +89,21 @@ def test_committed_dev_slice_matches_generator(tmp_path):
     ("v2", "minibench-v2.json"),
     ("pro", "minibench-pro-v1.json"),
 ])
-def test_repo_suite_file_is_current(suite, filename):
+def test_repo_suite_file_is_current(suite, filename, tmp_path):
     """The committed suite must equal what the generator produces for its seed —
     regenerate with `python -m agentbench.minibench_gen` if this fails."""
     from pathlib import Path
 
     suite_path = Path(__file__).resolve().parents[1] / "tasks" / filename
     committed = json.loads(suite_path.read_text(encoding="utf-8"))
-    fresh = [
-        {**{k: v for k, v in t.items() if k != "_gold"}, "canary": SUITES[suite]["canary"]}
-        for t in generate_tasks(committed["generator_seed"], suite=suite)
-    ]
+    fresh_path = tmp_path / filename
+    fresh_payload = write_suite(
+        generate_tasks(committed["generator_seed"], suite=suite),
+        fresh_path,
+        seed=committed["generator_seed"],
+        suite=suite,
+    )
+    fresh = fresh_payload["tasks"]
     assert committed["tasks"] == fresh
     assert committed["suite"] == SUITES[suite]["name"]
     assert committed["canary"] == SUITES[suite]["canary"]
@@ -114,3 +126,18 @@ def test_v2_format_tasks_never_empty_and_struct_has_tol():
         if t["id"].startswith("mb2-struct-") and "net_revenue" in t["verification"].get("required", {}):
             assert t["verification"].get("tol") == 0.01
             assert "Round EACH" in t["prompt"] or "round EACH" in t["prompt"].lower()
+
+
+def test_v2_tasks_have_arcade_scenario_types():
+    from agentbench.minibench_gen import V2_DEV_SEED
+
+    tasks = generate_tasks(V2_DEV_SEED, suite="v2")
+    for task in tasks:
+        scenario_type = scenario_type_for_task(task)
+        assert scenario_type in SCENARIO_TYPES
+        if task["category"] == "coding":
+            assert scenario_type == "cursor"
+        if task["category"] == "reasoning":
+            assert scenario_type == "spreadsheet"
+
+    assert {scenario_type_for_task(t) for t in tasks} == SCENARIO_TYPES

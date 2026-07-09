@@ -33,6 +33,38 @@ Four procedurally-generated capability suites, all deterministically graded
   (doc-conflict, constraint-pack, evidence-gap, proposal-arbitrate). Not under
   the `minibench-*` prefix, so cheap MoA / Self-MoA gates are allowed.
 
+## Arcade task authoring checklist
+
+Season task prompts should feel like work a developer could paste directly into
+Cursor, a spreadsheet assistant, or a Slack thread. The grader can stay strict
+and synthetic underneath, but the surface prompt should pass this Cursor-paste
+test before it ships:
+
+- The prompt names a concrete artifact to produce: a number, JSON object, short
+  transformation, or fenced Python block.
+- The context sounds like practical work, not benchmark machinery. Do not expose
+  gold answers, canaries, hidden tests, seed IDs, McNemar stats, or pruning goals.
+- The requested output channel is explicit enough for deterministic grading, and
+  any format restriction is phrased as a normal work constraint.
+- A human should understand why this would belong on one Arcade manual badge:
+  `spreadsheet`, `cursor`, or `slack`.
+
+`scenario_type` is metadata only; it must not change grader or oracle behavior.
+The badges use this convention:
+
+- `spreadsheet` — numeric reasoning, account math, table/order aggregation, or
+  any task whose natural workspace is rows, formulas, and totals.
+- `cursor` — code writing, code repair, debugging, or hidden-unit-test prompts
+  that belong in an editor.
+- `slack` — instruction-following, text transforms, incident/log triage, and
+  other conversational tasks that read like a pasted Slack request.
+
+For the committed v2 dev slices, `minibench-v2` maps reasoning tasks to
+`spreadsheet`, coding tasks to `cursor`, order-revenue structured tasks to
+`spreadsheet`, and log-batch or text-transform tasks to `slack`. `coding-v2`
+uses `cursor` for `code-*`, `spreadsheet` for `reason-*`, and `slack` for
+`tooluse-*`.
+
 ### Why minibench-pro-v1 is different
 
 Most public evals either grade a narrow slice or lean on an LLM judge (slow,

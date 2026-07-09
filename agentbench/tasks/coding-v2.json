@@ -6,6 +6,7 @@
     {
       "id": "code-topo-sort",
       "category": "coding",
+      "scenario_type": "cursor",
       "prompt": "Write a Python function `topo_sort(n, edges)` where `n` is the number of nodes labeled 0..n-1 and `edges` is a list of directed edges `(u, v)`. Return a list of all nodes in a valid topological order. If a cycle exists, return an empty list `[]`. Return only a fenced python block.",
       "verification": {
         "type": "unit_test",
@@ -15,6 +16,7 @@
     {
       "id": "code-sliding-window-max",
       "category": "coding",
+      "scenario_type": "cursor",
       "prompt": "Write a Python function `max_sliding_window(nums, k)` that returns a list of the maximum value in each contiguous window of size `k`. Assume `len(nums) >= k >= 1`. Must run in O(n) time (a naive O(n*k) re-scan per window is too slow — hidden tests include large inputs). Return only a fenced python block.",
       "verification": {
         "type": "unit_test",
@@ -25,6 +27,7 @@
     {
       "id": "code-min-stack",
       "category": "coding",
+      "scenario_type": "cursor",
       "prompt": "Implement a `MinStack` class with methods `push(x)`, `pop()`, `top()`, and `getMin()`. All four operations must be O(1) amortized. `pop` and `top` operate on the main stack; `getMin` returns the current minimum. Return only a fenced python block defining the class.",
       "verification": {
         "type": "unit_test",
@@ -34,6 +37,7 @@
     {
       "id": "code-rpn-eval",
       "category": "coding",
+      "scenario_type": "cursor",
       "prompt": "Write a Python function `eval_rpn(tokens)` that evaluates an expression in Reverse Polish Notation. `tokens` is a list of strings: each token is a signed integer or one of `+`, `-`, `*`, `/`. Division truncates toward zero (like Python `int(a/b)` for ints). Raise `ValueError` on invalid input. Return only a fenced python block.",
       "verification": {
         "type": "unit_test",
@@ -43,6 +47,7 @@
     {
       "id": "reason-clock-angle",
       "category": "reasoning",
+      "scenario_type": "spreadsheet",
       "prompt": "At exactly 3:15 (not 3:16), what is the smaller angle in degrees between the hour and minute hands on an analog clock? Give only the numeric answer.",
       "verification": {
         "type": "numeric_match",
@@ -53,6 +58,7 @@
     {
       "id": "reason-average-speed-trap",
       "category": "reasoning",
+      "scenario_type": "spreadsheet",
       "prompt": "A car drives 60 miles at 60 mph, then 60 miles at 30 mph. What is the average speed for the entire trip, in mph? Give only the numeric answer.",
       "verification": {
         "type": "numeric_match",
@@ -63,6 +69,7 @@
     {
       "id": "tooluse-incident-triage",
       "category": "tool-use",
+      "scenario_type": "slack",
       "prompt": "Triage this incident. Respond with ONLY a JSON object with keys: `severity` (CRITICAL/HIGH/MEDIUM/LOW), `customer_facing` (boolean), `needs_page` (boolean), `root_cause_hint` (one of: quota, deploy, dependency, unknown). Incident: 'Post-deploy, the billing webhook consumer is 6 hours behind; payments are still processing but finance dashboards show stale totals.'",
       "verification": {
         "type": "json_fields",
@@ -77,6 +84,7 @@
     {
       "id": "tooluse-regex-classify",
       "category": "tool-use",
+      "scenario_type": "slack",
       "prompt": "Extract structured data from this log line and respond with ONLY JSON keys `level`, `service`, `status_code` (integer). Log: '[ERROR] checkout-api status=503 upstream=payments retry=2'",
       "verification": {
         "type": "json_fields",

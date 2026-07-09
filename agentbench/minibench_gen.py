@@ -44,6 +44,7 @@ PRO_SUITE_NAME = "minibench-pro-v1"
 PRO_CANARY = "AGENTBENCH-CANARY-e5a11f24-DO-NOT-TRAIN"
 DEV_SEED = 20260706
 V2_DEV_SEED = 20260707
+SCENARIO_TYPES = {"spreadsheet", "cursor", "slack"}
 
 FIRST_NAMES = ["Ava", "Noah", "Mia", "Liam", "Zoe", "Kai", "Ivy", "Eli", "Uma", "Rex"]
 SERVICES = ["checkout", "auth", "billing", "search", "inventory", "gateway"]
@@ -1228,6 +1229,19 @@ _STRICT_TYPES = {"numeric_match", "json_fields", "exact_match", "regex_match", "
 MAX_OUTPUT_CHARS = 2000
 
 
+def scenario_type_for_task(task: dict[str, Any]) -> str:
+    """Map v2 task surfaces to Arcade manual badges."""
+    category = task["category"]
+    task_id = task["id"]
+    if category == "coding":
+        return "cursor"
+    if category == "reasoning":
+        return "spreadsheet"
+    if task_id.startswith("mb2-struct-") and int(task_id.rsplit("-", 1)[1]) % 2 == 1:
+        return "spreadsheet"
+    return "slack"
+
+
 def generate_tasks(seed: int, per_category: int = 5, suite: str = "core") -> list[dict[str, Any]]:
     """Deterministic task list for a seed. ``_gold`` is a correct answer used by
     the grader self-tests; ``write_suite`` strips it from the published file."""
@@ -1254,10 +1268,13 @@ def write_suite(tasks: list[dict[str, Any]], out: Path, *, seed: int, suite: str
     # prompt string a model sees) so scrapers that ingest the file co-locate
     # the tripwire with the task text — grade-time echo detection then catches
     # contaminated models.
-    public_tasks = [
-        {**{k: v for k, v in t.items() if k != "_gold"}, "canary": spec["canary"]}
-        for t in tasks
-    ]
+    public_tasks = []
+    for t in tasks:
+        public_task = {k: v for k, v in t.items() if k != "_gold"}
+        if suite == "v2":
+            public_task["scenario_type"] = scenario_type_for_task(t)
+        public_task["canary"] = spec["canary"]
+        public_tasks.append(public_task)
     payload = {
         "suite": spec["name"],
         "notes": spec["notes"].format(seed=seed),
