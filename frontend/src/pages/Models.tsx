@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { api } from '../api';
 import type { ModelLeaderboardEntry, KnownModel } from '../api';
-import { consumeLegacyLeaderboardNotice } from './LegacyLeaderboardRedirect';
+import { consumeLegacyLeaderboardNotice } from '../lib/legacyLeaderboardNotice';
 import {
   Card, CardHeader, PageHeader, Badge, ValidityBadge, Skeleton, EmptyState, ErrorState,
   CIBar, Select, SortableTh,
