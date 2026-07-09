@@ -11,15 +11,24 @@ import {
   CIBar, Select, SortableTh,
 } from '../components/ui';
 import { CHART, FrontierDot, TooltipCard, axisProps, fmtPct } from '../components/chart';
+import {
+  CABINET_OPTIONS,
+  DEFAULT_CABINET_SUITE,
+  categoryDisplayName,
+  formatScorecardLabel,
+  cabinetForSuite,
+  orderCategoryKeys,
+} from '../lib/scorecard.js';
 
 const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
 const fmtCost = (c: number | null) => (c == null ? '—' : c < 0.01 ? `$${c.toFixed(4)}` : `$${c.toFixed(3)}`);
 
 const SUITE_OPTIONS = [
-  { value: 'minibench-v2', label: 'minibench-v2 (frontier tier)' },
-  { value: 'minibench-hard-v1', label: 'minibench-hard-v1' },
-  { value: 'minibench-core-v1', label: 'minibench-core-v1' },
-  { value: '', label: 'All suites' },
+  ...CABINET_OPTIONS.map((c) => ({
+    value: c.suite,
+    label: `${c.label} · ${c.season}`,
+  })),
+  { value: '', label: 'All cabinets' },
 ] as const;
 
 type SortKey = 'pass_rate' | 'pass_hat_k' | 'cost_usd_per_task' | string;
@@ -48,7 +57,7 @@ interface Point {
 export default function Models() {
   const [entries, setEntries] = useState<ModelLeaderboardEntry[]>([]);
   const [newModels, setNewModels] = useState<KnownModel[]>([]);
-  const [suite, setSuite] = useState('minibench-v2');
+  const [suite, setSuite] = useState(DEFAULT_CABINET_SUITE);
   const [sortKey, setSortKey] = useState<SortKey>('pass_rate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [chartMetric, setChartMetric] = useState<string>('pass_rate');
@@ -77,9 +86,11 @@ export default function Models() {
   }, [load]);
 
   const categories = useMemo(
-    () => Array.from(new Set(entries.flatMap((e) => Object.keys(e.category_pass_rates)))).sort(),
+    () => orderCategoryKeys(entries.flatMap((e) => Object.keys(e.category_pass_rates))),
     [entries],
   );
+
+  const activeCabinet = cabinetForSuite(suite);
 
   const sortedEntries = useMemo(() => {
     const copy = [...entries];
@@ -124,14 +135,16 @@ export default function Models() {
     saturatedCount / entries.length >= 0.3;
 
   const chartMetricLabel =
-    chartMetric === 'pass_rate' ? 'Overall pass rate' : chartMetric.replace(/-/g, ' ');
+    chartMetric === 'pass_rate' ? 'Score' : categoryDisplayName(chartMetric);
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Capability leaderboard" title="Models, ranked by what they can do">
-        Best published minibench run per model — one model string, one call per prompt, decoding
-        pinned. Confidence intervals are shown as range bars: when two bars overlap, it's a tie,
-        not a winner.
+      <PageHeader
+        eyebrow="Solo Cabinet"
+        title={activeCabinet ? `${activeCabinet.label} · ${activeCabinet.season}` : 'Model scorecard'}
+      >
+        Scores that spread models apart on work you&apos;d actually do — tier · score on the active
+        cabinet, with 95% CI bars underneath. When two bars overlap, it&apos;s a tie, not a winner.
       </PageHeader>
 
       {legacyNotice && (
@@ -153,15 +166,15 @@ export default function Models() {
       )}
 
       <div className="flex flex-wrap items-end gap-4">
-        <Select label="Suite" value={suite} onChange={(e) => setSuite(e.target.value)}>
+        <Select label="Cabinet" value={suite} onChange={(e) => setSuite(e.target.value)}>
           {SUITE_OPTIONS.map((o) => (
             <option key={o.value || 'all'} value={o.value}>{o.label}</option>
           ))}
         </Select>
         <Select label="Chart Y-axis" value={chartMetric} onChange={(e) => setChartMetric(e.target.value)}>
-          <option value="pass_rate">Overall pass rate</option>
+          <option value="pass_rate">Score</option>
           {categories.map((c) => (
-            <option key={c} value={c}>{c.replace(/-/g, ' ')}</option>
+            <option key={c} value={c}>{categoryDisplayName(c)}</option>
           ))}
         </Select>
       </div>
@@ -184,8 +197,8 @@ export default function Models() {
       ) : entries.length === 0 ? (
         <EmptyState title="No published runs for this suite yet">
           {suite === 'minibench-v2'
-            ? 'Publish v2 runs with agentbench.run --tasks agentbench/tasks/minibench-v2.json to populate the frontier tier.'
-            : 'Score a model and publish it, then it appears here on the capability-vs-cost frontier.'}
+            ? 'Publish Season 2 runs with agentbench.run --tasks agentbench/tasks/minibench-v2.json to populate the cabinet.'
+            : 'Score a model and publish it, then it appears here on the Solo Cabinet leaderboard.'}
         </EmptyState>
       ) : (
         <>
@@ -238,7 +251,7 @@ export default function Models() {
                     <th className="py-3 pl-5 pr-2 font-semibold text-ink-3">#</th>
                     <th className="px-2 py-3 font-semibold text-ink-3">Model</th>
                     <SortableTh
-                      label="Pass rate · 95% CI"
+                      label="Score · 95% CI"
                       active={sortKey === 'pass_rate'}
                       dir={sortDir}
                       onClick={() => toggleSort('pass_rate')}
@@ -256,7 +269,7 @@ export default function Models() {
                     {categories.map((c) => (
                       <SortableTh
                         key={c}
-                        label={c}
+                        label={categoryDisplayName(c)}
                         active={sortKey === c}
                         dir={sortDir}
                         onClick={() => toggleSort(c)}
@@ -288,7 +301,8 @@ export default function Models() {
                         </div>
                         {e.family && <div className="text-[12px] text-ink-3">{e.family}</div>}
                       </td>
-                      <td className="px-2 py-3 min-w-[160px]">
+                      <td className="px-2 py-3 min-w-[180px]">
+                        <div className="font-medium text-ink">{formatScorecardLabel(e.pass_rate)}</div>
                         <CIBar value={Number(e.pass_rate)} lo={num(e.ci95_low)} hi={num(e.ci95_high)} />
                       </td>
                       <td className="tnum px-2 py-3 text-ink-2">{e.pass_hat_k != null ? fmtPct(e.pass_hat_k) : '—'}</td>
