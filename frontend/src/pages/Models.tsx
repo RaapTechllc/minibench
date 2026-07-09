@@ -13,8 +13,11 @@ import {
 import { axisProps, fmtPct, TooltipCard } from '../components/chart';
 import {
   CABINET_OPTIONS,
+  CREDITS_ROLLING_MIN,
   DEFAULT_CABINET_SUITE,
+  SATURATION_THRESHOLD,
   categoryDisplayName,
+  evaluateSaturation,
   formatScorecard,
   formatScorecardLabel,
   cabinetForSuite,
@@ -24,6 +27,8 @@ import {
 
 const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
 const fmtCost = (c: number | null) => (c == null ? '—' : c < 0.01 ? `$${c.toFixed(4)}` : `$${c.toFixed(3)}`);
+const MANUAL_CABINET_OVERRIDE_KEY = 'minibench.cabinet.override';
+const SEASON_2_SUITE = 'minibench-v2';
 
 /** Chart palette for the Solo Cabinet — neon on dark, not daylight blue. */
 const ARCADE_CHART = {
@@ -50,10 +55,27 @@ function ArcadeFrontierDot(props: {
   );
 }
 
+type CabinetOption = (typeof CABINET_OPTIONS)[number];
+
+const cabinetOptionLabel = (cabinet: CabinetOption) => {
+  if (cabinet.suite === 'minibench-core-v1') {
+    return `${cabinet.label} · ${cabinet.season} · optional`;
+  }
+  if (cabinet.label === cabinet.season) return cabinet.label;
+  return `${cabinet.label} · ${cabinet.season}`;
+};
+
+const readManualCabinetOverride = () => {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(MANUAL_CABINET_OVERRIDE_KEY);
+};
+
+const initialCabinetSuite = () => readManualCabinetOverride() ?? DEFAULT_CABINET_SUITE;
+
 const SUITE_OPTIONS = [
   ...CABINET_OPTIONS.map((c) => ({
     value: c.suite,
-    label: `${c.label} · ${c.season}`,
+    label: cabinetOptionLabel(c),
   })),
   { value: '', label: 'All cabinets' },
 ] as const;
@@ -84,7 +106,11 @@ interface Point {
 export default function Models() {
   const [entries, setEntries] = useState<ModelLeaderboardEntry[]>([]);
   const [newModels, setNewModels] = useState<KnownModel[]>([]);
-  const [suite, setSuite] = useState(DEFAULT_CABINET_SUITE);
+  const [suite, setSuite] = useState(initialCabinetSuite);
+  const [hasManualCabinetOverride, setHasManualCabinetOverride] = useState(
+    () => readManualCabinetOverride() !== null,
+  );
+  const [seasonUnlocked, setSeasonUnlocked] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('pass_rate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [chartMetric, setChartMetric] = useState<string>('pass_rate');
@@ -93,6 +119,7 @@ export default function Models() {
   const [legacyNotice, setLegacyNotice] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (consumeLegacyLeaderboardNotice()) setLegacyNotice(true);
   }, []);
 
@@ -111,6 +138,17 @@ export default function Models() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
+
+  const saturationState = evaluateSaturation(entries);
+
+  useEffect(() => {
+    if (suite !== DEFAULT_CABINET_SUITE || saturationState !== 'promote') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSeasonUnlocked(true);
+    if (!hasManualCabinetOverride) {
+      setSuite(SEASON_2_SUITE);
+    }
+  }, [hasManualCabinetOverride, saturationState, suite]);
 
   const categories = useMemo(
     () => orderCategoryKeys(entries.flatMap((e) => Object.keys(e.category_pass_rates))),
@@ -155,11 +193,12 @@ export default function Models() {
   const hasCalib = entries.some((e) => e.calibration_brier != null);
   const hasRobust = entries.some((e) => e.robustness_correct != null);
 
-  const saturatedCount = entries.filter((e) => Number(e.pass_rate) >= 99.9).length;
-  const showSaturation =
-    (suite === 'minibench-core-v1' || suite === '') &&
-    entries.length >= 3 &&
-    saturatedCount / entries.length >= 0.3;
+  const showSaturation = seasonUnlocked || (suite === DEFAULT_CABINET_SUITE && saturationState === 'promote');
+  const handleCabinetChange = (value: string) => {
+    setSuite(value);
+    setHasManualCabinetOverride(true);
+    window.localStorage.setItem(MANUAL_CABINET_OVERRIDE_KEY, value);
+  };
 
   const chartMetricLabel =
     chartMetric === 'pass_rate' ? 'Score' : categoryDisplayName(chartMetric);
@@ -170,8 +209,9 @@ export default function Models() {
         eyebrow="Solo Cabinet"
         title={activeCabinet ? `${activeCabinet.label} · ${activeCabinet.season}` : 'Model scorecard'}
       >
-        Scores that spread models apart on work you&apos;d actually do — tier · score on the active
-        cabinet, with 95% CI bars underneath. When two bars overlap, it&apos;s a tie, not a winner.
+        Scores that spread models apart on work you&apos;d actually do — and if everyone&apos;s Credits
+        Rolling, we&apos;re on the wrong board. Tier · score rides on the active cabinet, with 95% CI
+        bars underneath. When two bars overlap, it&apos;s a tie, not a winner.
       </PageHeader>
 
       {legacyNotice && (
@@ -193,7 +233,7 @@ export default function Models() {
       )}
 
       <div className="flex flex-wrap items-end gap-4">
-        <Select label="Cabinet" value={suite} onChange={(e) => setSuite(e.target.value)}>
+        <Select label="Cabinet" value={suite} onChange={(e) => handleCabinetChange(e.target.value)}>
           {SUITE_OPTIONS.map((o) => (
             <option key={o.value || 'all'} value={o.value}>{o.label}</option>
           ))}
@@ -209,10 +249,10 @@ export default function Models() {
       {showSaturation && (
         <Card className="border-frontier/40 bg-frontier-soft/30 px-5 py-4">
           <p className="text-[13px] text-ink">
-            <span className="font-semibold text-frontier">core-v1 is saturated</span>
-            {' '}— {saturatedCount} of {entries.length} models score ≥99.9%.
-            Switch to <strong>minibench-v2</strong> for frontier separation, or sort by category
-            below to see where models still differ.
+            <span className="font-semibold text-frontier">Season 1 cleared — Season 2 unlocked</span>
+            {' '}because more than {Math.round(SATURATION_THRESHOLD * 100)}% of Season 1 models
+            reached Credits Rolling ({CREDITS_ROLLING_MIN}+). New visitors now start on{' '}
+            <strong>minibench-v2</strong>; your cabinet picker stays in charge once you choose a board.
           </p>
         </Card>
       )}
