@@ -8,12 +8,12 @@ Apply **arcade chrome** styling to the Solo Cabinet: dark/neon palette, high-sco
 
 ## Acceptance criteria
 
-- [ ] Shared theme tokens (neon accent, dark surface, optional subtle grid/scanline) usable by other pages
-- [ ] Models leaderboard rows styled as high-score entries; tier · score uses display font
-- [ ] Body text and category labels remain readable sans font
-- [ ] No autoplay audio
-- [ ] Tier conveyed by label text, not color alone
-- [ ] Existing components (CI bar, badges, scatter chart) remain functional and visually coherent
+- [x] Shared theme tokens (neon accent, dark surface, optional subtle grid/scanline) usable by other pages
+- [x] Models leaderboard rows styled as high-score entries; tier · score uses display font
+- [x] Body text and category labels remain readable sans font
+- [x] No autoplay audio
+- [x] Tier conveyed by label text, not color alone
+- [x] Existing components (CI bar, badges, scatter chart) remain functional and visually coherent
 
 ## Blocked by
 

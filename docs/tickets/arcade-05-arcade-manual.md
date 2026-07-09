@@ -8,12 +8,12 @@ Upgrade run drill-down into an **Arcade manual**: default view shows scenario ty
 
 ## Acceptance criteria
 
-- [ ] Run detail default view groups tasks by display category names (Math & Logic, etc.)
-- [ ] Scenario badge shown per task when `scenario_type` metadata present; sensible fallback by category
-- [ ] Technician mode hidden by default; toggle reveals backstage stats already in API payload
-- [ ] Technician mode styling contrasts with arcade surface (terminal/clean)
-- [ ] Canaries, seed IDs, McNemar absent from all UI modes
-- [ ] Navigation back to appropriate cabinet (Solo or Multiplayer) preserved
+- [x] Run detail default view groups tasks by display category names (Math & Logic, etc.)
+- [x] Scenario badge shown per task when `scenario_type` metadata present; sensible fallback by category
+- [x] Technician mode hidden by default; toggle reveals backstage stats already in API payload
+- [x] Technician mode styling contrasts with arcade surface (terminal/clean)
+- [x] Canaries, seed IDs, McNemar absent from all UI modes
+- [x] Navigation back to appropriate cabinet (Solo or Multiplayer) preserved
 
 ## Blocked by
 

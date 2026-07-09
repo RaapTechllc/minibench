@@ -8,11 +8,11 @@ Prepare **Season 2** task content for practical surface prompts. Add `scenario_t
 
 ## Acceptance criteria
 
-- [ ] `scenario_type` field present on minibench-v2 dev-slice tasks (or documented convention for generator output)
-- [ ] Each v2 dev-slice prompt reviewed against Cursor-paste test
-- [ ] agentbench README documents authoring checklist and scenario types
-- [ ] Scenario types align with Arcade manual badges in drill-down ticket
-- [ ] No change to grader or oracle logic required for metadata-only additions
+- [x] `scenario_type` field present on minibench-v2 dev-slice tasks (or documented convention for generator output)
+- [x] Each v2 dev-slice prompt reviewed against Cursor-paste test
+- [x] agentbench README documents authoring checklist and scenario types
+- [x] Scenario types align with Arcade manual badges in drill-down ticket
+- [x] No change to grader or oracle logic required for metadata-only additions
 
 ## Blocked by
 

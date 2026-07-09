@@ -8,11 +8,11 @@ Add an **item pruning release gate** before publishing a new cabinet season. Wir
 
 ## Acceptance criteria
 
-- [ ] Release checklist document exists for "publish new season"
-- [ ] Checklist requires running item discrimination audit and resolving ceiling items
-- [ ] Optional: script or CI job fails when new season task set contains flagged ceiling items
-- [ ] Holdout refresh step documented per season rotation policy in ADR 0001
-- [ ] No change to live leaderboard until a season is explicitly published
+- [x] Release checklist document exists for "publish new season"
+- [x] Checklist requires running item discrimination audit and resolving ceiling items
+- [x] Optional: script or CI job fails when new season task set contains flagged ceiling items
+- [x] Holdout refresh step documented per season rotation policy in ADR 0001
+- [x] No change to live leaderboard until a season is explicitly published
 
 ## Blocked by
 

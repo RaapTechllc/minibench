@@ -8,12 +8,12 @@ Bring **Multiplayer Cabinet** (`/agents`) to parity with Solo Cabinet arcade pre
 
 ## Acceptance criteria
 
-- [ ] Agents leaderboard pass column shows tier · score via Scorecard module
-- [ ] Cost column header reads **$/quarter** (value still `cost_usd_per_task`)
-- [ ] Page header/eyebrow uses Multiplayer Cabinet framing
-- [ ] Arcade chrome tokens from Solo styling applied consistently
-- [ ] Quick picks and scatter chart still work
-- [ ] No changes to backend API contract
+- [x] Agents leaderboard pass column shows tier · score via Scorecard module
+- [x] Cost column header reads **$/quarter** (value still `cost_usd_per_task`)
+- [x] Page header/eyebrow uses Multiplayer Cabinet framing
+- [x] Arcade chrome tokens from Solo styling applied consistently
+- [x] Quick picks and scatter chart still work
+- [x] No changes to backend API contract
 
 ## Blocked by
 

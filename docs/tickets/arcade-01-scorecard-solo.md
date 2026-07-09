@@ -8,14 +8,14 @@ Introduce the **Scorecard** presentation layer and wire it into the **Solo Cabin
 
 ## Acceptance criteria
 
-- [ ] Pure Scorecard module exports tier mapping, category display names, scorecard formatter, cabinet config constants, and saturation evaluator
-- [ ] Unit tests cover tier band boundaries, all four category mappings, unknown-key fallback, and saturation threshold (>30% at ≥81 → promote)
-- [ ] Models page default suite is `minibench-hard-v1` (not v2 or core-v1)
-- [ ] Leaderboard rows show tier · score instead of raw pass rate as the primary headline metric
-- [ ] Category column headers use display names; sorting still works per category
-- [ ] Suite selector uses cabinet names (Hard Cabinet / Season 2 / Classic Cabinet)
-- [ ] Page header reflects Solo Cabinet framing
-- [ ] Existing API `?suite=` query behavior unchanged; CI green
+- [x] Pure Scorecard module exports tier mapping, category display names, scorecard formatter, cabinet config constants, and saturation evaluator
+- [x] Unit tests cover tier band boundaries, all four category mappings, unknown-key fallback, and saturation threshold (>30% at ≥81 → promote)
+- [x] Models page default suite is `minibench-hard-v1` (not v2 or core-v1)
+- [x] Leaderboard rows show tier · score instead of raw pass rate as the primary headline metric
+- [x] Category column headers use display names; sorting still works per category
+- [x] Suite selector uses cabinet names (Hard Cabinet / Season 2 / Classic Cabinet)
+- [x] Page header reflects Solo Cabinet framing
+- [x] Existing API `?suite=` query behavior unchanged; CI green
 
 ## Blocked by
 

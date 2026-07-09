@@ -8,12 +8,12 @@ When the active cabinet saturates (>30% of models at **Credits Rolling**, pass r
 
 ## Acceptance criteria
 
-- [ ] Saturation computed client-side from leaderboard entries via Scorecard module
-- [ ] Banner appears when threshold met; copy uses arcade framing (e.g. "Season 1 cleared — Season 2 unlocked")
-- [ ] Default cabinet switches to Season 2 (`minibench-v2`) unless user manually picked a cabinet
-- [ ] Manual cabinet selection persists and is not overwritten on reload
-- [ ] Classic Cabinet labeled clearly as regression / optional
-- [ ] Public promise copy visible near banner or page header
+- [x] Saturation computed client-side from leaderboard entries via Scorecard module
+- [x] Banner appears when threshold met; copy uses arcade framing (e.g. "Season 1 cleared — Season 2 unlocked")
+- [x] Default cabinet switches to Season 2 (`minibench-v2`) unless user manually picked a cabinet
+- [x] Manual cabinet selection persists and is not overwritten on reload
+- [x] Classic Cabinet labeled clearly as regression / optional
+- [x] Public promise copy visible near banner or page header
 
 ## Blocked by
 

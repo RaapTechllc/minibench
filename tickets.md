@@ -12,8 +12,8 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** None — can start immediately.
 
-- [ ] Scorecard module + unit tests
-- [ ] Models page wired; default hard-v1; cabinet selector labels
+- [x] Scorecard module + unit tests
+- [x] Models page wired; default hard-v1; cabinet selector labels
 
 ## Arcade: v2 task scenario metadata + authoring checklist — #21
 
@@ -21,8 +21,8 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** None — can start immediately (parallel).
 
-- [ ] scenario_type metadata on v2 dev slice
-- [ ] Authoring checklist in README
+- [x] scenario_type metadata on v2 dev slice
+- [x] Authoring checklist in README
 
 ## Arcade: item pruning release gate — #22
 
@@ -30,8 +30,8 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** None — can start immediately (parallel).
 
-- [ ] Release checklist document
-- [ ] Optional CI/script for ceiling items
+- [x] Release checklist document
+- [x] Optional CI/script for ceiling items
 
 ## Arcade: Solo Cabinet arcade chrome — #23
 
@@ -39,8 +39,8 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** #20
 
-- [ ] Shared theme tokens
-- [ ] Models leaderboard arcade chrome
+- [x] Shared theme tokens
+- [x] Models leaderboard arcade chrome
 
 ## Arcade: Arcade manual + Technician mode drill-down — #24
 
@@ -48,8 +48,8 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** #20
 
-- [ ] Scenario badges + display category grouping
-- [ ] Technician mode toggle
+- [x] Scenario badges + display category grouping
+- [x] Technician mode toggle
 
 ## Arcade: Multiplayer Cabinet scorecard parity — #25
 
@@ -57,8 +57,8 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** #20, #23
 
-- [ ] Tier · score on Agents
-- [ ] $/quarter column label
+- [x] Tier · score on Agents
+- [x] $/quarter column label
 
 ## Arcade: Season saturation banner + Season 2 auto-promote — #26
 
@@ -66,8 +66,8 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** #20, #23
 
-- [ ] Saturation banner when >30% Credits Rolling
-- [ ] Auto-promote default cabinet; persist manual override
+- [x] Saturation banner when >30% Credits Rolling
+- [x] Auto-promote default cabinet; persist manual override
 
 ---
 
@@ -81,4 +81,4 @@ Work the **frontier**: any ticket whose blockers are all done.
 #22 (parallel)
 ```
 
-**Start now:** #20, #21, #22
+**Status:** All tracer bullets complete (#20–#26).
