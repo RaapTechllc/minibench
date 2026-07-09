@@ -10,18 +10,45 @@ import {
   Card, CardHeader, PageHeader, Badge, ValidityBadge, Skeleton, EmptyState, ErrorState,
   CIBar, Select, SortableTh,
 } from '../components/ui';
-import { CHART, FrontierDot, TooltipCard, axisProps, fmtPct } from '../components/chart';
+import { axisProps, fmtPct, TooltipCard } from '../components/chart';
 import {
   CABINET_OPTIONS,
   DEFAULT_CABINET_SUITE,
   categoryDisplayName,
+  formatScorecard,
   formatScorecardLabel,
   cabinetForSuite,
   orderCategoryKeys,
+  tierChromeClass,
 } from '../lib/scorecard.js';
 
 const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
 const fmtCost = (c: number | null) => (c == null ? '—' : c < 0.01 ? `$${c.toFixed(4)}` : `$${c.toFixed(3)}`);
+
+/** Chart palette for the Solo Cabinet — neon on dark, not daylight blue. */
+const ARCADE_CHART = {
+  accent: '#39f3ff',
+  frontier: '#ffd166',
+  line: '#2a3555',
+  ink3: '#6b7594',
+  grid: '#1a2238',
+};
+
+function ArcadeFrontierDot(props: {
+  cx?: number; cy?: number; payload?: { on_pareto_frontier?: boolean };
+}) {
+  const { cx, cy, payload } = props;
+  if (cx === undefined || cy === undefined) return null;
+  const on = payload?.on_pareto_frontier;
+  return on ? (
+    <g>
+      <circle cx={cx} cy={cy} r={7} fill={ARCADE_CHART.frontier} fillOpacity={0.2} />
+      <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.frontier} stroke="#12182a" strokeWidth={1.5} />
+    </g>
+  ) : (
+    <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.accent} fillOpacity={0.9} stroke="#12182a" strokeWidth={1.5} />
+  );
+}
 
 const SUITE_OPTIONS = [
   ...CABINET_OPTIONS.map((c) => ({
@@ -138,7 +165,7 @@ export default function Models() {
     chartMetric === 'pass_rate' ? 'Score' : categoryDisplayName(chartMetric);
 
   return (
-    <div className="space-y-8">
+    <div className="arcade-cabinet space-y-8">
       <PageHeader
         eyebrow="Solo Cabinet"
         title={activeCabinet ? `${activeCabinet.label} · ${activeCabinet.season}` : 'Model scorecard'}
@@ -211,18 +238,24 @@ export default function Models() {
             <div className="px-2 pb-4">
               <ResponsiveContainer width="100%" height={380}>
                 <ScatterChart margin={{ top: 16, right: 32, bottom: 36, left: 8 }}>
-                  <CartesianGrid stroke={CHART.grid} />
+                  <CartesianGrid stroke={ARCADE_CHART.grid} />
                   <XAxis
-                    dataKey="cost" name="Cost/task" type="number" {...axisProps}
+                    dataKey="cost" name="Cost/task" type="number"
+                    {...axisProps}
+                    stroke={ARCADE_CHART.ink3}
+                    tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
                     tickFormatter={(v: number) => `$${v}`}
-                    label={{ value: 'Cost per task (USD)', position: 'insideBottom', offset: -18, fill: CHART.ink3, fontSize: 12 }}
+                    label={{ value: 'Cost per task (USD)', position: 'insideBottom', offset: -18, fill: ARCADE_CHART.ink3, fontSize: 12 }}
                   />
                   <YAxis
-                    dataKey="pass" name="Pass rate" type="number" domain={[0, 100]} {...axisProps}
-                    label={{ value: `${chartMetricLabel} (%)`, angle: -90, position: 'insideLeft', offset: 16, fill: CHART.ink3, fontSize: 12 }}
+                    dataKey="pass" name="Pass rate" type="number" domain={[0, 100]}
+                    {...axisProps}
+                    stroke={ARCADE_CHART.ink3}
+                    tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
+                    label={{ value: `${chartMetricLabel} (%)`, angle: -90, position: 'insideLeft', offset: 16, fill: ARCADE_CHART.ink3, fontSize: 12 }}
                   />
                   <Tooltip
-                    cursor={{ stroke: CHART.line, strokeDasharray: '4 4' }}
+                    cursor={{ stroke: ARCADE_CHART.line, strokeDasharray: '4 4' }}
                     content={({ payload }) => {
                       if (!payload?.length) return null;
                       const d = payload[0].payload as Point;
@@ -237,7 +270,7 @@ export default function Models() {
                       );
                     }}
                   />
-                  <Scatter data={points} shape={FrontierDot} isAnimationActive={false} />
+                  <Scatter data={points} shape={ArcadeFrontierDot} isAnimationActive={false} />
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
@@ -245,9 +278,9 @@ export default function Models() {
 
           <Card className="animate-rise rise-2 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="arcade-highscore-table w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-line text-[11px] uppercase tracking-wider">
+                  <tr className="text-[11px] uppercase tracking-wider">
                     <th className="py-3 pl-5 pr-2 font-semibold text-ink-3">#</th>
                     <th className="px-2 py-3 font-semibold text-ink-3">Model</th>
                     <SortableTh
@@ -287,36 +320,40 @@ export default function Models() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedEntries.map((e, i) => (
-                    <tr key={e.model_string}
-                      className={`border-b border-line/70 transition-colors hover:bg-surface-2 ${i % 2 ? 'bg-surface-2/40' : ''}`}>
-                      <td className="tnum py-3 pl-5 pr-2 text-ink-3">{e.rank}</td>
-                      <td className="px-2 py-3">
-                        <div className="flex items-center gap-2">
-                          <Link to={`/agents/runs/${e.run_id}`} className="font-medium text-ink hover:text-accent">
-                            {e.display_name ?? e.model_string}
-                          </Link>
-                          {e.on_pareto_frontier && <span className="text-frontier" title="Pareto-optimal">★</span>}
-                          <LicenseBadge license={e.license} />
-                        </div>
-                        {e.family && <div className="text-[12px] text-ink-3">{e.family}</div>}
-                      </td>
-                      <td className="px-2 py-3 min-w-[180px]">
-                        <div className="font-medium text-ink">{formatScorecardLabel(e.pass_rate)}</div>
-                        <CIBar value={Number(e.pass_rate)} lo={num(e.ci95_low)} hi={num(e.ci95_high)} />
-                      </td>
-                      <td className="tnum px-2 py-3 text-ink-2">{e.pass_hat_k != null ? fmtPct(e.pass_hat_k) : '—'}</td>
-                      {hasCalib && <td className="tnum px-2 py-3 text-ink-2">{e.calibration_brier != null ? Number(e.calibration_brier).toFixed(3) : '—'}</td>}
-                      {hasRobust && <td className="tnum px-2 py-3 text-ink-2">{e.robustness_correct != null ? fmtPct(Number(e.robustness_correct) * 100) : '—'}</td>}
-                      {categories.map((c) => (
-                        <td key={c} className={`tnum px-2 py-3 ${sortKey === c ? 'text-accent font-medium' : 'text-ink-2'}`}>
-                          {e.category_pass_rates[c] != null ? `${e.category_pass_rates[c].toFixed(0)}%` : '—'}
+                  {sortedEntries.map((e) => {
+                    const card = formatScorecard(e.pass_rate);
+                    return (
+                      <tr key={e.model_string}>
+                        <td className="arcade-rank tnum py-3 pl-5 pr-2 text-ink-3">{e.rank}</td>
+                        <td className="px-2 py-3">
+                          <div className="flex items-center gap-2">
+                            <Link to={`/agents/runs/${e.run_id}`} className="font-medium text-ink hover:text-accent">
+                              {e.display_name ?? e.model_string}
+                            </Link>
+                            {e.on_pareto_frontier && <span className="text-frontier" title="Pareto-optimal">★</span>}
+                            <LicenseBadge license={e.license} />
+                          </div>
+                          {e.family && <div className="text-[12px] text-ink-3">{e.family}</div>}
                         </td>
-                      ))}
-                      <td className="tnum px-2 py-3 text-ink-2">{fmtCost(num(e.cost_usd_per_task))}</td>
-                      <td className="px-2 py-3"><ValidityBadge isPrivate={e.is_private_split} /></td>
-                    </tr>
-                  ))}
+                        <td className="px-2 py-3 min-w-[200px]">
+                          <div className={`arcade-score ${tierChromeClass(card.tierId)}`}>
+                            {formatScorecardLabel(e.pass_rate)}
+                          </div>
+                          <CIBar value={Number(e.pass_rate)} lo={num(e.ci95_low)} hi={num(e.ci95_high)} />
+                        </td>
+                        <td className="tnum px-2 py-3 text-ink-2">{e.pass_hat_k != null ? fmtPct(e.pass_hat_k) : '—'}</td>
+                        {hasCalib && <td className="tnum px-2 py-3 text-ink-2">{e.calibration_brier != null ? Number(e.calibration_brier).toFixed(3) : '—'}</td>}
+                        {hasRobust && <td className="tnum px-2 py-3 text-ink-2">{e.robustness_correct != null ? fmtPct(Number(e.robustness_correct) * 100) : '—'}</td>}
+                        {categories.map((c) => (
+                          <td key={c} className={`tnum px-2 py-3 ${sortKey === c ? 'text-accent font-medium' : 'text-ink-2'}`}>
+                            {e.category_pass_rates[c] != null ? `${e.category_pass_rates[c].toFixed(0)}%` : '—'}
+                          </td>
+                        ))}
+                        <td className="tnum px-2 py-3 text-ink-2">{fmtCost(num(e.cost_usd_per_task))}</td>
+                        <td className="px-2 py-3"><ValidityBadge isPrivate={e.is_private_split} /></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

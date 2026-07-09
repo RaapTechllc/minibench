@@ -41,6 +41,7 @@ export function orderCategoryKeys(backendKeys: string[]): string[];
 export function formatScorecard(passRate: number): Scorecard;
 export function formatScorecardLabel(passRate: number): string;
 export function cabinetForSuite(suite: string): CabinetOption | null;
+export function tierChromeClass(tierId: string): string;
 export function evaluateSaturation(
   entries: Array<{ pass_rate?: number | string | null }>,
   threshold?: number,

@@ -8,6 +8,7 @@ import {
   formatScorecard,
   formatScorecardLabel,
   evaluateSaturation,
+  tierChromeClass,
   CREDITS_ROLLING_MIN,
   DEFAULT_CABINET_SUITE,
 } from '../src/lib/scorecard.js';
@@ -78,4 +79,17 @@ test('evaluateSaturation uses CREDITS_ROLLING_MIN threshold', () => {
 
 test('default cabinet suite is hard-v1', () => {
   assert.equal(DEFAULT_CABINET_SUITE, 'minibench-hard-v1');
+});
+
+test('tierChromeClass maps each tier id to a stable CSS class', () => {
+  assert.equal(tierChromeClass('insert-coin'), 'arcade-tier-insert-coin');
+  assert.equal(tierChromeClass('warm-up'), 'arcade-tier-warm-up');
+  assert.equal(tierChromeClass('high-score'), 'arcade-tier-high-score');
+  assert.equal(tierChromeClass('boss-beaten'), 'arcade-tier-boss-beaten');
+  assert.equal(tierChromeClass('credits-rolling'), 'arcade-tier-credits-rolling');
+});
+
+test('tierChromeClass falls back for unknown ids', () => {
+  assert.equal(tierChromeClass('unknown'), 'arcade-tier-insert-coin');
+  assert.equal(tierChromeClass(''), 'arcade-tier-insert-coin');
 });

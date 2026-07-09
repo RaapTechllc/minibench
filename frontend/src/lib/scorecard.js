@@ -108,6 +108,16 @@ export function cabinetForSuite(suite) {
 }
 
 /**
+ * @param {string} tierId
+ * @returns {string}
+ */
+export function tierChromeClass(tierId) {
+  const known = TIER_BANDS.some((b) => b.id === tierId);
+  const id = known ? tierId : 'insert-coin';
+  return `arcade-tier-${id}`;
+}
+
+/**
  * @param {Array<{ pass_rate?: number | string | null }>} entries
  * @param {number} [threshold]
  * @returns {'ok' | 'promote'}
