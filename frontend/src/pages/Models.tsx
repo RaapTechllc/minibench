@@ -5,7 +5,8 @@ import {
 } from 'recharts';
 import { api } from '../api';
 import type { ModelLeaderboardEntry, KnownModel } from '../api';
-import { consumeLegacyLeaderboardNotice } from './LegacyLeaderboardRedirect';
+import { consumeLegacyLeaderboardNotice } from '../lib/legacyNotice';
+import { heatBand, compositeScore } from '../lib/scoreScale';
 import {
   Card, CardHeader, PageHeader, Badge, ValidityBadge, Skeleton, EmptyState, ErrorState,
   CIBar, Select, SortableTh,
@@ -29,8 +30,17 @@ function sortValue(e: ModelLeaderboardEntry, key: SortKey): number {
   if (key === 'pass_rate') return Number(e.pass_rate);
   if (key === 'pass_hat_k') return Number(e.pass_hat_k ?? -1);
   if (key === 'cost_usd_per_task') return Number(e.cost_usd_per_task ?? Number.POSITIVE_INFINITY);
+  if (key === 'composite') return compositeScore(e.category_pass_rates) ?? -1;
   return e.category_pass_rates[key] ?? -1;
 }
+
+const HEAT_LEGEND = [
+  { range: '85–100', sample: 92 },
+  { range: '70–84', sample: 77 },
+  { range: '55–69', sample: 62 },
+  { range: '40–54', sample: 47 },
+  { range: '<40', sample: 20 },
+] as const;
 
 function LicenseBadge({ license }: { license: string | null }) {
   if (!license) return null;
@@ -49,16 +59,16 @@ export default function Models() {
   const [entries, setEntries] = useState<ModelLeaderboardEntry[]>([]);
   const [newModels, setNewModels] = useState<KnownModel[]>([]);
   const [suite, setSuite] = useState('minibench-v2');
+  // One-shot: if the default suite has no published runs yet, widen to all
+  // suites instead of opening on an empty page. Never overrides a user choice.
+  const [autoWidened, setAutoWidened] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('pass_rate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [chartMetric, setChartMetric] = useState<string>('pass_rate');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [legacyNotice, setLegacyNotice] = useState(false);
-
-  useEffect(() => {
-    if (consumeLegacyLeaderboardNotice()) setLegacyNotice(true);
-  }, []);
+  // Lazy initializer: consume the one-shot flag during first render, no effect.
+  const [legacyNotice, setLegacyNotice] = useState(() => consumeLegacyLeaderboardNotice());
 
   const load = useCallback(() => {
     setLoading(true);
@@ -66,10 +76,17 @@ export default function Models() {
     const params: Record<string, string> = {};
     if (suite) params.suite = suite;
     Promise.all([
-      api.getModelLeaderboard(params).then(setEntries),
+      api.getModelLeaderboard(params).then((list) => {
+        if (list.length === 0 && suite === 'minibench-v2' && !autoWidened) {
+          setAutoWidened(true);
+          setSuite('');
+          return;
+        }
+        setEntries(list);
+      }),
       api.getNewModels().then(setNewModels).catch(() => setNewModels([])),
     ]).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  }, [suite]);
+  }, [suite, autoWidened]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -153,7 +170,7 @@ export default function Models() {
       )}
 
       <div className="flex flex-wrap items-end gap-4">
-        <Select label="Suite" value={suite} onChange={(e) => setSuite(e.target.value)}>
+        <Select label="Suite" value={suite} onChange={(e) => { setAutoWidened(true); setSuite(e.target.value); }}>
           {SUITE_OPTIONS.map((o) => (
             <option key={o.value || 'all'} value={o.value}>{o.label}</option>
           ))}
@@ -253,6 +270,14 @@ export default function Models() {
                     />
                     {hasCalib && <th className="px-2 py-3 font-semibold text-ink-3" title="Calibration Brier — lower is better">Calib.</th>}
                     {hasRobust && <th className="px-2 py-3 font-semibold text-ink-3" title="Robustness — solved on both sides of a perturbation">Robust.</th>}
+                    <SortableTh
+                      label="Composite"
+                      title="Equal-weight mean of the category pass rates — every category counts the same, so specializing in one can't game the number"
+                      active={sortKey === 'composite'}
+                      dir={sortDir}
+                      onClick={() => toggleSort('composite')}
+                      className="px-2 py-3"
+                    />
                     {categories.map((c) => (
                       <SortableTh
                         key={c}
@@ -294,17 +319,57 @@ export default function Models() {
                       <td className="tnum px-2 py-3 text-ink-2">{e.pass_hat_k != null ? fmtPct(e.pass_hat_k) : '—'}</td>
                       {hasCalib && <td className="tnum px-2 py-3 text-ink-2">{e.calibration_brier != null ? Number(e.calibration_brier).toFixed(3) : '—'}</td>}
                       {hasRobust && <td className="tnum px-2 py-3 text-ink-2">{e.robustness_correct != null ? fmtPct(Number(e.robustness_correct) * 100) : '—'}</td>}
-                      {categories.map((c) => (
-                        <td key={c} className={`tnum px-2 py-3 ${sortKey === c ? 'text-accent font-medium' : 'text-ink-2'}`}>
-                          {e.category_pass_rates[c] != null ? `${e.category_pass_rates[c].toFixed(0)}%` : '—'}
-                        </td>
-                      ))}
+                      <td className="px-2 py-3 min-w-[110px]">
+                        {(() => {
+                          const comp = compositeScore(e.category_pass_rates);
+                          const band = heatBand(comp);
+                          if (comp == null || band == null) return <span className="text-ink-3">—</span>;
+                          return (
+                            <div className="flex items-center gap-2" title={`Composite ${comp.toFixed(1)} — equal-weight mean of ${Object.keys(e.category_pass_rates).length} categories`}>
+                              <span className="tnum w-10 text-right text-[13px] font-semibold" style={{ color: band.text }}>
+                                {comp.toFixed(1)}
+                              </span>
+                              <div className="relative h-1.5 min-w-[48px] flex-1 rounded-full bg-line">
+                                <div className="absolute inset-y-0 left-0 rounded-full"
+                                  style={{ width: `${Math.max(2, Math.min(100, comp))}%`, backgroundColor: band.text }} />
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      {categories.map((c) => {
+                        const v = e.category_pass_rates[c];
+                        const band = heatBand(v);
+                        return (
+                          <td key={c} className="px-1 py-2">
+                            <div
+                              className={`tnum rounded-md px-2 py-1.5 text-center ${sortKey === c ? 'font-semibold' : ''}`}
+                              style={band ? { backgroundColor: band.bg, color: band.text } : undefined}
+                            >
+                              {v != null ? `${v.toFixed(0)}%` : <span className="text-ink-3">—</span>}
+                            </div>
+                          </td>
+                        );
+                      })}
                       <td className="tnum px-2 py-3 text-ink-2">{fmtCost(num(e.cost_usd_per_task))}</td>
                       <td className="px-2 py-3"><ValidityBadge isPrivate={e.is_private_split} /></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line/70 px-5 py-3 text-[11px] text-ink-3">
+              <span className="font-medium text-ink-2">Category heat scale</span>
+              {HEAT_LEGEND.map(({ range, sample }) => {
+                const band = heatBand(sample)!;
+                return (
+                  <span key={range} className="inline-flex items-center gap-1.5">
+                    <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: band.bg, boxShadow: `inset 0 0 0 1px ${band.text}33` }} />
+                    <span>{range}</span>
+                  </span>
+                );
+              })}
+              <span>· Composite = equal-weight category mean</span>
             </div>
           </Card>
 

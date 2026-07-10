@@ -41,6 +41,13 @@ frontend npm deps, and copies `.env.example` → `.env` if missing.
 
 See `agentbench/README.md` for MoA presets, grading, and publishing to `/api/v1/agents/*`.
 
+**No key? Populate the leaderboards anyway** — replay the committed live result
+artifacts into your local backend:
+
+```bash
+python -m agentbench.import_results agentbench/results/*.json --api http://localhost:3070
+```
+
 The frontend is served by nginx and reverse-proxies `/api` and `/health` to the
 API container, so it works unchanged whether you run it on localhost or deploy
 it elsewhere.
@@ -107,11 +114,16 @@ Set the API target with `MINIBENCH_API_URL` (default `http://localhost:3070`).
 | Route | Page |
 |-------|------|
 | `/` | Dashboard — efficiency frontier, bandwidth vs throughput, recent submissions |
-| `/leaderboard` | Ranked table (HEI / t/s / bandwidth); rows link to detail |
+| `/models` | Model capability leaderboard — heatmap category cells, equal-weight composite, CI bars, capability-vs-cost frontier |
+| `/agents` | Agent/MoA config leaderboard (published `agentbench` runs) |
+| `/agents/runs/:runId` | Single published run detail (per-task results) |
+| `/methodology` | How the numbers are made — graders, dual scoring, CIs, contamination defenses |
 | `/benchmarks/:id` | Single-benchmark detail (full hardware/software/performance breakdown) |
 | `/compare` | Side-by-side comparison of two benchmarks |
-| `/hardware` | Hardware specs database |
-| `/submit` | CLI instructions for submitting results |
+| `/moa-calculator` | MoA cost calculator |
+| `/hardware` | Test-rig reference profiles + hardware specs |
+| `/submit` | Submit results — CLI instructions and manual form |
+| `/leaderboard` | Legacy route — redirects to `/models` |
 
 ## API endpoints
 
