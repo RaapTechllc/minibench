@@ -1,0 +1,79 @@
+
+> frontend@0.0.0 lint
+> eslint .
+
+
+/home/user/minibench/frontend/src/pages/Agents.tsx
+  116:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/user/minibench/frontend/src/pages/Agents.tsx:116:21
+  114 |   }, [sortBy]);
+  115 |
+> 116 |   useEffect(() => { load(); }, [load]);
+      |                     ^^^^ Avoid calling setState() directly within an effect
+  117 |
+  118 |   useEffect(() => {
+  119 |     api.getNewModels().then(setNewModels).catch(() => setNewModels([]));  react-hooks/set-state-in-effect
+
+/home/user/minibench/frontend/src/pages/Compare.tsx
+  35:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/user/minibench/frontend/src/pages/Compare.tsx:35:21
+  33 |   }
+  34 |
+> 35 |   useEffect(() => { loadBenchmarks(); }, []);
+     |                     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  36 |
+  37 |   useEffect(() => {
+  38 |     if (idA && idB) {  react-hooks/set-state-in-effect
+
+/home/user/minibench/frontend/src/pages/Dashboard.tsx
+  199:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/user/minibench/frontend/src/pages/Dashboard.tsx:199:21
+  197 |   }
+  198 |
+> 199 |   useEffect(() => { load(); }, []);
+      |                     ^^^^ Avoid calling setState() directly within an effect
+  200 |
+  201 |   if (loading) {
+  202 |     return (  react-hooks/set-state-in-effect
+
+/home/user/minibench/frontend/src/pages/Hardware.tsx
+  55:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/home/user/minibench/frontend/src/pages/Hardware.tsx:55:5
+  53 |
+  54 |   useEffect(() => {
+> 55 |     load();
+     |     ^^^^ Avoid calling setState() directly within an effect
+  56 |   }, [load]);
+  57 |
+  58 |   if (loading) {  react-hooks/set-state-in-effect
+
+✖ 4 problems (0 errors, 4 warnings)
+
