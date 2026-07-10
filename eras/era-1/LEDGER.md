@@ -21,8 +21,8 @@ offline-verified and labeled.**
 - `./scripts/setup-dev.sh` → SETUP_OK: venvs at `backend/.venv`, `cli/.venv`,
   `agentbench/.venv`; `frontend/node_modules` via npm ci; `.env`,
   `backend/.env`, `agentbench/.env` created from examples (keys empty).
-- Baseline gates: **recorded below when the background run completes** —
-  see "Baseline gates" table.
+- Baseline gates: see table below; raw logs committed at
+  [`gates/`](gates/) (`.txt` because the frontend `.gitignore` ignores `*.log`).
 
 ### Baseline gates (run 2026-07-10; logs in session scratchpad `gate-*.log`)
 
@@ -146,10 +146,30 @@ errors · frontend tests **18 passed** (incl. 6 new scoreScale) · build ok.
 | D3 | Can this era include live model benchmark runs? | No. | No `OPENROUTER_API_KEY` in any `.env`; guardrail forbids new signups/spending. Everything demonstrable must work from committed result artifacts, seeds, and dry-runs — labeled as such. |
 | D4 | Which branch? | `claude/company-builder-experiment-qaaexr` (assigned). | Session instruction; never push elsewhere. |
 
+## Phase 4 — Red team (complete; findings + resolutions in [RED-TEAM.md](RED-TEAM.md))
+
+Two adversarial agents ran in parallel after the build commit:
+
+1. **Code skeptic** — instructed to refute 8 claims (importer honesty gates,
+   payload fidelity, heatBand/composite correctness, auto-widen safety, lint-fix
+   behavior parity, methodology accuracy, era-doc facts, CI compatibility) with
+   REFUTED as the default verdict.
+2. **Completeness critic** — graded the era against both definition-of-done
+   checklists; produced an 11-item punch list.
+
+Punch-list items fixed immediately: screenshots + gate logs moved from a
+wrong-cwd `frontend/eras/` into `eras/era-1/` (logs renamed `.txt` — the
+frontend `.gitignore` swallows `*.log`); branch pushed; draft PR #29 opened;
+`scripts/setup-dev.sh` now installs pytest into `cli/.venv` (the gate landmine
+a stranger would hit); this in-flight section refreshed. Remaining items
+(RECAP.md, RED-TEAM.md, era index flip, fresh-agent audit) close in Phase 5/6.
+
 ## In-flight
 
-- Background: baseline gates run (all four suites).
-- Background: 2 recon scouts.
+- Code-skeptic red-team agent (Phase 4, claim-by-claim verdicts) — findings
+  land in RED-TEAM.md when it returns.
+- Draft PR: https://github.com/RaapTechllc/minibench/pull/29 (subscribed to CI
+  + review events).
 
 ## Verify-first (for a resuming instance)
 
