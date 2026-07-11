@@ -148,14 +148,19 @@ errors · frontend tests **18 passed** (incl. 6 new scoreScale) · build ok.
 
 ## Phase 4 — Red team (complete; findings + resolutions in [RED-TEAM.md](RED-TEAM.md))
 
-Two adversarial agents ran in parallel after the build commit:
+Two adversarial agents launched in parallel after the build commit:
 
 1. **Code skeptic** — instructed to refute 8 claims (importer honesty gates,
    payload fidelity, heatBand/composite correctness, auto-widen safety, lint-fix
    behavior parity, methodology accuracy, era-doc facts, CI compatibility) with
-   REFUTED as the default verdict.
+   REFUTED as the default verdict. **This agent was killed mid-run by a session
+   usage limit**; the same claim list was then re-run inline (direct code reads
+   + commands) — 3 defects found and fixed (RT-1..RT-3 in RED-TEAM.md), plus a
+   regression test (agentbench suite 165 → 166).
 2. **Completeness critic** — graded the era against both definition-of-done
-   checklists; produced an 11-item punch list.
+   checklists; produced an 11-item punch list and committed the mechanical
+   fixes itself (gate artifacts, setup-dev pytest, audit-state cleanup, push +
+   draft PR #29).
 
 Punch-list items fixed immediately: screenshots + gate logs moved from a
 wrong-cwd `frontend/eras/` into `eras/era-1/` (logs renamed `.txt` — the

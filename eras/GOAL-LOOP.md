@@ -95,4 +95,4 @@ Closing an era **is** opening the next one:
 
 | Era | Branch | Status | Recap |
 |-----|--------|--------|-------|
-| 1 | `claude/company-builder-experiment-qaaexr` | in progress | [era-1/RECAP.md](era-1/RECAP.md) |
+| 1 | `claude/company-builder-experiment-qaaexr` ([PR #29](https://github.com/RaapTechllc/minibench/pull/29)) | complete | [era-1/RECAP.md](era-1/RECAP.md) |
