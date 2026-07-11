@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -60,8 +60,10 @@ export default function Models() {
   const [newModels, setNewModels] = useState<KnownModel[]>([]);
   const [suite, setSuite] = useState('minibench-v2');
   // One-shot: if the default suite has no published runs yet, widen to all
-  // suites instead of opening on an empty page. Never overrides a user choice.
-  const [autoWidened, setAutoWidened] = useState(false);
+  // suites instead of opening on an empty page. A ref (read at response time,
+  // set synchronously on any user choice or prior widen) rather than state,
+  // so a stale in-flight response can never override the user's selection.
+  const suitePinned = useRef(false);
   const [sortKey, setSortKey] = useState<SortKey>('pass_rate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [chartMetric, setChartMetric] = useState<string>('pass_rate');
@@ -77,8 +79,8 @@ export default function Models() {
     if (suite) params.suite = suite;
     Promise.all([
       api.getModelLeaderboard(params).then((list) => {
-        if (list.length === 0 && suite === 'minibench-v2' && !autoWidened) {
-          setAutoWidened(true);
+        if (list.length === 0 && suite === 'minibench-v2' && !suitePinned.current) {
+          suitePinned.current = true;
           setSuite('');
           return;
         }
@@ -86,7 +88,7 @@ export default function Models() {
       }),
       api.getNewModels().then(setNewModels).catch(() => setNewModels([])),
     ]).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  }, [suite, autoWidened]);
+  }, [suite]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -170,7 +172,7 @@ export default function Models() {
       )}
 
       <div className="flex flex-wrap items-end gap-4">
-        <Select label="Suite" value={suite} onChange={(e) => { setAutoWidened(true); setSuite(e.target.value); }}>
+        <Select label="Suite" value={suite} onChange={(e) => { suitePinned.current = true; setSuite(e.target.value); }}>
           {SUITE_OPTIONS.map((o) => (
             <option key={o.value || 'all'} value={o.value}>{o.label}</option>
           ))}

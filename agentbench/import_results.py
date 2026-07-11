@@ -89,13 +89,16 @@ def artifact_to_payload(
 
     trials = load_trials(raw_trials)
 
-    n_canary = summary.get("n_canary_flags", sum(t.canary_flag for t in trials))
+    # Defense in depth: never trust the summary counters over the trials
+    # themselves — an artifact whose summary says 0 while a trial carries the
+    # flag is refused, not laundered.
+    n_canary = max(summary.get("n_canary_flags", 0), sum(t.canary_flag for t in trials))
     if n_canary > 0:
         raise ImportRefused(
             f"{source}: {n_canary} canary-echo trial(s) — training contamination; "
             "quarantine this artifact."
         )
-    n_infra = summary.get("n_infra_errors", sum(t.infra_error for t in trials))
+    n_infra = max(summary.get("n_infra_errors", 0), sum(t.infra_error for t in trials))
     if n_infra > 0 and not allow_infra_errors:
         raise ImportRefused(
             f"{source}: {n_infra} infra-error trial(s) — partial run; rerun it or "

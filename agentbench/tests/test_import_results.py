@@ -101,6 +101,19 @@ def test_canary_refused_from_summary_and_from_trials():
         artifact_to_payload(art, source="x.json")
 
 
+def test_lying_summary_cannot_launder_flagged_trials():
+    """Summary counters saying 0 must not override per-trial flags."""
+    art = _legacy_artifact(n_canary_flags=0)
+    art["trials"][0]["canary_flag"] = True
+    with pytest.raises(ImportRefused, match="canary"):
+        artifact_to_payload(art, source="x.json")
+
+    art = _legacy_artifact(n_infra_errors=0)
+    art["trials"][0]["infra_error"] = True
+    with pytest.raises(ImportRefused, match="infra-error"):
+        artifact_to_payload(art, source="x.json")
+
+
 def test_infra_errors_refused_unless_allowed():
     art = _legacy_artifact(n_infra_errors=2)
     with pytest.raises(ImportRefused, match="infra-error"):

@@ -80,7 +80,7 @@ const DEFENSES: ReactRow[] = [
   ],
   [
     'Pinned decoding',
-    <>Temperature 0.0, top_p 1.0, max_tokens 1024, no system prompt. MoA configs are rejected for <Mono>minibench-*</Mono> suites, so a pipeline can never pose as a model.</>,
+    <>Temperature 0.0, top_p 1.0, max_tokens 4096 (reasoning headroom — graders still cap gradable text at 2,000 chars), no system prompt. MoA configs are rejected for <Mono>minibench-*</Mono> suites, so a pipeline can never pose as a model.</>,
   ],
   [
     'Coding-task hardening',
