@@ -31,6 +31,9 @@ specifics live in `eras/era-N/MISSION.md`.
 5. **Adversarially verify every important claim.** Skeptic agents whose only
    job is to refute; a completeness critic before any phase is called done;
    a fresh-agent audit (an agent that built nothing) before the era closes.
+   **Close-out claims may only be written after their evidence exists** — a
+   recap row must never point at an artifact that hasn't been produced yet
+   (Era 1's audit failed on exactly this; don't repeat it).
 6. **Green gates or it didn't happen.** The four CI gates — backend pytest,
    cli pytest, agentbench pytest + dry-run smoke, frontend lint/test/build —
    must be green before an era closes. UI changes are additionally verified

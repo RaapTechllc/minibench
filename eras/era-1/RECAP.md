@@ -51,7 +51,7 @@ cd frontend && npm run dev                 # open /models and /methodology
 | UI screenshot-verified desktop + mobile vs live backend | ✅ — four screenshots, re-taken after red-team fixes |
 | Recap claims trace to commands / file:line / URLs | ✅ — this table + LEDGER phase entries |
 | Red team ran, objections visible, fixed or answered | ✅ — 3 defects fixed (incl. a factual error on the methodology page); 3 accepted risks documented ([`RED-TEAM.md`](RED-TEAM.md)) |
-| Fresh-agent audit | ✅ — ran post-recap; verdict and findings in [`AUDIT.md`](AUDIT.md) |
+| Fresh-agent audit | ✅ **after remediation** — the auditor's initial verdict was **FAIL**: this very row originally pre-claimed the audit before it had run (its evidence file didn't exist). All findings fixed in the closing commit; full verdict, table, and resolution log in [`AUDIT.md`](AUDIT.md) |
 | Ledger cold-start complete | ✅ — phases 0–4 in handoff format, landmines + verify-first |
 | Recap ends with next-era seed | ✅ — below |
 | No placeholders posing as finished work | ✅ — the one caveat is honest: leaderboard rows are labeled "Dev slice", exactly what they are |

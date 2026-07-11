@@ -171,10 +171,11 @@ a stranger would hit); this in-flight section refreshed. Remaining items
 
 ## In-flight
 
-- Code-skeptic red-team agent (Phase 4, claim-by-claim verdicts) — findings
-  land in RED-TEAM.md when it returns.
-- Draft PR: https://github.com/RaapTechllc/minibench/pull/29 (subscribed to CI
-  + review events).
+Nothing — the era is closed. (The code-skeptic agent never returned: killed by
+a session usage limit and re-run inline; see Phase 4 and RED-TEAM.md.) The
+draft PR https://github.com/RaapTechllc/minibench/pull/29 remains subscribed
+for CI + review events until merged or closed; an hourly self check-in is
+armed on the owning session.
 
 ## Verify-first (for a resuming instance)
 
