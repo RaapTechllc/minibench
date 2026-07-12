@@ -1,6 +1,8 @@
 # MiniBench — Audit / Build State
 
-_Lightweight state for `/audit` and `/goal`. Source-backed; keep it small._
+_Lightweight build state. Source-backed; keep it small. The `/goal` command
+(`.claude/commands/goal.md`) runs eras per `eras/GOAL-LOOP.md`; an `/audit`
+command was referenced here historically but never existed._
 
 - **last_build_sha:** `50950b3` (branch `claude/benchmark-detail-page`)
 - **last_audit_sha:** _none — no `/audit` has been run. Baseline before this run

@@ -1,0 +1,28 @@
+{
+  "manifest_version": "1",
+  "suite": "minibench-agent-v1",
+  "task_id": "mba-offline-text-repair-001",
+  "category": "repository-repair",
+  "scenario_type": "offline-text-repair",
+  "fixture": {
+    "reference": "offline-text-repair@1",
+    "digest": "sha256:760554a0320df97ccce509047ac3825878a252a4a2852f22f8ced20da7a5aa2c"
+  },
+  "public_prompt": "Repair service.conf so the service status is READY. Preserve the file format.",
+  "preparation": {
+    "strategy": "offline-text-repair-v1"
+  },
+  "verification": {
+    "strategy": "offline-text-repair-v1"
+  },
+  "required_capabilities": [
+    "filesystem"
+  ],
+  "budget": {
+    "max_turns": 1,
+    "wall_time_seconds": 5,
+    "max_tokens": 100,
+    "max_cost_usd": 0.0
+  },
+  "private": false
+}

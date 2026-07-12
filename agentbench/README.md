@@ -125,6 +125,15 @@ python -m agentbench.run --config agentbench/presets/moa-v1.yaml \
     --tasks agentbench/tasks/coding-v1.json --trials 3 --dry-run
 ```
 
+Real-Work Agent Cabinet lifecycle smoke (fresh fixture per trial, deterministic
+fake agent, hidden verification, and cleanup; no keys or network):
+
+```bash
+python -m agentbench.agent_tasks \
+    --manifest agentbench/tasks/minibench-agent-v1-offline.json \
+    --trials 2 --out /tmp/minibench-agent-smoke.json
+```
+
 Cheap live testing (7B-class models, harder tasks — expect <100% pass rate):
 
 ```bash
@@ -270,3 +279,25 @@ python -m agentbench.run --config agentbench/presets/moa-dev.yaml \
 `--publish` transforms the summary (pass rates as 0–100, `ci95_low`/`ci95_high`, per-task
 `results`) and POSTs to `/api/v1/agents/runs`. The React **Agents** page renders the
 pass-rate table plus the cost-vs-accuracy Pareto frontier.
+
+### Re-publishing committed artifacts (no API key needed)
+
+A fresh database starts with empty leaderboards, and `--publish` only fires
+after executing a live run. To replay the committed, auditable artifacts in
+`agentbench/results/` into a local backend instead:
+
+```bash
+# Validate without POSTing:
+python -m agentbench.import_results agentbench/results/*.json --check
+
+# Publish to a running backend:
+python -m agentbench.import_results agentbench/results/*.json --api http://localhost:3070
+```
+
+The importer reuses the exact live-path payload builder and applies the same
+honesty gates: `dry_run` artifacts are refused unconditionally (no override),
+canary-flagged runs are refused, and infra-error runs are refused unless
+`--allow-infra-errors`. Legacy pre-grader-v3 artifacts import with absent
+fields left null — never guessed. Note the endpoint does not deduplicate:
+importing the same artifact twice creates two runs (the model leaderboard
+still shows only the best run per model).

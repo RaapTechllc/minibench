@@ -1,7 +1,9 @@
+// One-shot sessionStorage flag: /leaderboard redirect sets it, /models
+// consumes it once to show the migration banner. Lives in lib/ so the page
+// files each export only a component (react-refresh constraint).
 const NOTICE_KEY = 'minibench-legacy-leaderboard-notice';
 
-/** One-time flag set by /leaderboard redirect; Models consumes it for a banner. */
-export function markLegacyLeaderboardNotice(): void {
+export function setLegacyLeaderboardNotice(): void {
   sessionStorage.setItem(NOTICE_KEY, '1');
 }
 
