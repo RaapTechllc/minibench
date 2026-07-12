@@ -141,8 +141,10 @@ export default function Models() {
     if (suite) params.suite = suite;
     Promise.all([
       api.getModelLeaderboard(params).then((list) => {
-        if (list.length === 0 && suite === DEFAULT_CABINET_SUITE
-            && !suitePinned.current && !hasManualCabinetOverride) {
+        // Covers both the default cabinet and a season auto-promote landing on
+        // a board with no published runs yet — widen to all cabinets rather
+        // than open empty. Never fires over a user's own cabinet choice.
+        if (list.length === 0 && !suitePinned.current && !hasManualCabinetOverride) {
           suitePinned.current = true;
           setSuite('');
           return;
@@ -227,7 +229,11 @@ export default function Models() {
     <div className="arcade-cabinet space-y-8">
       <PageHeader
         eyebrow="Solo Cabinet"
-        title={activeCabinet ? `${activeCabinet.label} · ${activeCabinet.season}` : 'Model scorecard'}
+        title={activeCabinet
+          ? (activeCabinet.label === activeCabinet.season
+            ? activeCabinet.label
+            : `${activeCabinet.label} · ${activeCabinet.season}`)
+          : 'Model scorecard'}
       >
         Scores that spread models apart on work you&apos;d actually do — and if everyone&apos;s Credits
         Rolling, we&apos;re on the wrong board. Tier · score rides on the active cabinet, with 95% CI
