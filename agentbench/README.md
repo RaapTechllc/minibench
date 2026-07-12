@@ -92,6 +92,15 @@ python -m agentbench.run --config agentbench/presets/moa-v1.yaml \
     --tasks agentbench/tasks/coding-v1.json --trials 3 --dry-run
 ```
 
+Real-Work Agent Cabinet lifecycle smoke (fresh fixture per trial, deterministic
+fake agent, hidden verification, and cleanup; no keys or network):
+
+```bash
+python -m agentbench.agent_tasks \
+    --manifest agentbench/tasks/minibench-agent-v1-offline.json \
+    --trials 2 --out /tmp/minibench-agent-smoke.json
+```
+
 Cheap live testing (7B-class models, harder tasks — expect <100% pass rate):
 
 ```bash
