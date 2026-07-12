@@ -9,9 +9,23 @@ import type { AgentLeaderboardEntry, KnownModel } from '../api';
 import {
   Card, CardHeader, PageHeader, Badge, Select, Skeleton, EmptyState, ErrorState, CIBar,
 } from '../components/ui';
-import { CHART, FrontierDot, TooltipCard, axisProps, fmtPct } from '../components/chart';
+import { TooltipCard, axisProps, fmtPct } from '../components/chart';
+import {
+  formatScorecard,
+  formatScorecardLabel,
+  tierChromeClass,
+} from '../lib/scorecard.js';
 
 const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
+
+/** Chart palette for the Multiplayer Cabinet — mirrors Solo Cabinet chrome. */
+const ARCADE_CHART = {
+  accent: '#39f3ff',
+  frontier: '#ffd166',
+  line: '#2a3555',
+  ink3: '#6b7594',
+  grid: '#1a2238',
+};
 
 // Cost display keeps sub-cent precision for near-free configs, otherwise 3 dp.
 function fmtCost(v: number | null): string {
@@ -22,7 +36,23 @@ function fmtCost(v: number | null): string {
   return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(3)}`;
 }
 
-// Cost-vs-accuracy scatter point. Shared FrontierDot keys off on_pareto_frontier.
+function ArcadeFrontierDot(props: {
+  cx?: number; cy?: number; payload?: { on_pareto_frontier?: boolean };
+}) {
+  const { cx, cy, payload } = props;
+  if (cx === undefined || cy === undefined) return null;
+  const on = payload?.on_pareto_frontier;
+  return on ? (
+    <g>
+      <circle cx={cx} cy={cy} r={7} fill={ARCADE_CHART.frontier} fillOpacity={0.2} />
+      <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.frontier} stroke="#12182a" strokeWidth={1.5} />
+    </g>
+  ) : (
+    <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.accent} fillOpacity={0.9} stroke="#12182a" strokeWidth={1.5} />
+  );
+}
+
+// Cost-vs-score scatter point. Arcade dot chrome keys off on_pareto_frontier.
 interface ParetoPoint {
   cost: number;
   pass: number;
@@ -49,9 +79,9 @@ function computeQuickPicks(entries: AgentLeaderboardEntry[]): QuickPick[] {
 
   const mostAccurate = [...entries].sort((a, b) => Number(b.pass_rate) - Number(a.pass_rate))[0];
   picks.push({
-    label: 'Highest accuracy',
+    label: 'Top score',
     entry: mostAccurate,
-    detail: fmtPct(mostAccurate.pass_rate),
+    detail: formatScorecardLabel(mostAccurate.pass_rate),
     icon: Trophy,
     tint: 'text-accent bg-accent-soft',
   });
@@ -88,7 +118,7 @@ function computeQuickPicks(entries: AgentLeaderboardEntry[]): QuickPick[] {
     picks.push({
       label: 'Best value',
       entry: bestValue,
-      detail: `${fmtPct(bestValue.pass_rate)} @ ${fmtCost(bestValue.cost_usd_per_task)}`,
+      detail: `${formatScorecardLabel(bestValue.pass_rate)} @ ${fmtCost(bestValue.cost_usd_per_task)}`,
       icon: Gem,
       tint: 'text-accent-strong bg-accent-soft',
     });
@@ -113,7 +143,10 @@ export default function Agents() {
       .finally(() => setLoading(false));
   }, [sortBy]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
 
   useEffect(() => {
     api.getNewModels().then(setNewModels).catch(() => setNewModels([]));
@@ -132,11 +165,11 @@ export default function Agents() {
   const quickPicks = computeQuickPicks(entries);
 
   return (
-    <div className="space-y-8">
-      <PageHeader eyebrow="Agent leaderboard" title="MoA & agentic configs, on the frontier">
-        Mixture-of-Agents and agentic configs on contamination-resistant tasks. Ranked by pass
-        rate — but the gold Pareto frontier is what actually matters: expensive setups rarely sit
-        on it.
+    <div className="arcade-cabinet space-y-8">
+      <PageHeader eyebrow="Multiplayer Cabinet" title="MoA scorecards, on the frontier">
+        Multi-agent and agentic configs ranked by tier · score on contamination-resistant tasks.
+        Confidence bars stay underneath for receipts; the gold Pareto frontier still marks the
+        configs that earn their quarters.
       </PageHeader>
 
       {newModels.length > 0 && (
@@ -188,8 +221,8 @@ export default function Agents() {
           {/* Signature chart: Cost vs Accuracy Pareto frontier. */}
           <Card className="animate-rise rise-2">
             <CardHeader
-              title="Cost vs. accuracy"
-              sub="Pass rate vs. cost per task. Up is more accurate; left is cheaper."
+              title="Score vs. $/quarter"
+              sub="Tier score vs. cost per task. Up is stronger; left is cheaper."
               right={<Badge tone="frontier">Gold = Pareto-optimal</Badge>}
             />
             <div className="px-2 pb-4">
@@ -201,18 +234,22 @@ export default function Agents() {
               ) : (
                 <ResponsiveContainer width="100%" height={380}>
                   <ScatterChart margin={{ top: 16, right: 32, bottom: 36, left: 8 }}>
-                    <CartesianGrid stroke={CHART.grid} />
+                    <CartesianGrid stroke={ARCADE_CHART.grid} />
                     <XAxis
-                      dataKey="cost" name="Cost/task" type="number" {...axisProps}
+                      dataKey="cost" name="$/quarter" type="number" {...axisProps}
+                      stroke={ARCADE_CHART.ink3}
+                      tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
                       tickFormatter={(v: number) => `$${v}`}
-                      label={{ value: 'Cost per task (USD)', position: 'insideBottom', offset: -18, fill: CHART.ink3, fontSize: 12 }}
+                      label={{ value: '$/quarter (USD)', position: 'insideBottom', offset: -18, fill: ARCADE_CHART.ink3, fontSize: 12 }}
                     />
                     <YAxis
-                      dataKey="pass" name="Pass rate" type="number" domain={[0, 100]} {...axisProps}
-                      label={{ value: 'Pass rate (%)', angle: -90, position: 'insideLeft', offset: 16, fill: CHART.ink3, fontSize: 12 }}
+                      dataKey="pass" name="Score" type="number" domain={[0, 100]} {...axisProps}
+                      stroke={ARCADE_CHART.ink3}
+                      tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
+                      label={{ value: 'Score', angle: -90, position: 'insideLeft', offset: 16, fill: ARCADE_CHART.ink3, fontSize: 12 }}
                     />
                     <Tooltip
-                      cursor={{ stroke: CHART.line, strokeDasharray: '4 4' }}
+                      cursor={{ stroke: ARCADE_CHART.line, strokeDasharray: '4 4' }}
                       content={({ payload }) => {
                         if (!payload?.length) return null;
                         const d = payload[0].payload as ParetoPoint;
@@ -222,14 +259,14 @@ export default function Agents() {
                               {d.name}
                               {d.self_moa && <span className="ml-1 text-[11px] text-accent-strong">(Self-MoA)</span>}
                             </div>
-                            <div className="tnum mt-1 text-accent-strong">{fmtPct(d.pass)} pass</div>
-                            <div className="tnum text-ink-2">{fmtCost(d.cost)}/task</div>
+                            <div className="tnum mt-1 text-accent-strong">{formatScorecardLabel(d.pass)}</div>
+                            <div className="tnum text-ink-2">{fmtCost(d.cost)}/quarter</div>
                             {d.on_pareto_frontier && <div className="mt-1 text-[11px] text-frontier">On Pareto frontier</div>}
                           </TooltipCard>
                         );
                       }}
                     />
-                    <Scatter data={paretoData} shape={FrontierDot} isAnimationActive={false} />
+                    <Scatter data={paretoData} shape={ArcadeFrontierDot} isAnimationActive={false} />
                   </ScatterChart>
                 </ResponsiveContainer>
               )}
@@ -241,69 +278,72 @@ export default function Agents() {
             <Select label="Sort" value={sortBy} onChange={e => setSortBy(e.target.value)}>
               <option value="pass_rate">Pass rate</option>
               <option value="pass_hat_k">Pass^k (consistency)</option>
-              <option value="cost_usd_per_task">Cost/task</option>
+              <option value="cost_usd_per_task">$/quarter</option>
             </Select>
           </div>
 
-          <Card className="overflow-hidden">
+          <Card className="animate-rise rise-3 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="arcade-highscore-table w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-line text-[11px] uppercase tracking-wider text-ink-3">
-                    <th className="py-3 pl-5 pr-2 font-semibold whitespace-nowrap">#</th>
-                    <th className="px-2 py-3 font-semibold whitespace-nowrap">Config</th>
-                    <th className="px-2 py-3 font-semibold whitespace-nowrap">Suite</th>
-                    <th className="px-2 py-3 font-semibold whitespace-nowrap">Provider</th>
-                    <th className="px-2 py-3 font-semibold whitespace-nowrap">Pass rate · 95% CI</th>
-                    <th className="px-2 py-3 font-semibold whitespace-nowrap">Pass^k</th>
-                    <th className="px-2 py-3 font-semibold whitespace-nowrap">Cost/task</th>
-                    <th className="px-2 py-3 font-semibold whitespace-nowrap">Latency p50/p95</th>
-                    <th className="px-2 py-3 font-semibold whitespace-nowrap">Trials</th>
+                  <tr className="text-[11px] uppercase tracking-wider">
+                    <th className="py-3 pl-5 pr-2 font-semibold whitespace-nowrap text-ink-3">#</th>
+                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Config</th>
+                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Suite</th>
+                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Provider</th>
+                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Score · 95% CI</th>
+                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Pass^k</th>
+                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">$/quarter</th>
+                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Latency p50/p95</th>
+                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Trials</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.map((e, i) => (
-                    <tr
-                      key={e.run_id}
-                      className={`border-b border-line/70 transition-colors hover:bg-surface-2 ${i % 2 ? 'bg-surface-2/40' : ''}`}
-                    >
-                      <td className="tnum py-3 pl-5 pr-2 text-ink-3">#{e.rank}</td>
-                      <td className="px-2 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Link
-                            to={`/agents/runs/${e.run_id}`}
-                            className="font-medium text-ink whitespace-nowrap hover:text-accent"
-                          >
-                            {e.config_name ?? e.run_id.slice(0, 8)}
-                          </Link>
-                          {e.self_moa && (
-                            <Badge tone="accent" title="Self-MoA — one model aggregating its own samples">Self-MoA</Badge>
+                  {entries.map((e) => {
+                    const card = formatScorecard(e.pass_rate);
+                    return (
+                      <tr key={e.run_id}>
+                        <td className="arcade-rank tnum py-3 pl-5 pr-2 text-ink-3">#{e.rank}</td>
+                        <td className="px-2 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                              to={`/agents/runs/${e.run_id}`}
+                              className="font-medium text-ink whitespace-nowrap hover:text-accent"
+                            >
+                              {e.config_name ?? e.run_id.slice(0, 8)}
+                            </Link>
+                            {e.self_moa && (
+                              <Badge tone="accent" title="Self-MoA — one model aggregating its own samples">Self-MoA</Badge>
+                            )}
+                            {e.on_pareto_frontier && (
+                              <Badge tone="frontier" title="On the cost/accuracy Pareto frontier">Pareto</Badge>
+                            )}
+                          </div>
+                          {e.model_snapshot_date && (
+                            <div className="mt-0.5 text-[12px] text-ink-3">snapshot {e.model_snapshot_date}</div>
                           )}
-                          {e.on_pareto_frontier && (
-                            <Badge tone="frontier" title="On the cost/accuracy Pareto frontier">Pareto</Badge>
-                          )}
-                        </div>
-                        {e.model_snapshot_date && (
-                          <div className="mt-0.5 text-[12px] text-ink-3">snapshot {e.model_snapshot_date}</div>
-                        )}
-                      </td>
-                      <td className="px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">{e.benchmark_suite}</td>
-                      <td className="px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">{e.provider ?? '—'}</td>
-                      <td className="px-2 py-3 min-w-[168px]">
-                        <CIBar value={Number(e.pass_rate)} lo={num(e.ci95_low)} hi={num(e.ci95_high)} />
-                      </td>
-                      <td className="tnum px-2 py-3 text-ink-2 whitespace-nowrap">{fmtPct(e.pass_hat_k)}</td>
-                      <td className="tnum px-2 py-3 text-ink-2 whitespace-nowrap">{fmtCost(e.cost_usd_per_task)}</td>
-                      <td className="tnum px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">
-                        {e.latency_p50_ms != null ? `${e.latency_p50_ms}` : '—'}
-                        {' / '}
-                        {e.latency_p95_ms != null ? `${e.latency_p95_ms}ms` : '—'}
-                      </td>
-                      <td className="tnum px-2 py-3 text-[12px] text-ink-3 whitespace-nowrap">
-                        {e.n_tasks}×{e.n_trials}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">{e.benchmark_suite}</td>
+                        <td className="px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">{e.provider ?? '—'}</td>
+                        <td className="px-2 py-3 min-w-[200px]">
+                          <div className={`arcade-score ${tierChromeClass(card.tierId)}`}>
+                            {formatScorecardLabel(e.pass_rate)}
+                          </div>
+                          <CIBar value={Number(e.pass_rate)} lo={num(e.ci95_low)} hi={num(e.ci95_high)} />
+                        </td>
+                        <td className="tnum px-2 py-3 text-ink-2 whitespace-nowrap">{fmtPct(e.pass_hat_k)}</td>
+                        <td className="tnum px-2 py-3 text-ink-2 whitespace-nowrap">{fmtCost(e.cost_usd_per_task)}</td>
+                        <td className="tnum px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">
+                          {e.latency_p50_ms != null ? `${e.latency_p50_ms}` : '—'}
+                          {' / '}
+                          {e.latency_p95_ms != null ? `${e.latency_p95_ms}ms` : '—'}
+                        </td>
+                        <td className="tnum px-2 py-3 text-[12px] text-ink-3 whitespace-nowrap">
+                          {e.n_tasks}×{e.n_trials}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

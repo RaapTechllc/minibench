@@ -34,11 +34,26 @@
   --color-frontier: #b8860b;   /* Pareto gold, muted for daylight */
   --color-frontier-soft: #fbf3dc;
 
+  /* Arcade chrome — Solo / Multiplayer cabinets (scoped via .arcade-cabinet) */
+  --color-arcade-bg: #0b0f1a;
+  --color-arcade-surface: #12182a;
+  --color-arcade-surface-2: #1a2238;
+  --color-arcade-line: #2a3555;
+  --color-arcade-ink: #e8ecf8;
+  --color-arcade-ink-2: #9aa3c0;
+  --color-arcade-ink-3: #6b7594;
+  --color-arcade-neon: #39f3ff;
+  --color-arcade-neon-2: #ff4fd8;
+  --color-arcade-gold: #ffd166;
+  --color-arcade-pass: #3dff9a;
+  --color-arcade-fail: #ff6b6b;
+
   /* Type roles */
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
                Roboto, system-ui, sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", "Roboto Mono",
                ui-monospace, monospace;
+  --font-arcade: "Press Start 2P", "VT323", ui-monospace, monospace;
 
   /* Radii — Apple-soft */
   --radius-md: 10px;
@@ -48,6 +63,7 @@
   /* Soft, layered depth (never harsh) */
   --shadow-card: 0 1px 2px rgba(20, 20, 43, 0.04), 0 4px 16px rgba(20, 20, 43, 0.05);
   --shadow-pop: 0 8px 30px rgba(20, 20, 43, 0.12);
+  --shadow-arcade: 0 0 0 1px rgba(57, 243, 255, 0.12), 0 12px 40px rgba(0, 0, 0, 0.45);
 }
 
 @layer base {
@@ -68,6 +84,93 @@
     border-radius: 4px;
   }
   ::selection { background: var(--color-accent-soft); }
+}
+
+@layer components {
+  /* Arcade cabinet shell — dark/neon high-score board. Scoped so daylight
+     pages stay untouched; Multiplayer can reuse the same class later. */
+  .arcade-cabinet {
+    --color-paper: var(--color-arcade-bg);
+    --color-surface: var(--color-arcade-surface);
+    --color-surface-2: var(--color-arcade-surface-2);
+    --color-ink: var(--color-arcade-ink);
+    --color-ink-2: var(--color-arcade-ink-2);
+    --color-ink-3: var(--color-arcade-ink-3);
+    --color-line: var(--color-arcade-line);
+    --color-line-strong: #3a4668;
+    --color-accent: var(--color-arcade-neon);
+    --color-accent-strong: #7af7ff;
+    --color-accent-soft: rgba(57, 243, 255, 0.12);
+    --color-pass: var(--color-arcade-pass);
+    --color-pass-soft: rgba(61, 255, 154, 0.12);
+    --color-fail: var(--color-arcade-fail);
+    --color-fail-soft: rgba(255, 107, 107, 0.12);
+    --color-frontier: var(--color-arcade-gold);
+    --color-frontier-soft: rgba(255, 209, 102, 0.14);
+    --shadow-card: var(--shadow-arcade);
+
+    color: var(--color-ink);
+    background:
+      linear-gradient(180deg, rgba(57, 243, 255, 0.04), transparent 28%),
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 255, 255, 0.015) 2px,
+        rgba(255, 255, 255, 0.015) 3px
+      ),
+      var(--color-arcade-bg);
+    border-radius: var(--radius-xl);
+    padding: 1.25rem 1.25rem 1.5rem;
+    box-shadow: var(--shadow-arcade);
+  }
+
+  .arcade-cabinet :focus-visible {
+    outline-color: var(--color-arcade-neon);
+  }
+
+  .arcade-cabinet ::selection {
+    background: rgba(57, 243, 255, 0.28);
+  }
+
+  /* Display font for tier · score only — body stays readable sans. */
+  .arcade-score {
+    font-family: var(--font-arcade);
+    font-size: 0.68rem;
+    line-height: 1.55;
+    letter-spacing: 0.02em;
+    color: var(--color-arcade-neon);
+    text-shadow: 0 0 12px rgba(57, 243, 255, 0.35);
+  }
+
+  .arcade-highscore-table thead tr {
+    border-bottom: 1px solid var(--color-arcade-line);
+  }
+
+  .arcade-highscore-table tbody tr {
+    border-bottom: 1px solid rgba(42, 53, 85, 0.7);
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .arcade-highscore-table tbody tr:nth-child(even) {
+    background: rgba(26, 34, 56, 0.45);
+  }
+
+  .arcade-highscore-table tbody tr:hover {
+    background: rgba(57, 243, 255, 0.06);
+    box-shadow: inset 3px 0 0 var(--color-arcade-neon);
+  }
+
+  .arcade-highscore-table tbody tr:first-child .arcade-rank {
+    color: var(--color-arcade-gold);
+  }
+
+  /* Tier accent via class — label text remains the primary signal. */
+  .arcade-tier-insert-coin { color: var(--color-arcade-ink-3); text-shadow: none; }
+  .arcade-tier-warm-up { color: #8ec8ff; }
+  .arcade-tier-high-score { color: var(--color-arcade-neon); }
+  .arcade-tier-boss-beaten { color: var(--color-arcade-neon-2); text-shadow: 0 0 12px rgba(255, 79, 216, 0.35); }
+  .arcade-tier-credits-rolling { color: var(--color-arcade-gold); text-shadow: 0 0 12px rgba(255, 209, 102, 0.4); }
 }
 
 @layer utilities {

@@ -11,16 +11,74 @@ import {
   Card, CardHeader, PageHeader, Badge, ValidityBadge, Skeleton, EmptyState, ErrorState,
   CIBar, Select, SortableTh,
 } from '../components/ui';
-import { CHART, FrontierDot, TooltipCard, axisProps, fmtPct } from '../components/chart';
+import { axisProps, fmtPct, TooltipCard } from '../components/chart';
+import {
+  CABINET_OPTIONS,
+  CREDITS_ROLLING_MIN,
+  DEFAULT_CABINET_SUITE,
+  SATURATION_THRESHOLD,
+  categoryDisplayName,
+  evaluateSaturation,
+  formatScorecard,
+  formatScorecardLabel,
+  cabinetForSuite,
+  orderCategoryKeys,
+  tierChromeClass,
+} from '../lib/scorecard.js';
 
 const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
 const fmtCost = (c: number | null) => (c == null ? '—' : c < 0.01 ? `$${c.toFixed(4)}` : `$${c.toFixed(3)}`);
+const MANUAL_CABINET_OVERRIDE_KEY = 'minibench.cabinet.override';
+const SEASON_2_SUITE = 'minibench-v2';
+
+/** Chart palette for the Solo Cabinet — neon on dark, not daylight blue. */
+const ARCADE_CHART = {
+  accent: '#39f3ff',
+  frontier: '#ffd166',
+  line: '#2a3555',
+  ink3: '#6b7594',
+  grid: '#1a2238',
+};
+
+function ArcadeFrontierDot(props: {
+  cx?: number; cy?: number; payload?: { on_pareto_frontier?: boolean };
+}) {
+  const { cx, cy, payload } = props;
+  if (cx === undefined || cy === undefined) return null;
+  const on = payload?.on_pareto_frontier;
+  return on ? (
+    <g>
+      <circle cx={cx} cy={cy} r={7} fill={ARCADE_CHART.frontier} fillOpacity={0.2} />
+      <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.frontier} stroke="#12182a" strokeWidth={1.5} />
+    </g>
+  ) : (
+    <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.accent} fillOpacity={0.9} stroke="#12182a" strokeWidth={1.5} />
+  );
+}
+
+type CabinetOption = (typeof CABINET_OPTIONS)[number];
+
+const cabinetOptionLabel = (cabinet: CabinetOption) => {
+  if (cabinet.suite === 'minibench-core-v1') {
+    return `${cabinet.label} · ${cabinet.season} · optional`;
+  }
+  if (cabinet.label === cabinet.season) return cabinet.label;
+  return `${cabinet.label} · ${cabinet.season}`;
+};
+
+const readManualCabinetOverride = () => {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(MANUAL_CABINET_OVERRIDE_KEY);
+};
+
+const initialCabinetSuite = () => readManualCabinetOverride() ?? DEFAULT_CABINET_SUITE;
 
 const SUITE_OPTIONS = [
-  { value: 'minibench-v2', label: 'minibench-v2 (frontier tier)' },
-  { value: 'minibench-hard-v1', label: 'minibench-hard-v1' },
-  { value: 'minibench-core-v1', label: 'minibench-core-v1' },
-  { value: '', label: 'All suites' },
+  ...CABINET_OPTIONS.map((c) => ({
+    value: c.suite,
+    label: cabinetOptionLabel(c),
+  })),
+  { value: '', label: 'All cabinets' },
 ] as const;
 
 type SortKey = 'pass_rate' | 'pass_hat_k' | 'cost_usd_per_task' | string;
@@ -58,9 +116,13 @@ interface Point {
 export default function Models() {
   const [entries, setEntries] = useState<ModelLeaderboardEntry[]>([]);
   const [newModels, setNewModels] = useState<KnownModel[]>([]);
-  const [suite, setSuite] = useState('minibench-v2');
-  // One-shot: if the default suite has no published runs yet, widen to all
-  // suites instead of opening on an empty page. A ref (read at response time,
+  const [suite, setSuite] = useState(initialCabinetSuite);
+  const [hasManualCabinetOverride, setHasManualCabinetOverride] = useState(
+    () => readManualCabinetOverride() !== null,
+  );
+  const [seasonUnlocked, setSeasonUnlocked] = useState(false);
+  // One-shot: if the default cabinet has no published runs yet, widen to all
+  // cabinets instead of opening on an empty page. A ref (read at response time,
   // set synchronously on any user choice or prior widen) rather than state,
   // so a stale in-flight response can never override the user's selection.
   const suitePinned = useRef(false);
@@ -79,7 +141,10 @@ export default function Models() {
     if (suite) params.suite = suite;
     Promise.all([
       api.getModelLeaderboard(params).then((list) => {
-        if (list.length === 0 && suite === 'minibench-v2' && !suitePinned.current) {
+        // Covers both the default cabinet and a season auto-promote landing on
+        // a board with no published runs yet — widen to all cabinets rather
+        // than open empty. Never fires over a user's own cabinet choice.
+        if (list.length === 0 && !suitePinned.current && !hasManualCabinetOverride) {
           suitePinned.current = true;
           setSuite('');
           return;
@@ -88,17 +153,30 @@ export default function Models() {
       }),
       api.getNewModels().then(setNewModels).catch(() => setNewModels([])),
     ]).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  }, [suite]);
+  }, [suite, hasManualCabinetOverride]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
+  const saturationState = evaluateSaturation(entries);
+
+  useEffect(() => {
+    if (suite !== DEFAULT_CABINET_SUITE || saturationState !== 'promote') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSeasonUnlocked(true);
+    if (!hasManualCabinetOverride) {
+      setSuite(SEASON_2_SUITE);
+    }
+  }, [hasManualCabinetOverride, saturationState, suite]);
+
   const categories = useMemo(
-    () => Array.from(new Set(entries.flatMap((e) => Object.keys(e.category_pass_rates)))).sort(),
+    () => orderCategoryKeys(entries.flatMap((e) => Object.keys(e.category_pass_rates))),
     [entries],
   );
+
+  const activeCabinet = cabinetForSuite(suite);
 
   const sortedEntries = useMemo(() => {
     const copy = [...entries];
@@ -136,21 +214,30 @@ export default function Models() {
   const hasCalib = entries.some((e) => e.calibration_brier != null);
   const hasRobust = entries.some((e) => e.robustness_correct != null);
 
-  const saturatedCount = entries.filter((e) => Number(e.pass_rate) >= 99.9).length;
-  const showSaturation =
-    (suite === 'minibench-core-v1' || suite === '') &&
-    entries.length >= 3 &&
-    saturatedCount / entries.length >= 0.3;
+  const showSaturation = seasonUnlocked || (suite === DEFAULT_CABINET_SUITE && saturationState === 'promote');
+  const handleCabinetChange = (value: string) => {
+    suitePinned.current = true;
+    setSuite(value);
+    setHasManualCabinetOverride(true);
+    window.localStorage.setItem(MANUAL_CABINET_OVERRIDE_KEY, value);
+  };
 
   const chartMetricLabel =
-    chartMetric === 'pass_rate' ? 'Overall pass rate' : chartMetric.replace(/-/g, ' ');
+    chartMetric === 'pass_rate' ? 'Score' : categoryDisplayName(chartMetric);
 
   return (
-    <div className="space-y-8">
-      <PageHeader eyebrow="Capability leaderboard" title="Models, ranked by what they can do">
-        Best published minibench run per model — one model string, one call per prompt, decoding
-        pinned. Confidence intervals are shown as range bars: when two bars overlap, it's a tie,
-        not a winner.
+    <div className="arcade-cabinet space-y-8">
+      <PageHeader
+        eyebrow="Solo Cabinet"
+        title={activeCabinet
+          ? (activeCabinet.label === activeCabinet.season
+            ? activeCabinet.label
+            : `${activeCabinet.label} · ${activeCabinet.season}`)
+          : 'Model scorecard'}
+      >
+        Scores that spread models apart on work you&apos;d actually do — and if everyone&apos;s Credits
+        Rolling, we&apos;re on the wrong board. Tier · score rides on the active cabinet, with 95% CI
+        bars underneath. When two bars overlap, it&apos;s a tie, not a winner.
       </PageHeader>
 
       {legacyNotice && (
@@ -172,15 +259,15 @@ export default function Models() {
       )}
 
       <div className="flex flex-wrap items-end gap-4">
-        <Select label="Suite" value={suite} onChange={(e) => { suitePinned.current = true; setSuite(e.target.value); }}>
+        <Select label="Cabinet" value={suite} onChange={(e) => handleCabinetChange(e.target.value)}>
           {SUITE_OPTIONS.map((o) => (
             <option key={o.value || 'all'} value={o.value}>{o.label}</option>
           ))}
         </Select>
         <Select label="Chart Y-axis" value={chartMetric} onChange={(e) => setChartMetric(e.target.value)}>
-          <option value="pass_rate">Overall pass rate</option>
+          <option value="pass_rate">Score</option>
           {categories.map((c) => (
-            <option key={c} value={c}>{c.replace(/-/g, ' ')}</option>
+            <option key={c} value={c}>{categoryDisplayName(c)}</option>
           ))}
         </Select>
       </div>
@@ -188,10 +275,10 @@ export default function Models() {
       {showSaturation && (
         <Card className="border-frontier/40 bg-frontier-soft/30 px-5 py-4">
           <p className="text-[13px] text-ink">
-            <span className="font-semibold text-frontier">core-v1 is saturated</span>
-            {' '}— {saturatedCount} of {entries.length} models score ≥99.9%.
-            Switch to <strong>minibench-v2</strong> for frontier separation, or sort by category
-            below to see where models still differ.
+            <span className="font-semibold text-frontier">Season 1 cleared — Season 2 unlocked</span>
+            {' '}because more than {Math.round(SATURATION_THRESHOLD * 100)}% of Season 1 models
+            reached Credits Rolling ({CREDITS_ROLLING_MIN}+). New visitors now start on{' '}
+            <strong>minibench-v2</strong>; your cabinet picker stays in charge once you choose a board.
           </p>
         </Card>
       )}
@@ -203,8 +290,8 @@ export default function Models() {
       ) : entries.length === 0 ? (
         <EmptyState title="No published runs for this suite yet">
           {suite === 'minibench-v2'
-            ? 'Publish v2 runs with agentbench.run --tasks agentbench/tasks/minibench-v2.json to populate the frontier tier.'
-            : 'Score a model and publish it, then it appears here on the capability-vs-cost frontier.'}
+            ? 'Publish Season 2 runs with agentbench.run --tasks agentbench/tasks/minibench-v2.json to populate the cabinet.'
+            : 'Score a model and publish it, then it appears here on the Solo Cabinet leaderboard.'}
         </EmptyState>
       ) : (
         <>
@@ -217,18 +304,24 @@ export default function Models() {
             <div className="px-2 pb-4">
               <ResponsiveContainer width="100%" height={380}>
                 <ScatterChart margin={{ top: 16, right: 32, bottom: 36, left: 8 }}>
-                  <CartesianGrid stroke={CHART.grid} />
+                  <CartesianGrid stroke={ARCADE_CHART.grid} />
                   <XAxis
-                    dataKey="cost" name="Cost/task" type="number" {...axisProps}
+                    dataKey="cost" name="Cost/task" type="number"
+                    {...axisProps}
+                    stroke={ARCADE_CHART.ink3}
+                    tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
                     tickFormatter={(v: number) => `$${v}`}
-                    label={{ value: 'Cost per task (USD)', position: 'insideBottom', offset: -18, fill: CHART.ink3, fontSize: 12 }}
+                    label={{ value: 'Cost per task (USD)', position: 'insideBottom', offset: -18, fill: ARCADE_CHART.ink3, fontSize: 12 }}
                   />
                   <YAxis
-                    dataKey="pass" name="Pass rate" type="number" domain={[0, 100]} {...axisProps}
-                    label={{ value: `${chartMetricLabel} (%)`, angle: -90, position: 'insideLeft', offset: 16, fill: CHART.ink3, fontSize: 12 }}
+                    dataKey="pass" name="Pass rate" type="number" domain={[0, 100]}
+                    {...axisProps}
+                    stroke={ARCADE_CHART.ink3}
+                    tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
+                    label={{ value: `${chartMetricLabel} (%)`, angle: -90, position: 'insideLeft', offset: 16, fill: ARCADE_CHART.ink3, fontSize: 12 }}
                   />
                   <Tooltip
-                    cursor={{ stroke: CHART.line, strokeDasharray: '4 4' }}
+                    cursor={{ stroke: ARCADE_CHART.line, strokeDasharray: '4 4' }}
                     content={({ payload }) => {
                       if (!payload?.length) return null;
                       const d = payload[0].payload as Point;
@@ -243,7 +336,7 @@ export default function Models() {
                       );
                     }}
                   />
-                  <Scatter data={points} shape={FrontierDot} isAnimationActive={false} />
+                  <Scatter data={points} shape={ArcadeFrontierDot} isAnimationActive={false} />
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
@@ -251,13 +344,13 @@ export default function Models() {
 
           <Card className="animate-rise rise-2 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="arcade-highscore-table w-full text-left text-[13px]">
                 <thead>
-                  <tr className="border-b border-line text-[11px] uppercase tracking-wider">
+                  <tr className="text-[11px] uppercase tracking-wider">
                     <th className="py-3 pl-5 pr-2 font-semibold text-ink-3">#</th>
                     <th className="px-2 py-3 font-semibold text-ink-3">Model</th>
                     <SortableTh
-                      label="Pass rate · 95% CI"
+                      label="Score · 95% CI"
                       active={sortKey === 'pass_rate'}
                       dir={sortDir}
                       onClick={() => toggleSort('pass_rate')}
@@ -283,7 +376,7 @@ export default function Models() {
                     {categories.map((c) => (
                       <SortableTh
                         key={c}
-                        label={c}
+                        label={categoryDisplayName(c)}
                         active={sortKey === c}
                         dir={sortDir}
                         onClick={() => toggleSort(c)}
@@ -301,62 +394,67 @@ export default function Models() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedEntries.map((e, i) => (
-                    <tr key={e.model_string}
-                      className={`border-b border-line/70 transition-colors hover:bg-surface-2 ${i % 2 ? 'bg-surface-2/40' : ''}`}>
-                      <td className="tnum py-3 pl-5 pr-2 text-ink-3">{e.rank}</td>
-                      <td className="px-2 py-3">
-                        <div className="flex items-center gap-2">
-                          <Link to={`/agents/runs/${e.run_id}`} className="font-medium text-ink hover:text-accent">
-                            {e.display_name ?? e.model_string}
-                          </Link>
-                          {e.on_pareto_frontier && <span className="text-frontier" title="Pareto-optimal">★</span>}
-                          <LicenseBadge license={e.license} />
-                        </div>
-                        {e.family && <div className="text-[12px] text-ink-3">{e.family}</div>}
-                      </td>
-                      <td className="px-2 py-3 min-w-[160px]">
-                        <CIBar value={Number(e.pass_rate)} lo={num(e.ci95_low)} hi={num(e.ci95_high)} />
-                      </td>
-                      <td className="tnum px-2 py-3 text-ink-2">{e.pass_hat_k != null ? fmtPct(e.pass_hat_k) : '—'}</td>
-                      {hasCalib && <td className="tnum px-2 py-3 text-ink-2">{e.calibration_brier != null ? Number(e.calibration_brier).toFixed(3) : '—'}</td>}
-                      {hasRobust && <td className="tnum px-2 py-3 text-ink-2">{e.robustness_correct != null ? fmtPct(Number(e.robustness_correct) * 100) : '—'}</td>}
-                      <td className="px-2 py-3 min-w-[110px]">
-                        {(() => {
-                          const comp = compositeScore(e.category_pass_rates);
-                          const band = heatBand(comp);
-                          if (comp == null || band == null) return <span className="text-ink-3">—</span>;
-                          return (
-                            <div className="flex items-center gap-2" title={`Composite ${comp.toFixed(1)} — equal-weight mean of ${Object.keys(e.category_pass_rates).length} categories`}>
-                              <span className="tnum w-10 text-right text-[13px] font-semibold" style={{ color: band.text }}>
-                                {comp.toFixed(1)}
-                              </span>
-                              <div className="relative h-1.5 min-w-[48px] flex-1 rounded-full bg-line">
-                                <div className="absolute inset-y-0 left-0 rounded-full"
-                                  style={{ width: `${Math.max(2, Math.min(100, comp))}%`, backgroundColor: band.text }} />
+                  {sortedEntries.map((e) => {
+                    const card = formatScorecard(e.pass_rate);
+                    return (
+                      <tr key={e.model_string}>
+                        <td className="arcade-rank tnum py-3 pl-5 pr-2 text-ink-3">{e.rank}</td>
+                        <td className="px-2 py-3">
+                          <div className="flex items-center gap-2">
+                            <Link to={`/agents/runs/${e.run_id}`} className="font-medium text-ink hover:text-accent">
+                              {e.display_name ?? e.model_string}
+                            </Link>
+                            {e.on_pareto_frontier && <span className="text-frontier" title="Pareto-optimal">★</span>}
+                            <LicenseBadge license={e.license} />
+                          </div>
+                          {e.family && <div className="text-[12px] text-ink-3">{e.family}</div>}
+                        </td>
+                        <td className="px-2 py-3 min-w-[200px]">
+                          <div className={`arcade-score ${tierChromeClass(card.tierId)}`}>
+                            {formatScorecardLabel(e.pass_rate)}
+                          </div>
+                          <CIBar value={Number(e.pass_rate)} lo={num(e.ci95_low)} hi={num(e.ci95_high)} />
+                        </td>
+                        <td className="tnum px-2 py-3 text-ink-2">{e.pass_hat_k != null ? fmtPct(e.pass_hat_k) : '—'}</td>
+                        {hasCalib && <td className="tnum px-2 py-3 text-ink-2">{e.calibration_brier != null ? Number(e.calibration_brier).toFixed(3) : '—'}</td>}
+                        {hasRobust && <td className="tnum px-2 py-3 text-ink-2">{e.robustness_correct != null ? fmtPct(Number(e.robustness_correct) * 100) : '—'}</td>}
+                        <td className="px-2 py-3 min-w-[110px]">
+                          {(() => {
+                            const comp = compositeScore(e.category_pass_rates);
+                            const band = heatBand(comp);
+                            if (comp == null || band == null) return <span className="text-ink-3">—</span>;
+                            return (
+                              <div className="flex items-center gap-2" title={`Composite ${comp.toFixed(1)} — equal-weight mean of ${Object.keys(e.category_pass_rates).length} categories`}>
+                                <span className="tnum w-10 text-right text-[13px] font-semibold" style={{ color: band.text }}>
+                                  {comp.toFixed(1)}
+                                </span>
+                                <div className="relative h-1.5 min-w-[48px] flex-1 rounded-full bg-line">
+                                  <div className="absolute inset-y-0 left-0 rounded-full"
+                                    style={{ width: `${Math.max(2, Math.min(100, comp))}%`, backgroundColor: band.text }} />
+                                </div>
                               </div>
-                            </div>
+                            );
+                          })()}
+                        </td>
+                        {categories.map((c) => {
+                          const v = e.category_pass_rates[c];
+                          const band = heatBand(v);
+                          return (
+                            <td key={c} className="px-1 py-2">
+                              <div
+                                className={`tnum rounded-md px-2 py-1.5 text-center ${sortKey === c ? 'font-semibold' : ''}`}
+                                style={band ? { backgroundColor: band.bg, color: band.text } : undefined}
+                              >
+                                {v != null ? `${v.toFixed(0)}%` : <span className="text-ink-3">—</span>}
+                              </div>
+                            </td>
                           );
-                        })()}
-                      </td>
-                      {categories.map((c) => {
-                        const v = e.category_pass_rates[c];
-                        const band = heatBand(v);
-                        return (
-                          <td key={c} className="px-1 py-2">
-                            <div
-                              className={`tnum rounded-md px-2 py-1.5 text-center ${sortKey === c ? 'font-semibold' : ''}`}
-                              style={band ? { backgroundColor: band.bg, color: band.text } : undefined}
-                            >
-                              {v != null ? `${v.toFixed(0)}%` : <span className="text-ink-3">—</span>}
-                            </div>
-                          </td>
-                        );
-                      })}
-                      <td className="tnum px-2 py-3 text-ink-2">{fmtCost(num(e.cost_usd_per_task))}</td>
-                      <td className="px-2 py-3"><ValidityBadge isPrivate={e.is_private_split} /></td>
-                    </tr>
-                  ))}
+                        })}
+                        <td className="tnum px-2 py-3 text-ink-2">{fmtCost(num(e.cost_usd_per_task))}</td>
+                        <td className="px-2 py-3"><ValidityBadge isPrivate={e.is_private_split} /></td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

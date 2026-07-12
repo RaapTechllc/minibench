@@ -1,6 +1,7 @@
 import pytest
 
 from agentbench.compare import ComparabilityError, check_comparable, compare_pair
+from agentbench.check_ceiling_items import ceiling_items
 from agentbench.item_stats import audit, point_biserial
 
 
@@ -113,3 +114,13 @@ def test_audit_does_not_fabricate_zero_for_infra_excluded_task():
     assert hard["n_models_scored"] == 2  # weak excluded, not counted as 0
     assert hard["mean_pass"] == 1.0      # would be 0.667 if fabricated to 0
     assert any(f.startswith("missing-") for f in hard["flags"])
+
+
+def test_ceiling_gate_uses_release_threshold():
+    runs = [
+        _run("strong", {"too_easy": [True], "keeper": [True]}),
+        _run("mid", {"too_easy": [True], "keeper": [False]}),
+        _run("weak", {"too_easy": [True], "keeper": [False]}),
+    ]
+    report = audit(runs)
+    assert [item["task_id"] for item in ceiling_items(report, threshold=0.9)] == ["too_easy"]
