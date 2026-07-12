@@ -1,0 +1,122 @@
+
+> frontend@0.0.0 test
+> node --test tests/*.test.mjs
+
+TAP version 13
+# Subtest: calculates token-weighted single model task cost
+ok 1 - calculates token-weighted single model task cost
+  ---
+  duration_ms: 0.930312
+  type: 'test'
+  ...
+# Subtest: calculates MoA preset cost by summing each reference plus aggregator
+ok 2 - calculates MoA preset cost by summing each reference plus aggregator
+  ---
+  duration_ms: 0.192977
+  type: 'test'
+  ...
+# Subtest: projects monthly savings versus Opus baseline
+ok 3 - projects monthly savings versus Opus baseline
+  ---
+  duration_ms: 0.186562
+  type: 'test'
+  ...
+# Subtest: recommends first preset that satisfies quality and cost caps
+ok 4 - recommends first preset that satisfies quality and cost caps
+  ---
+  duration_ms: 0.18324
+  type: 'test'
+  ...
+# Subtest: band edges: 85 excellent, 70 strong, 55 mixed, 40 weak, below failing
+ok 5 - band edges: 85 excellent, 70 strong, 55 mixed, 40 weak, below failing
+  ---
+  duration_ms: 0.868587
+  type: 'test'
+  ...
+# Subtest: out-of-range values clamp instead of falling off the scale
+ok 6 - out-of-range values clamp instead of falling off the scale
+  ---
+  duration_ms: 0.155908
+  type: 'test'
+  ...
+# Subtest: missing scores get no band — no fake colors for absent data
+ok 7 - missing scores get no band — no fake colors for absent data
+  ---
+  duration_ms: 0.119781
+  type: 'test'
+  ...
+# Subtest: every band ships a bg tint and a readable text color
+ok 8 - every band ships a bg tint and a readable text color
+  ---
+  duration_ms: 0.323891
+  type: 'test'
+  ...
+# Subtest: composite is the equal-weight category mean, rounded to 1 decimal
+ok 9 - composite is the equal-weight category mean, rounded to 1 decimal
+  ---
+  duration_ms: 1.32368
+  type: 'test'
+  ...
+# Subtest: composite ignores null holes and returns null when empty
+ok 10 - composite ignores null holes and returns null when empty
+  ---
+  duration_ms: 0.13449
+  type: 'test'
+  ...
+# Subtest: valid form has no errors
+ok 11 - valid form has no errors
+  ---
+  duration_ms: 2.055669
+  type: 'test'
+  ...
+# Subtest: missing required fields are flagged
+ok 12 - missing required fields are flagged
+  ---
+  duration_ms: 0.223529
+  type: 'test'
+  ...
+# Subtest: non-numeric input is rejected
+ok 13 - non-numeric input is rejected
+  ---
+  duration_ms: 0.23277
+  type: 'test'
+  ...
+# Subtest: mirrors API range rules
+ok 14 - mirrors API range rules
+  ---
+  duration_ms: 1.380169
+  type: 'test'
+  ...
+# Subtest: token counts must be whole numbers
+ok 15 - token counts must be whole numbers
+  ---
+  duration_ms: 0.200997
+  type: 'test'
+  ...
+# Subtest: payload coerces numbers and trims strings
+ok 16 - payload coerces numbers and trims strings
+  ---
+  duration_ms: 0.210673
+  type: 'test'
+  ...
+# Subtest: payload omits blank optional fields
+ok 17 - payload omits blank optional fields
+  ---
+  duration_ms: 0.174049
+  type: 'test'
+  ...
+# Subtest: payload includes provided optional fields as numbers
+ok 18 - payload includes provided optional fields as numbers
+  ---
+  duration_ms: 0.217052
+  type: 'test'
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 18
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 99.483206

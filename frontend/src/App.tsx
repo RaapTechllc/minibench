@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Gauge, BarChart3, Database, Bot, Calculator, Trophy, Menu, X } from 'lucide-react';
+import { Gauge, BarChart3, Database, Bot, Calculator, Trophy, BookOpen, Menu, X } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Compare from './pages/Compare';
 import Submit from './pages/Submit';
@@ -11,6 +11,7 @@ import Agents from './pages/Agents';
 import RunDetail from './pages/RunDetail';
 import MoaCalculator from './pages/MoaCalculator';
 import Models from './pages/Models';
+import Methodology from './pages/Methodology';
 
 const NAV = [
   { path: '/', label: 'Overview', icon: BarChart3 },
@@ -18,6 +19,7 @@ const NAV = [
   { path: '/agents', label: 'Agents', icon: Bot },
   { path: '/moa-calculator', label: 'MoA Calculator', icon: Calculator },
   { path: '/hardware', label: 'Test Rigs', icon: Database },
+  { path: '/methodology', label: 'Methodology', icon: BookOpen },
 ];
 
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {
@@ -91,6 +93,7 @@ export default function App() {
           <Route path="/moa-calculator" element={<MoaCalculator />} />
           <Route path="/hardware" element={<Hardware />} />
           <Route path="/submit" element={<Submit />} />
+          <Route path="/methodology" element={<Methodology />} />
         </Routes>
       </main>
 

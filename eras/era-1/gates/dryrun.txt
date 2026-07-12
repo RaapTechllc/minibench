@@ -1,0 +1,43 @@
+{
+  "suite": "our-coding-v1",
+  "moa_config": {
+    "name": "moa-v1",
+    "self_moa": false,
+    "models": [
+      "openrouter/qwen/qwen-2.5-72b-instruct",
+      "openrouter/meta-llama/llama-3.3-70b-instruct",
+      "openrouter/mistralai/mixtral-8x22b-instruct",
+      "openrouter/anthropic/claude-sonnet-4"
+    ]
+  },
+  "grader_version": "3",
+  "decoding": {
+    "temperature": 0.7,
+    "top_p": 1.0,
+    "max_tokens": 2048,
+    "system_prompt": "moa"
+  },
+  "n_tasks": 4,
+  "n_trials": 2,
+  "pass_hat_k_effective_k": 2,
+  "n_infra_errors": 0,
+  "n_canary_flags": 0,
+  "pass_rate": 1.0,
+  "pass_capability": 1.0,
+  "pass_format": 1.0,
+  "pass_rate_ci95": [
+    0.6756,
+    1.0
+  ],
+  "pass_rate_ci95_boot": [
+    1.0,
+    1.0
+  ],
+  "pass_hat_k": 1.0,
+  "cost_usd_total": 0.0,
+  "cost_usd_per_task": 0.0,
+  "latency_p50_ms": 0.0,
+  "latency_p95_ms": 0.0
+}
+
+Wrote /home/user/minibench/agentbench/results/moa-v1-our-coding-v1-dryrun-20260710T052019Z.json

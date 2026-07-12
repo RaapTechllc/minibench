@@ -144,19 +144,21 @@ export function ErrorState({ onRetry, children }: { onRetry?: () => void; childr
    AND its uncertainty at a glance. ─────────────────────────────────────────── */
 /* Clickable table header for client-side sort. */
 export function SortableTh({
-  label, active, dir, onClick, className = '',
+  label, active, dir, onClick, className = '', title,
 }: {
   label: string;
   active: boolean;
   dir: 'asc' | 'desc';
   onClick: () => void;
   className?: string;
+  title?: string;
 }) {
   const arrow = active ? (dir === 'asc' ? ' ↑' : ' ↓') : '';
   return (
     <th className={className}>
       <button
         type="button"
+        title={title}
         onClick={onClick}
         className={`inline-flex items-center gap-0.5 font-semibold capitalize transition-colors hover:text-ink ${
           active ? 'text-accent' : 'text-ink-3'

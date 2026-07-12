@@ -28,7 +28,7 @@ setup_venv() {
 
 echo "==> Python virtualenvs"
 setup_venv backend -r requirements.txt -r requirements-dev.txt
-setup_venv cli -e .
+setup_venv cli -e . pytest
 setup_venv agentbench -r requirements.txt -r requirements-dev.txt
 
 echo "==> Frontend"
