@@ -169,6 +169,26 @@ frontend `.gitignore` swallows `*.log`); branch pushed; draft PR #29 opened;
 a stranger would hit); this in-flight section refreshed. Remaining items
 (RECAP.md, RED-TEAM.md, era index flip, fresh-agent audit) close in Phase 5/6.
 
+## Post-era addendum (2026-07-12, owner-directed)
+
+The owner marked PR #29 ready for review and asked for the open PRs to be
+merged clean. Sequence:
+
+1. **PR #29 squash-merged** into main (`6456b82`). Note: main had also picked
+   up **PR #38** ("trustworthy offline agent-task lifecycle", from another
+   session) — the squash landed cleanly on top.
+2. **PR #28** ("Arcade Scorecard") had no CI runs and conflicted with Era 1 in
+   `Models.tsx`, `LegacyLeaderboardRedirect.tsx`, and `agentbench/README.md`.
+   Resolution on the PR branch (merge commit + fixes, `d6d59af`): arcade
+   cabinet chrome kept as the product direction; Era 1's heatmap cells,
+   Composite column, legend, and race-safe auto-widen integrated into it
+   (auto-widen generalized to also catch a season auto-promote landing on an
+   empty board — screenshot-verified); duplicate legacy-notice lib deduped to
+   `lib/legacyNotice.ts`; README merged (arcade rewrite + #38 lifecycle smoke
+   + #29 importer sections).
+3. Full local gates on the merged branch: backend 27 · cli 12 · agentbench
+   **199** · frontend lint 0 errors · tests **30** · build ✓.
+
 ## In-flight
 
 Nothing — the era is closed. (The code-skeptic agent never returned: killed by
