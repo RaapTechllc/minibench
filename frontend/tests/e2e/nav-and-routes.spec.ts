@@ -53,10 +53,11 @@ test.describe('Navigation & routes', () => {
       await page.goto('/');
       await waitForAppReady(page);
       const labels = ['Overview', 'Models', 'Agents', 'MoA Calculator', 'Test Rigs', 'Methodology'];
+      const desktopNav = page.locator('header nav').first();
       for (const label of labels) {
-        await page.locator('header nav').filter({ has: page.locator('a') }).getByRole('link', { name: label }).first().click();
+        await desktopNav.getByRole('link', { name: label }).click();
         await waitForAppReady(page);
-        await expect(page.getByRole('link', { name: label }).first()).toHaveAttribute('aria-current', 'page');
+        await expect(desktopNav.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page');
       }
     });
 

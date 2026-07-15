@@ -51,7 +51,23 @@ export async function withErrorCapture<T>(
 
 export async function waitForAppReady(page: Page) {
   await page.waitForLoadState('domcontentloaded');
-  await expect(page.locator('header').getByText('MiniBench')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'MiniBench' }).first()).toBeVisible();
+}
+
+/** Goto + wait for a matching API response without missing the race. */
+export async function gotoAndWaitForApi(
+  page: Page,
+  path: string,
+  urlPart: string,
+) {
+  const responsePromise = page.waitForResponse(
+    (r) => r.url().includes(urlPart) && r.request().method() === 'GET',
+    { timeout: 30_000 },
+  );
+  await page.goto(path);
+  const res = await responsePromise;
+  await waitForAppReady(page);
+  return res;
 }
 
 export async function dismissLegacyNoticeIfPresent(page: Page) {

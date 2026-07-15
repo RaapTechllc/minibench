@@ -11,8 +11,10 @@ test.describe('MoA Calculator', () => {
       await snap(page, 'moa-default');
 
       await expect(page.locator('h1')).toContainText('MoA Cost Calculator');
-      await expect(page.getByText('Recommended')).toBeVisible();
+      await expect(page.getByText('Opus baseline/task')).toBeVisible();
       await expect(page.locator('table')).toBeVisible();
+      // Stat tile labeled Recommended
+      await expect(page.locator('div').filter({ hasText: /^Recommended$/ }).first()).toBeVisible();
 
       const fields = [
         { label: 'Input tokens/task', value: '20000' },

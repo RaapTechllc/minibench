@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { snap, waitForAppReady, withErrorCapture } from './helpers';
+import { snap, waitForAppReady, withErrorCapture, gotoAndWaitForApi } from './helpers';
 
 const VALID_SUBMIT = {
   cpu_model: 'Apple M4 Pro',
@@ -12,7 +12,7 @@ const VALID_SUBMIT = {
   os: 'macOS 15.2',
   inference_engine: 'llama.cpp',
   engine_version: '0.5.4',
-  model_name: 'E2E-Test-Model',
+  model_name: `E2E-Test-Model-${Date.now()}`,
   model_params_b: '8',
   quantization: 'Q4_K_M',
   tokens_per_second: '42.5',
@@ -49,7 +49,7 @@ test.describe('Submit & Compare (legacy)', () => {
       await fillByLabel(/^OS/, VALID_SUBMIT.os);
       await fillByLabel(/^Inference engine/, VALID_SUBMIT.inference_engine);
       await fillByLabel(/^Engine version/, VALID_SUBMIT.engine_version);
-      await fillByLabel(/^Model/, VALID_SUBMIT.model_name);
+      await fillByLabel(/^Model/, `E2E-Test-Model-${Date.now()}`);
       await fillByLabel(/^Params \(B\)/, VALID_SUBMIT.model_params_b);
       await fillByLabel(/^Quantization/, VALID_SUBMIT.quantization);
       await fillByLabel(/^Tokens\/sec/, VALID_SUBMIT.tokens_per_second);
@@ -85,9 +85,7 @@ test.describe('Submit & Compare (legacy)', () => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'desktop');
 
     const { failedRequests, pageErrors } = await withErrorCapture(page, async () => {
-      await page.goto('/compare');
-      await waitForAppReady(page);
-      await page.waitForResponse((r) => r.url().includes('/api/v1/benchmarks') && r.ok());
+      await gotoAndWaitForApi(page, '/compare', '/api/v1/benchmarks');
       await snap(page, 'compare-default');
 
       const selectA = page.getByLabel('A');
@@ -99,11 +97,15 @@ test.describe('Submit & Compare (legacy)', () => {
         opts.map((o) => (o as HTMLOptionElement).value),
       );
       if (aOpts.length >= 2) {
-        await selectA.selectOption(aOpts[0]);
-        await selectB.selectOption(aOpts[1]);
-        await page.waitForResponse((r) => r.url().includes('/api/v1/compare') && r.ok());
+        // Page auto-loads compare for first two; force a different pairing.
+        const wait = page.waitForResponse((r) => r.url().includes('/api/v1/compare') && r.ok());
+        await selectA.selectOption(aOpts[aOpts.length - 1]);
+        await selectB.selectOption(aOpts[0]);
+        await wait;
         await expect(page.getByText('Metric comparison')).toBeVisible();
         await snap(page, 'compare-side-by-side');
+      } else {
+        await expect(page.getByText(/Pick two systems|Metric comparison/i)).toBeVisible();
       }
 
       // Cross-links

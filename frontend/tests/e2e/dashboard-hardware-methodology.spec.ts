@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { snap, waitForAppReady, withErrorCapture } from './helpers';
+import { snap, waitForAppReady, withErrorCapture, gotoAndWaitForApi } from './helpers';
 
 test.describe('Hardware, Methodology, Dashboard', () => {
   test('dashboard loads stats, charts, and recent submission links', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'desktop');
 
     const { failedRequests, pageErrors } = await withErrorCapture(page, async () => {
-      await page.goto('/');
-      await waitForAppReady(page);
-      await page.waitForResponse((r) => r.url().includes('/api/v1/stats') && r.ok()).catch(() => null);
+      await gotoAndWaitForApi(page, '/', '/api/v1/stats').catch(async () => {
+        await page.goto('/');
+        await waitForAppReady(page);
+      });
       await snap(page, 'dashboard-full');
 
       // Links into models / hardware / benchmark detail
@@ -37,9 +38,8 @@ test.describe('Hardware, Methodology, Dashboard', () => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'desktop');
 
     const { failedRequests, pageErrors } = await withErrorCapture(page, async () => {
-      await page.goto('/hardware');
-      await waitForAppReady(page);
-      await page.waitForResponse((r) => r.url().includes('/api/v1/hardware') && r.ok());
+      const res = await gotoAndWaitForApi(page, '/hardware', '/api/v1/hardware');
+      expect(res.ok()).toBeTruthy();
       await snap(page, 'hardware');
       await expect(page.locator('h1')).toContainText(/Test Rigs/i);
       await expect(page.locator('body')).not.toContainText("Couldn't load this");
@@ -56,10 +56,9 @@ test.describe('Hardware, Methodology, Dashboard', () => {
     await waitForAppReady(page);
     await snap(page, 'methodology');
     await expect(page.locator('h1').first()).toBeVisible();
-    const overview = page.getByRole('link', { name: 'Overview' });
-    if (await overview.isVisible()) {
-      await overview.click();
-      await expect(page).toHaveURL('/');
-    }
+    const overview = page.getByRole('main').getByRole('link', { name: 'Overview' });
+    await expect(overview).toBeVisible();
+    await overview.click();
+    await expect(page).toHaveURL('/');
   });
 });

@@ -1,14 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { snap, waitForAppReady, withErrorCapture } from './helpers';
+import { snap, waitForAppReady, withErrorCapture, gotoAndWaitForApi } from './helpers';
 
 test.describe('Agents page (Multiplayer Cabinet)', () => {
   test('loads quick picks, sort control, and run drill-down', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'desktop interactions');
 
     const { failedRequests, pageErrors } = await withErrorCapture(page, async () => {
-      await page.goto('/agents');
-      await waitForAppReady(page);
-      await page.waitForResponse((r) => r.url().includes('/api/v1/agents/leaderboard') && r.ok());
+      await gotoAndWaitForApi(page, '/agents', '/api/v1/agents/leaderboard');
       await snap(page, 'agents-default');
 
       await expect(page.locator('h1').first()).toContainText(/MoA scorecards|frontier/i);
@@ -24,9 +22,12 @@ test.describe('Agents page (Multiplayer Cabinet)', () => {
 
       const sort = page.getByLabel('Sort');
       await expect(sort).toBeVisible();
-      for (const value of ['pass_rate', 'pass_hat_k', 'cost_usd_per_task']) {
+      for (const value of ['pass_hat_k', 'cost_usd_per_task', 'pass_rate']) {
+        const wait = page.waitForResponse(
+          (r) => r.url().includes('/api/v1/agents/leaderboard') && r.url().includes(`sort_by=${value}`) && r.ok(),
+        );
         await sort.selectOption(value);
-        await page.waitForResponse((r) => r.url().includes('/api/v1/agents/leaderboard') && r.ok());
+        await wait;
       }
       await snap(page, 'agents-sorted-by-cost');
 

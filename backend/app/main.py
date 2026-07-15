@@ -27,13 +27,16 @@ from app.schemas import (
 )
 from app.seed import run_seed
 from app.agents_router import router as agents_router
+from app.schema_ensure import ensure_schema
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables (async engine), then seed reference + sample data (sync).
+    # Create tables (async engine), then add any missing columns on existing
+    # tables (create_all alone never alters), then seed reference + sample data.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(ensure_schema)
     try:
         run_seed()
     except Exception as e:  # pragma: no cover - seeding is best-effort
