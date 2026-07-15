@@ -19,3 +19,10 @@ agentbench/results/*.json
 !agentbench/results/*minibench-pro-v1*.json
 
 .firecrawl/
+
+# Playwright E2E
+frontend/test-results/
+frontend/playwright-report/
+frontend/playwright-results.json
+frontend/playwright-results.xml
+frontend/artifacts/
