@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   dismissLegacyNoticeIfPresent,
+  gotoAndWaitForApi,
   snap,
   waitForAppReady,
   withErrorCapture,
@@ -11,9 +12,7 @@ test.describe('Models page (Solo Cabinet)', () => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'desktop interactions');
 
     const { failedRequests, pageErrors } = await withErrorCapture(page, async () => {
-      await page.goto('/models');
-      await waitForAppReady(page);
-      await page.waitForResponse((r) => r.url().includes('/api/v1/agents/models/leaderboard') && r.ok());
+      await gotoAndWaitForApi(page, '/models', '/api/v1/agents/models/leaderboard');
       await dismissLegacyNoticeIfPresent(page);
       await snap(page, 'models-default');
 

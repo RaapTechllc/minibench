@@ -334,9 +334,13 @@ export default function Agents() {
                         <td className="tnum px-2 py-3 text-ink-2 whitespace-nowrap">{fmtPct(e.pass_hat_k)}</td>
                         <td className="tnum px-2 py-3 text-ink-2 whitespace-nowrap">{fmtCost(e.cost_usd_per_task)}</td>
                         <td className="tnum px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">
-                          {e.latency_p50_ms != null ? `${e.latency_p50_ms}` : '—'}
-                          {' / '}
-                          {e.latency_p95_ms != null ? `${e.latency_p95_ms}ms` : '—'}
+                          {e.latency_p50_ms != null && e.latency_p95_ms != null
+                            ? `${e.latency_p50_ms} / ${e.latency_p95_ms}ms`
+                            : e.latency_p50_ms != null
+                              ? `${e.latency_p50_ms}ms`
+                              : e.latency_p95_ms != null
+                                ? `— / ${e.latency_p95_ms}ms`
+                                : '—'}
                         </td>
                         <td className="tnum px-2 py-3 text-[12px] text-ink-3 whitespace-nowrap">
                           {e.n_tasks}×{e.n_trials}
