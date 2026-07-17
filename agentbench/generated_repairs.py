@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import multiprocessing
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -37,6 +38,7 @@ FIXTURE_VERSION = "generated-repository-repair@1"
 HARNESS = "agent-cabinet-generated-repair"
 _BUDGET = AgentBudget(max_turns=3, wall_time_seconds=5, max_tokens=300, max_cost_usd=0.0)
 _IGNORED_RUNTIME_PATH_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+_PRIVATE_PROBE_TIMEOUT_SECONDS = 1
 
 
 @dataclass(frozen=True)
@@ -157,6 +159,45 @@ def _is_runtime_artifact(path: Path) -> bool:
     return any(part in _IGNORED_RUNTIME_PATH_PARTS for part in path.parts)
 
 
+def _private_probe_child(connection, template_name: str, target: str, source: str, repaired_source: str) -> None:
+    try:
+        namespace: dict[str, Any] = {}
+        exec(compile(source, target, "exec"), namespace)
+        if template_name == "explicit-zero-default":
+            expected: dict[str, Any] = {}
+            exec(compile(repaired_source, target, "exec"), expected)
+            passed = namespace["timeout"]() == expected["timeout"]() and namespace["timeout"](0) == 0 and namespace["timeout"](7) == 7
+        elif template_name == "csv-delimiter":
+            passed = namespace["fields"]("a,b") == ["a", "b"] and namespace["fields"]("a,b,c") == ["a", "b", "c"] and namespace["fields"]("single") == ["single"]
+        else:
+            passed = namespace["cache_key"]("u", "en") != namespace["cache_key"]("u", "fr") and namespace["cache_key"]("u", "en") == namespace["cache_key"]("u", "en") and namespace["cache_key"]("u", "en") != namespace["cache_key"]("v", "en")
+        connection.send(bool(passed))
+    except BaseException:
+        connection.send(False)
+    finally:
+        connection.close()
+
+
+def _run_private_probe(template_name: str, target: str, source: str, repaired_source: str) -> bool:
+    context = multiprocessing.get_context("fork")
+    parent, child = context.Pipe(duplex=False)
+    process = context.Process(target=_private_probe_child, args=(child, template_name, target, source, repaired_source), daemon=True)
+    process.start()
+    child.close()
+    if not parent.poll(_PRIVATE_PROBE_TIMEOUT_SECONDS):
+        process.terminate()
+        process.join()
+        parent.close()
+        return False
+    try:
+        return parent.recv() is True
+    except (EOFError, OSError):
+        return False
+    finally:
+        parent.close()
+        process.join()
+
+
 class GeneratedRepairEnvironment(TaskEnvironment):
     def __init__(self, fixture: GeneratedRepairFixture, root: str | Path | None = None):
         self.fixture = fixture
@@ -191,11 +232,14 @@ class GeneratedRepairEnvironment(TaskEnvironment):
         return execute_agent_with_budget(agent, prompt, handle.workspace, budget)
 
     def verify(self, handle: EnvironmentHandle) -> VerificationResult:
-        actual = {
-            str(path.relative_to(handle.workspace)): path.read_text(encoding="utf-8")
-            for path in handle.workspace.rglob("*")
-            if path.is_file() and not _is_runtime_artifact(path.relative_to(handle.workspace))
-        }
+        try:
+            actual = {
+                str(path.relative_to(handle.workspace)): path.read_text(encoding="utf-8")
+                for path in handle.workspace.rglob("*")
+                if path.is_file() and not _is_runtime_artifact(path.relative_to(handle.workspace))
+            }
+        except BaseException:
+            return VerificationResult(False, "hidden behavioral or collateral check failed")
         target = next(
             path for path, content in self.fixture.repaired_files.items()
             if content != self.fixture.broken_files[path]
@@ -210,31 +254,7 @@ class GeneratedRepairEnvironment(TaskEnvironment):
             return VerificationResult(False, "hidden behavioral or collateral check failed")
         if actual[target] == self.fixture.broken_files[target]:
             return VerificationResult(False, "hidden behavioral or collateral check failed")
-        namespace: dict[str, Any] = {}
-        try:
-            exec(compile(actual[target], target, "exec"), namespace)  # fixture source is generated locally
-            if self.fixture.template.name == "explicit-zero-default":
-                expected_namespace: dict[str, Any] = {}
-                exec(compile(self.fixture.repaired_files[target], target, "exec"), expected_namespace)
-                behavior_passed = (
-                    namespace["timeout"]() == expected_namespace["timeout"]()
-                    and namespace["timeout"](0) == 0
-                    and namespace["timeout"](7) == 7
-                )
-            elif self.fixture.template.name == "csv-delimiter":
-                behavior_passed = (
-                    namespace["fields"]("a,b") == ["a", "b"]
-                    and namespace["fields"]("a,b,c") == ["a", "b", "c"]
-                    and namespace["fields"]("single") == ["single"]
-                )
-            else:
-                behavior_passed = (
-                    namespace["cache_key"]("u", "en") != namespace["cache_key"]("u", "fr")
-                    and namespace["cache_key"]("u", "en") == namespace["cache_key"]("u", "en")
-                    and namespace["cache_key"]("u", "en") != namespace["cache_key"]("v", "en")
-                )
-        except Exception:
-            return VerificationResult(False, "hidden behavioral or collateral check failed")
+        behavior_passed = _run_private_probe(self.fixture.template.name, target, actual[target], self.fixture.repaired_files[target])
         if not behavior_passed:
             return VerificationResult(False, "hidden behavioral or collateral check failed")
         return VerificationResult(True, "hidden behavioral and regression checks passed")

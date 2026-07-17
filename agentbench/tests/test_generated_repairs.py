@@ -157,6 +157,42 @@ def test_oracle_treats_probe_errors_as_failed_repairs(tmp_path):
 
 
 @pytest.mark.parametrize(
+    "source",
+    ["raise SystemExit(0)\n", "def fields(line):\n    while True:\n        pass\n"],
+)
+def test_oracle_bounds_private_probe_and_converts_child_failures(tmp_path, source):
+    fixture = generate_fixture(1)
+
+    class HostileCandidate:
+        def execute(self, prompt, workspace, budget):
+            budget.consume(turns=1)
+            (workspace / "app/records.py").write_text(source, encoding="utf-8")
+            return AgentResult("completed", claimed_success=True)
+
+    started = time.monotonic()
+    result = run_agent_trial(
+        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), HostileCandidate(), trial=1
+    )
+    assert result.outcome == "verification_failed"
+    assert time.monotonic() - started < 1.8
+
+
+def test_oracle_converts_unreadable_candidate_to_verification_failure(tmp_path):
+    fixture = generate_fixture(1)
+
+    class NonUtf8Candidate:
+        def execute(self, prompt, workspace, budget):
+            budget.consume(turns=1)
+            (workspace / "app/records.py").write_bytes(b"\xff\xfe")
+            return AgentResult("completed", claimed_success=True)
+
+    result = run_agent_trial(
+        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), NonUtf8Candidate(), trial=1
+    )
+    assert result.outcome == "verification_failed"
+
+
+@pytest.mark.parametrize(
     ("field", "value"),
     [("fixture", "wrong-fixture"), ("preparation", "wrong-preparation"), ("verification", "wrong-verification")],
 )
