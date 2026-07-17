@@ -94,7 +94,7 @@ def test_gold_repair_passes_and_noop_fails(tmp_path):
 @pytest.mark.parametrize(
     ("seed", "equivalent_source"),
     [
-        (0, "def timeout(value=None):\n    if value is None:\n        return 44\n    return value\n"),
+        (0, "def timeout(value=None):\n    if value is None:\n        return 46\n    return value\n"),
         (1, "def fields(line):\n    return [part for part in line.split(',')]\n"),
         (2, "def cache_key(user, locale):\n    return '{}|{}'.format(user, locale)\n"),
     ],
@@ -121,6 +121,73 @@ def test_oracle_accepts_behaviorally_equivalent_non_gold_repairs(tmp_path, seed,
     )
 
     assert result.outcome == "success"
+
+
+def test_oracle_rejects_changed_seed_specific_default(tmp_path):
+    fixture = generate_fixture(0)
+
+    class ChangedDefault:
+        def execute(self, prompt, workspace, budget):
+            budget.consume(turns=1)
+            (workspace / "app/config.py").write_text(
+                "def timeout(value=None):\n    return 44 if value is None else value\n",
+                encoding="utf-8",
+            )
+            return AgentResult("completed", claimed_success=True)
+
+    result = run_agent_trial(
+        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), ChangedDefault(), trial=1
+    )
+    assert result.outcome == "verification_failed"
+
+
+def test_oracle_treats_probe_errors_as_failed_repairs(tmp_path):
+    fixture = generate_fixture(1)
+
+    class MissingSymbol:
+        def execute(self, prompt, workspace, budget):
+            budget.consume(turns=1)
+            (workspace / "app/records.py").write_text("def unrelated():\n    return []\n", encoding="utf-8")
+            return AgentResult("completed", claimed_success=True)
+
+    result = run_agent_trial(
+        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), MissingSymbol(), trial=1
+    )
+    assert result.outcome == "verification_failed"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("fixture", "wrong-fixture"), ("preparation", "wrong-preparation"), ("verification", "wrong-verification")],
+)
+def test_prepare_rejects_incompatible_manifest_metadata(tmp_path, field, value):
+    fixture = generate_fixture(0)
+    manifest = manifest_for(fixture)
+    if field == "fixture":
+        manifest = replace(manifest, fixture=replace(manifest.fixture, reference=value))
+    elif field == "preparation":
+        manifest = replace(manifest, preparation=replace(manifest.preparation, strategy=value))
+    else:
+        manifest = replace(manifest, verification=replace(manifest.verification, strategy=value))
+
+    with pytest.raises(ValueError, match="unsupported"):
+        GeneratedRepairEnvironment(fixture, tmp_path).prepare(manifest, trial=1)
+
+
+def test_digest_mismatch_fails_preparation_and_cleans_workspace(tmp_path):
+    fixture = generate_fixture(0)
+    manifest = manifest_for(fixture)
+    other = manifest_for(generate_fixture(1))
+    mismatched = replace(manifest, fixture=replace(manifest.fixture, digest=other.fixture.digest))
+    result = run_agent_trial(
+        mismatched,
+        GeneratedRepairEnvironment(fixture, tmp_path),
+        GeneratedRepairGoldAgent(fixture),
+        trial=1,
+    )
+    assert result.outcome == "preparation_failed"
+    assert result.workspace_disposed is True
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_generated_harness_terminates_agent_at_wall_time_budget(tmp_path):

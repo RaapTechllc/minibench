@@ -166,6 +166,12 @@ class GeneratedRepairEnvironment(TaskEnvironment):
     def prepare(self, manifest: AgentTaskManifest, trial: int) -> PreparedEnvironment:
         if manifest.scenario_type != "generated-repository-repair":
             raise ValueError("unsupported scenario type")
+        if manifest.fixture.reference != FIXTURE_VERSION:
+            raise ValueError("unsupported fixture reference")
+        if manifest.preparation.strategy != FIXTURE_VERSION:
+            raise ValueError("unsupported preparation strategy")
+        if manifest.verification.strategy != FIXTURE_VERSION:
+            raise ValueError("unsupported verification strategy")
         workspace = self.root / f"{manifest.task_id}-trial-{trial}"
         workspace.mkdir(parents=True, exist_ok=False)
         try:
@@ -207,28 +213,28 @@ class GeneratedRepairEnvironment(TaskEnvironment):
         namespace: dict[str, Any] = {}
         try:
             exec(compile(actual[target], target, "exec"), namespace)  # fixture source is generated locally
+            if self.fixture.template.name == "explicit-zero-default":
+                expected_namespace: dict[str, Any] = {}
+                exec(compile(self.fixture.repaired_files[target], target, "exec"), expected_namespace)
+                behavior_passed = (
+                    namespace["timeout"]() == expected_namespace["timeout"]()
+                    and namespace["timeout"](0) == 0
+                    and namespace["timeout"](7) == 7
+                )
+            elif self.fixture.template.name == "csv-delimiter":
+                behavior_passed = (
+                    namespace["fields"]("a,b") == ["a", "b"]
+                    and namespace["fields"]("a,b,c") == ["a", "b", "c"]
+                    and namespace["fields"]("single") == ["single"]
+                )
+            else:
+                behavior_passed = (
+                    namespace["cache_key"]("u", "en") != namespace["cache_key"]("u", "fr")
+                    and namespace["cache_key"]("u", "en") == namespace["cache_key"]("u", "en")
+                    and namespace["cache_key"]("u", "en") != namespace["cache_key"]("v", "en")
+                )
         except Exception:
             return VerificationResult(False, "hidden behavioral or collateral check failed")
-        if self.fixture.template.name == "explicit-zero-default":
-            expected_default = namespace["timeout"]()
-            behavior_passed = (
-                isinstance(expected_default, int)
-                and 10 <= expected_default < 60
-                and namespace["timeout"](0) == 0
-                and namespace["timeout"](7) == 7
-            )
-        elif self.fixture.template.name == "csv-delimiter":
-            behavior_passed = (
-                namespace["fields"]("a,b") == ["a", "b"]
-                and namespace["fields"]("a,b,c") == ["a", "b", "c"]
-                and namespace["fields"]("single") == ["single"]
-            )
-        else:
-            behavior_passed = (
-                namespace["cache_key"]("u", "en") != namespace["cache_key"]("u", "fr")
-                and namespace["cache_key"]("u", "en") == namespace["cache_key"]("u", "en")
-                and namespace["cache_key"]("u", "en") != namespace["cache_key"]("v", "en")
-            )
         if not behavior_passed:
             return VerificationResult(False, "hidden behavioral or collateral check failed")
         return VerificationResult(True, "hidden behavioral and regression checks passed")
