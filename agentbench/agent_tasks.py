@@ -283,27 +283,7 @@ class OfflineTextEnvironment:
         prompt: str,
         budget: AgentBudget,
     ) -> AgentResult:
-        parent, child = multiprocessing.get_context("fork").Pipe(duplex=False)
-        process = multiprocessing.get_context("fork").Process(
-            target=_execute_agent_child,
-            args=(child, agent, prompt, handle.workspace, budget),
-            daemon=True,
-        )
-        process.start()
-        child.close()
-        if not parent.poll(budget.wall_time_seconds):
-            process.terminate()
-            process.join()
-            parent.close()
-            raise TimeoutError("wall-time budget exceeded")
-        kind, payload = parent.recv()
-        parent.close()
-        process.join()
-        if kind == "timeout":
-            raise TimeoutError("agent reported timeout")
-        if kind == "error":
-            raise RuntimeError("agent execution failed")
-        return payload
+        return execute_agent_with_budget(agent, prompt, handle.workspace, budget)
 
     def verify(self, handle: EnvironmentHandle) -> VerificationResult:
         # Expected state lives in the verifier, never in the agent workspace.
@@ -349,6 +329,35 @@ def _execute_agent_child(connection, agent, prompt, workspace, budget) -> None:
         connection.send(("error", None))
     finally:
         connection.close()
+
+
+def execute_agent_with_budget(
+    agent: AgentAdapter,
+    prompt: str,
+    workspace: Path,
+    budget: AgentBudget,
+) -> AgentResult:
+    parent, child = multiprocessing.get_context("fork").Pipe(duplex=False)
+    process = multiprocessing.get_context("fork").Process(
+        target=_execute_agent_child,
+        args=(child, agent, prompt, workspace, budget),
+        daemon=True,
+    )
+    process.start()
+    child.close()
+    if not parent.poll(budget.wall_time_seconds):
+        process.terminate()
+        process.join()
+        parent.close()
+        raise TimeoutError("wall-time budget exceeded")
+    kind, payload = parent.recv()
+    parent.close()
+    process.join()
+    if kind == "timeout":
+        raise TimeoutError("agent reported timeout")
+    if kind == "error":
+        raise RuntimeError("agent execution failed")
+    return payload
 
 
 def _valid_agent_result(result: Any) -> bool:

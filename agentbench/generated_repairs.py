@@ -28,6 +28,7 @@ from agentbench.agent_tasks import (
     TaskEnvironment,
     VerificationResult,
     build_agent_artifact,
+    execute_agent_with_budget,
     run_agent_trial,
 )
 
@@ -35,6 +36,7 @@ from agentbench.agent_tasks import (
 FIXTURE_VERSION = "generated-repository-repair@1"
 HARNESS = "agent-cabinet-generated-repair"
 _BUDGET = AgentBudget(max_turns=3, wall_time_seconds=5, max_tokens=300, max_cost_usd=0.0)
+_IGNORED_RUNTIME_PATH_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 
 
 @dataclass(frozen=True)
@@ -154,6 +156,10 @@ def manifest_for(fixture: GeneratedRepairFixture) -> AgentTaskManifest:
     )
 
 
+def _is_runtime_artifact(path: Path) -> bool:
+    return any(part in _IGNORED_RUNTIME_PATH_PARTS for part in path.parts)
+
+
 class GeneratedRepairEnvironment(TaskEnvironment):
     def __init__(self, fixture: GeneratedRepairFixture, root: str | Path | None = None):
         self.fixture = fixture
@@ -179,12 +185,13 @@ class GeneratedRepairEnvironment(TaskEnvironment):
             raise
 
     def execute(self, agent: AgentAdapter, handle: EnvironmentHandle, prompt: str, budget: AgentBudget) -> AgentResult:
-        return agent.execute(prompt, handle.workspace, AgentBudgetGuard(budget))
+        return execute_agent_with_budget(agent, prompt, handle.workspace, budget)
 
     def verify(self, handle: EnvironmentHandle) -> VerificationResult:
         actual = {
             str(path.relative_to(handle.workspace)): path.read_text(encoding="utf-8")
-            for path in handle.workspace.rglob("*") if path.is_file()
+            for path in handle.workspace.rglob("*")
+            if path.is_file() and not _is_runtime_artifact(path.relative_to(handle.workspace))
         }
         if actual != self.fixture.repaired_files:
             return VerificationResult(False, "hidden behavioral or collateral check failed")

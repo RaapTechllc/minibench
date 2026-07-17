@@ -1,5 +1,8 @@
 import hashlib
 import json
+import time
+from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -27,14 +30,23 @@ def test_seeded_generation_replays_byte_for_byte_and_varies_validly():
     assert len({generate_fixture(seed).template.name for seed in (0, 1, 2)}) == 3
 
 
-def test_public_prompt_is_symptom_only():
+def test_public_prompt_does_not_expose_private_fixture_atoms():
     for seed in (0, 1, 2, 101):
         fixture = generate_fixture(seed)
         prompt = fixture.prompt.lower()
-        assert fixture.template.name not in prompt
-        assert str(seed) not in prompt
+        changed_paths = {
+            path
+            for path, content in fixture.repaired_files.items()
+            if fixture.broken_files[path] != content
+        }
+        forbidden = {fixture.template.name, str(fixture.seed), fixture.probe, *changed_paths}
+        for path in changed_paths:
+            forbidden.update(Path(path).parts)
+        for text in fixture.repaired_files.values():
+            forbidden.update(token for token in ("timeout", "fields", "cache_key", "split(',')") if token in text)
+
+        assert all(atom.lower() not in prompt for atom in forbidden if atom)
         assert "repair" not in prompt
-        assert "app/" not in prompt
 
 
 def test_gold_repair_passes_and_noop_fails(tmp_path):
@@ -60,6 +72,57 @@ def test_gold_repair_passes_and_noop_fails(tmp_path):
         trial=1,
     )
     assert failed.outcome == "verification_failed"
+
+
+def test_generated_harness_terminates_agent_at_wall_time_budget(tmp_path):
+    fixture = generate_fixture(0)
+    manifest = manifest_for(fixture)
+    manifest = replace(manifest, budget=replace(manifest.budget, wall_time_seconds=1))
+
+    class SlowAgent:
+        def execute(self, prompt, workspace, budget):
+            time.sleep(2)
+            return AgentResult("completed", claimed_success=True)
+
+    started = time.monotonic()
+    result = run_agent_trial(
+        manifest,
+        GeneratedRepairEnvironment(fixture, tmp_path),
+        SlowAgent(),
+        trial=1,
+    )
+
+    assert result.outcome == "timeout"
+    assert time.monotonic() - started < 1.8
+    assert result.workspace_disposed is True
+
+
+def test_oracle_ignores_runtime_cache_artifacts(tmp_path):
+    fixture = generate_fixture(1)
+    manifest = manifest_for(fixture)
+
+    class CorrectRepairWithCaches:
+        def execute(self, prompt, workspace, budget):
+            budget.consume(turns=1)
+            target = next(
+                path for path, content in fixture.repaired_files.items()
+                if fixture.broken_files[path] != content
+            )
+            (workspace / target).write_text(fixture.repaired_files[target], encoding="utf-8")
+            (workspace / "app" / "__pycache__").mkdir(parents=True)
+            (workspace / "app" / "__pycache__" / "records.cpython-312.pyc").write_bytes(b"cache")
+            (workspace / ".pytest_cache").mkdir()
+            (workspace / ".pytest_cache" / "README.md").write_text("cache\n", encoding="utf-8")
+            return AgentResult("completed", claimed_success=True)
+
+    result = run_agent_trial(
+        manifest,
+        GeneratedRepairEnvironment(fixture, tmp_path),
+        CorrectRepairWithCaches(),
+        trial=1,
+    )
+
+    assert result.outcome == "success"
 
 
 @pytest.mark.parametrize("seed", [1, 2])
