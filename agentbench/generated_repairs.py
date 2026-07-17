@@ -159,29 +159,39 @@ def _is_runtime_artifact(path: Path) -> bool:
     return any(part in _IGNORED_RUNTIME_PATH_PARTS for part in path.parts)
 
 
-def _private_probe_child(connection, template_name: str, target: str, source: str, repaired_source: str) -> None:
+def _candidate_probe_child(connection, target: str, source: str, symbol: str, calls: tuple[tuple[Any, ...], ...]) -> None:
     try:
         namespace: dict[str, Any] = {}
         exec(compile(source, target, "exec"), namespace)
-        if template_name == "explicit-zero-default":
-            expected: dict[str, Any] = {}
-            exec(compile(repaired_source, target, "exec"), expected)
-            passed = namespace["timeout"]() == expected["timeout"]() and namespace["timeout"](0) == 0 and namespace["timeout"](7) == 7
-        elif template_name == "csv-delimiter":
-            passed = namespace["fields"]("a,b") == ["a", "b"] and namespace["fields"]("a,b,c") == ["a", "b", "c"] and namespace["fields"]("single") == ["single"]
-        else:
-            passed = namespace["cache_key"]("u", "en") != namespace["cache_key"]("u", "fr") and namespace["cache_key"]("u", "en") == namespace["cache_key"]("u", "en") and namespace["cache_key"]("u", "en") != namespace["cache_key"]("v", "en")
-        connection.send(bool(passed))
+        function = namespace[symbol]
+        connection.send((True, tuple(function(*args) for args in calls)))
     except BaseException:
-        connection.send(False)
+        connection.send((False, ()))
     finally:
         connection.close()
 
 
 def _run_private_probe(template_name: str, target: str, source: str, repaired_source: str) -> bool:
-    context = multiprocessing.get_context("fork")
+    if template_name == "explicit-zero-default":
+        expected_namespace: dict[str, Any] = {}
+        exec(compile(repaired_source, target, "exec"), expected_namespace)
+        symbol = "timeout"
+        calls: tuple[tuple[Any, ...], ...] = ((), (0,), (7,))
+        expected = (expected_namespace[symbol](), 0, 7)
+    elif template_name == "csv-delimiter":
+        symbol = "fields"
+        calls = (("a,b",), ("a,b,c",), ("single",))
+        expected = (["a", "b"], ["a", "b", "c"], ["single"])
+    else:
+        symbol = "cache_key"
+        calls = (("u", "en"), ("u", "fr"), ("u", "en"), ("v", "en"))
+        expected = None
+
+    # Spawn is intentional: fork would inherit fixture/gold data in the
+    # untrusted candidate's object graph and expose it through introspection.
+    context = multiprocessing.get_context("spawn")
     parent, child = context.Pipe(duplex=False)
-    process = context.Process(target=_private_probe_child, args=(child, template_name, target, source, repaired_source), daemon=True)
+    process = context.Process(target=_candidate_probe_child, args=(child, target, source, symbol, calls), daemon=True)
     process.start()
     child.close()
     if not parent.poll(_PRIVATE_PROBE_TIMEOUT_SECONDS):
@@ -190,7 +200,12 @@ def _run_private_probe(template_name: str, target: str, source: str, repaired_so
         parent.close()
         return False
     try:
-        return parent.recv() is True
+        completed, outputs = parent.recv()
+        if not completed:
+            return False
+        if template_name == "locale-cache-key":
+            return outputs[0] != outputs[1] and outputs[0] == outputs[2] and outputs[0] != outputs[3]
+        return outputs == expected
     except (EOFError, OSError):
         return False
     finally:

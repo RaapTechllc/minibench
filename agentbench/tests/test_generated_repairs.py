@@ -192,6 +192,31 @@ def test_oracle_converts_unreadable_candidate_to_verification_failure(tmp_path):
     assert result.outcome == "verification_failed"
 
 
+def test_oracle_keeps_gold_source_out_of_candidate_frames(tmp_path):
+    fixture = generate_fixture(0)
+    gold = fixture.repaired_files["app/config.py"]
+    hostile = """import inspect
+def timeout(value=None):
+    frame = inspect.currentframe()
+    while frame is not None:
+        if any(candidate == %r for candidate in frame.f_locals.values()):
+            return 46 if value is None else value
+        frame = frame.f_back
+    return -1
+""" % gold
+
+    class FrameInspector:
+        def execute(self, prompt, workspace, budget):
+            budget.consume(turns=1)
+            (workspace / "app/config.py").write_text(hostile, encoding="utf-8")
+            return AgentResult("completed", claimed_success=True)
+
+    result = run_agent_trial(
+        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), FrameInspector(), trial=1
+    )
+    assert result.outcome == "verification_failed"
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [("fixture", "wrong-fixture"), ("preparation", "wrong-preparation"), ("verification", "wrong-verification")],
