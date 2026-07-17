@@ -82,7 +82,6 @@ def _config_template(seed: int) -> tuple[dict[str, str], dict[str, str], str, st
     files = {
         "pyproject.toml": "[project]\nname = 'cabinet-sample'\n",
         "app/config.py": broken,
-        "tests/test_config.py": "from app.config import timeout\n\ndef test_explicit_zero():\n    assert timeout(0) == 0\n",
     }
     repaired_files = {**files, "app/config.py": repaired}
     return files, repaired_files, "A configuration value is ignored when it is explicitly set to zero.", "timeout(0) == 0"
@@ -95,7 +94,6 @@ def _records_template(seed: int) -> tuple[dict[str, str], dict[str, str], str, s
     files = {
         "pyproject.toml": "[project]\nname = 'cabinet-sample'\n",
         "app/records.py": broken,
-        "tests/test_records.py": "from app.records import fields\n\ndef test_csv():\n    assert fields('a,b') == ['a', 'b']\n",
         "app/version.py": f"VERSION = '{marker}'\n",
     }
     repaired_files = {**files, "app/records.py": repaired}
@@ -109,7 +107,6 @@ def _cache_template(seed: int) -> tuple[dict[str, str], dict[str, str], str, str
     files = {
         "pyproject.toml": "[project]\nname = 'cabinet-sample'\n",
         "app/cache.py": broken,
-        "tests/test_cache.py": "from app.cache import cache_key\n\ndef test_locale_isolated():\n    assert cache_key('u', 'en') != cache_key('u', 'fr')\n",
         "app/build.py": f"BUILD = '{prefix}'\n",
     }
     repaired_files = {**files, "app/cache.py": repaired}
@@ -193,20 +190,45 @@ class GeneratedRepairEnvironment(TaskEnvironment):
             for path in handle.workspace.rglob("*")
             if path.is_file() and not _is_runtime_artifact(path.relative_to(handle.workspace))
         }
-        if actual != self.fixture.repaired_files:
-            return VerificationResult(False, "hidden behavioral or collateral check failed")
-        namespace: dict[str, Any] = {}
         target = next(
             path for path, content in self.fixture.repaired_files.items()
             if content != self.fixture.broken_files[path]
         )
-        exec(compile(actual[target], target, "exec"), namespace)  # fixture source is generated locally
+        if set(actual) != set(self.fixture.broken_files):
+            return VerificationResult(False, "hidden behavioral or collateral check failed")
+        if any(
+            actual[path] != content
+            for path, content in self.fixture.broken_files.items()
+            if path != target
+        ):
+            return VerificationResult(False, "hidden behavioral or collateral check failed")
+        if actual[target] == self.fixture.broken_files[target]:
+            return VerificationResult(False, "hidden behavioral or collateral check failed")
+        namespace: dict[str, Any] = {}
+        try:
+            exec(compile(actual[target], target, "exec"), namespace)  # fixture source is generated locally
+        except Exception:
+            return VerificationResult(False, "hidden behavioral or collateral check failed")
         if self.fixture.template.name == "explicit-zero-default":
-            behavior_passed = namespace["timeout"](0) == 0 and namespace["timeout"](7) == 7
+            expected_default = namespace["timeout"]()
+            behavior_passed = (
+                isinstance(expected_default, int)
+                and 10 <= expected_default < 60
+                and namespace["timeout"](0) == 0
+                and namespace["timeout"](7) == 7
+            )
         elif self.fixture.template.name == "csv-delimiter":
-            behavior_passed = namespace["fields"]("a,b") == ["a", "b"]
+            behavior_passed = (
+                namespace["fields"]("a,b") == ["a", "b"]
+                and namespace["fields"]("a,b,c") == ["a", "b", "c"]
+                and namespace["fields"]("single") == ["single"]
+            )
         else:
-            behavior_passed = namespace["cache_key"]("u", "en") != namespace["cache_key"]("u", "fr")
+            behavior_passed = (
+                namespace["cache_key"]("u", "en") != namespace["cache_key"]("u", "fr")
+                and namespace["cache_key"]("u", "en") == namespace["cache_key"]("u", "en")
+                and namespace["cache_key"]("u", "en") != namespace["cache_key"]("v", "en")
+            )
         if not behavior_passed:
             return VerificationResult(False, "hidden behavioral or collateral check failed")
         return VerificationResult(True, "hidden behavioral and regression checks passed")

@@ -49,6 +49,23 @@ def test_public_prompt_does_not_expose_private_fixture_atoms():
         assert "repair" not in prompt
 
 
+def test_prepared_workspace_excludes_private_assertions(tmp_path):
+    for seed in (0, 1, 2):
+        fixture = generate_fixture(seed)
+        environment = GeneratedRepairEnvironment(fixture, tmp_path / str(seed))
+        prepared = environment.prepare(manifest_for(fixture), trial=1)
+        visible = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in prepared.handle.workspace.rglob("*")
+            if path.is_file()
+        )
+
+        assert "assert " not in visible
+        assert fixture.probe not in visible
+        assert not (prepared.handle.workspace / "tests").exists()
+        environment.dispose(prepared.handle)
+
+
 def test_gold_repair_passes_and_noop_fails(tmp_path):
     fixture = generate_fixture(0)
     manifest = manifest_for(fixture)
@@ -72,6 +89,38 @@ def test_gold_repair_passes_and_noop_fails(tmp_path):
         trial=1,
     )
     assert failed.outcome == "verification_failed"
+
+
+@pytest.mark.parametrize(
+    ("seed", "equivalent_source"),
+    [
+        (0, "def timeout(value=None):\n    if value is None:\n        return 44\n    return value\n"),
+        (1, "def fields(line):\n    return [part for part in line.split(',')]\n"),
+        (2, "def cache_key(user, locale):\n    return '{}|{}'.format(user, locale)\n"),
+    ],
+)
+def test_oracle_accepts_behaviorally_equivalent_non_gold_repairs(tmp_path, seed, equivalent_source):
+    fixture = generate_fixture(seed)
+
+    class EquivalentRepair:
+        def execute(self, prompt, workspace, budget):
+            budget.consume(turns=1)
+            target = next(
+                path for path, content in fixture.repaired_files.items()
+                if fixture.broken_files[path] != content
+            )
+            assert equivalent_source != fixture.repaired_files[target]
+            (workspace / target).write_text(equivalent_source, encoding="utf-8")
+            return AgentResult("completed", claimed_success=True)
+
+    result = run_agent_trial(
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path / str(seed)),
+        EquivalentRepair(),
+        trial=1,
+    )
+
+    assert result.outcome == "success"
 
 
 def test_generated_harness_terminates_agent_at_wall_time_budget(tmp_path):
@@ -154,8 +203,9 @@ def test_oracle_rejects_test_only_symptom_suppression(tmp_path):
     class SymptomOnly:
         def execute(self, prompt, workspace, budget):
             budget.consume(turns=1)
-            test_file = next(path for path in fixture.broken_files if path.startswith("tests/"))
-            (workspace / test_file).write_text("def test_symptom_is_gone():\n    assert True\n", encoding="utf-8")
+            test_file = workspace / "tests" / "test_symptom.py"
+            test_file.parent.mkdir()
+            test_file.write_text("def test_symptom_is_gone():\n    assert True\n", encoding="utf-8")
             return AgentResult("completed", claimed_success=True)
 
     result = run_agent_trial(
