@@ -217,6 +217,33 @@ def timeout(value=None):
     assert result.outcome == "verification_failed"
 
 
+def test_oracle_never_unpickles_candidate_controlled_outputs(tmp_path):
+    fixture = generate_fixture(1)
+    marker = tmp_path / "pickle-executed"
+    hostile = """import os
+class Hostile:
+    def __reduce__(self):
+        return (os.system, (%r,))
+def fields(line):
+    return Hostile()
+""" % f"touch {marker}"
+
+    class PicklePayload:
+        def execute(self, prompt, workspace, budget):
+            budget.consume(turns=1)
+            (workspace / "app/records.py").write_text(hostile, encoding="utf-8")
+            return AgentResult("completed", claimed_success=True)
+
+    result = run_agent_trial(
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path / "workspace"),
+        PicklePayload(),
+        trial=1,
+    )
+    assert result.outcome == "verification_failed"
+    assert not marker.exists()
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [("fixture", "wrong-fixture"), ("preparation", "wrong-preparation"), ("verification", "wrong-verification")],

@@ -164,9 +164,16 @@ def _candidate_probe_child(connection, target: str, source: str, symbol: str, ca
         namespace: dict[str, Any] = {}
         exec(compile(source, target, "exec"), namespace)
         function = namespace[symbol]
-        connection.send((True, tuple(function(*args) for args in calls)))
+        # Never pickle candidate-controlled values across the trust boundary.
+        # JSON encoding happens in the killable child and the parent accepts a
+        # small bytes payload containing JSON primitives only.
+        payload = json.dumps(
+            {"completed": True, "outputs": [function(*args) for args in calls]},
+            separators=(",", ":"),
+        ).encode("utf-8")
+        connection.send_bytes(payload)
     except BaseException:
-        connection.send((False, ()))
+        connection.send_bytes(b'{"completed":false,"outputs":[]}')
     finally:
         connection.close()
 
@@ -200,13 +207,19 @@ def _run_private_probe(template_name: str, target: str, source: str, repaired_so
         parent.close()
         return False
     try:
-        completed, outputs = parent.recv()
-        if not completed:
+        payload = json.loads(parent.recv_bytes(4096).decode("utf-8"))
+        if (
+            not isinstance(payload, dict)
+            or payload.get("completed") is not True
+            or not isinstance(payload.get("outputs"), list)
+            or set(payload) != {"completed", "outputs"}
+        ):
             return False
+        outputs = payload["outputs"]
         if template_name == "locale-cache-key":
             return outputs[0] != outputs[1] and outputs[0] == outputs[2] and outputs[0] != outputs[3]
-        return outputs == expected
-    except (EOFError, OSError):
+        return tuple(outputs) == expected
+    except (EOFError, OSError, UnicodeDecodeError, json.JSONDecodeError):
         return False
     finally:
         parent.close()
