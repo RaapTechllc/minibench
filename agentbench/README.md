@@ -134,6 +134,18 @@ python -m agentbench.agent_tasks \
     --trials 2 --out /tmp/minibench-agent-smoke.json
 ```
 
+Generated repository-repair smoke is also deterministic and fully offline. It
+creates a fresh repository-shaped fixture, runs the reference repair adapter,
+and writes a sanitized artifact without a model or API key:
+
+```bash
+agentbench/.venv/bin/python -m agentbench.generated_repairs \
+    --seed 20260717 --trials 2 --out /tmp/minibench-generated-repair.json
+```
+
+Artifacts retain only the seed fingerprint, fixture version, mutation-template
+hash, budgets, harness, and terminal outcome.
+
 Cheap live testing (7B-class models, harder tasks — expect <100% pass rate):
 
 ```bash
