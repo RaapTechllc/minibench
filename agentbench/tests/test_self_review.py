@@ -10,7 +10,7 @@ from agentbench.agent_tasks import (
     load_agent_manifest,
 )
 from agentbench.compare import ComparabilityError, _outcomes, check_comparable
-from agentbench.import_results import load_trials
+from agentbench.import_results import artifact_to_payload, load_trials
 from agentbench.self_review import (
     CORRECTION_PROMPT_MARKER,
     build_self_review_artifact,
@@ -83,6 +83,24 @@ class _BudgetAwareAgent:
             f"status={status}\n", encoding="utf-8"
         )
         return AgentResult("completed", claimed_success=True, turns=1)
+
+
+class _PartialUsageAgent:
+    def execute(self, prompt, workspace, budget):
+        budget.consume(turns=1)
+        if CORRECTION_PROMPT_MARKER in prompt:
+            (workspace / "service.conf").write_text(
+                "status=READY\n", encoding="utf-8"
+            )
+            return AgentResult(
+                "completed",
+                claimed_success=True,
+                turns=1,
+                tokens_in=2,
+                tokens_out=3,
+                cost_usd=0.0,
+            )
+        return AgentResult("completed", claimed_success=False, turns=1)
 
 
 @pytest.mark.parametrize(
@@ -223,7 +241,7 @@ def test_correction_infrastructure_failure_is_phase_specific(tmp_path):
     result = run_paired_review_trial(
         manifest,
         OfflineTextEnvironment(tmp_path),
-        _PromptScriptedAgent("fail", "error"),
+        _PromptScriptedAgent("pass", "error"),
         correction_budget=CORRECTION_BUDGET,
         trial=1,
     )
@@ -237,7 +255,95 @@ def test_correction_infrastructure_failure_is_phase_specific(tmp_path):
     assert result.pair_complete is False
     assert result.corrected_failure is False
     assert summary["n_infra_errors"] == 1
+    assert summary["n_first_attempts"] == 1
+    assert summary["first_pass_completion"] == 1.0
+    assert summary["first_attempt_usage"] == {
+        "turns_total": 1,
+        "wall_time_ms_total": result.first_attempt.wall_time_ms,
+        "tokens_in_total": 2,
+        "tokens_out_total": 3,
+        "cost_usd_total": 0.0,
+    }
+    assert summary["final_completion"] is None
     assert summary["self_correction_lift"] is None
+    assert summary["pass_rate"] == 0.0
+    assert summary["n_paired_trials"] == 0
+    assert build_self_review_artifact(
+        manifest, [result], CORRECTION_BUDGET
+    )["provenance"]["terminal_outcome"] == "infrastructure_failed"
+
+
+def test_partial_phase_usage_is_not_silently_counted_as_zero(tmp_path):
+    manifest = load_agent_manifest(MANIFEST_PATH)
+    result = run_paired_review_trial(
+        manifest,
+        OfflineTextEnvironment(tmp_path),
+        _PartialUsageAgent(),
+        correction_budget=CORRECTION_BUDGET,
+        trial=1,
+    )
+    artifact = build_self_review_artifact(manifest, [result], CORRECTION_BUDGET)
+    row = artifact["trials"][0]
+
+    assert result.passed is True
+    assert result.first_attempt.tokens_in is None
+    assert result.correction.tokens_in == 2
+    assert row["tokens_in"] is None
+    assert row["tokens_out"] is None
+    assert row["cost_usd"] is None
+    assert artifact["summary"]["first_attempt_usage"]["tokens_in_total"] is None
+    assert artifact["summary"]["first_attempt_usage"]["tokens_out_total"] is None
+    assert artifact["summary"]["first_attempt_usage"]["cost_usd_total"] is None
+
+    artifact["dry_run"] = False
+    payload = artifact_to_payload(
+        artifact, source="paired.json", provider="offline"
+    )
+    assert payload["tokens_in"] is None
+    assert payload["tokens_out"] is None
+    assert payload["results"][0]["tokens_in"] is None
+    assert payload["results"][0]["tokens_out"] is None
+
+
+def test_lift_uses_only_complete_pairs_while_first_pass_uses_all_eligible(tmp_path):
+    manifest = load_agent_manifest(MANIFEST_PATH)
+    correction_infra = run_paired_review_trial(
+        manifest,
+        OfflineTextEnvironment(tmp_path / "infra"),
+        _PromptScriptedAgent("pass", "error"),
+        correction_budget=CORRECTION_BUDGET,
+        trial=1,
+    )
+    corrected = run_paired_review_trial(
+        manifest,
+        OfflineTextEnvironment(tmp_path / "complete"),
+        _PromptScriptedAgent("fail", "pass"),
+        correction_budget=CORRECTION_BUDGET,
+        trial=2,
+    )
+
+    artifact = build_self_review_artifact(
+        manifest, [correction_infra, corrected], CORRECTION_BUDGET
+    )
+    summary = artifact["summary"]
+
+    assert summary["n_first_attempts"] == 2
+    assert summary["first_pass_completion"] == 0.5
+    assert summary["first_attempt_usage"]["turns_total"] == 2
+    assert summary["n_paired_trials"] == 1
+    assert summary["paired_first_pass_completion"] == 0.0
+    assert summary["final_completion"] == 1.0
+    assert summary["self_correction_lift"] == 1.0
+    assert summary["cost_usd_total"] is None
+    assert summary["cost_usd_per_task"] is None
+    artifact["dry_run"] = False
+    payload = artifact_to_payload(
+        artifact,
+        source="mixed-paired.json",
+        provider="offline",
+        allow_infra_errors=True,
+    )
+    assert payload["cost_usd_per_task"] is None
 
 
 def test_artifact_has_compatible_trial_shape_and_paired_metrics(tmp_path):
@@ -273,6 +379,7 @@ def test_artifact_has_compatible_trial_shape_and_paired_metrics(tmp_path):
     assert summary["no_change_outcomes"] == 2
     assert summary["self_correction_lift"] == 0.0
     assert summary["n_paired_trials"] == 4
+    assert summary["n_first_attempts"] == 4
     assert _outcomes(artifact) == {
         (manifest.task_id, 1): True,
         (manifest.task_id, 2): False,
@@ -345,6 +452,34 @@ def test_paired_rows_load_through_existing_result_importer(tmp_path):
     assert loaded[0].tokens_out == 6
     assert artifact["trials"][0]["first_attempt"]["passed"] is False
     assert artifact["trials"][0]["correction"]["passed"] is True
+
+
+def test_terminal_outcome_distinguishes_scored_failure_from_infrastructure(tmp_path):
+    manifest = load_agent_manifest(MANIFEST_PATH)
+    scored_failure = run_paired_review_trial(
+        manifest,
+        OfflineTextEnvironment(tmp_path / "scored"),
+        _PromptScriptedAgent("fail", "fail"),
+        correction_budget=CORRECTION_BUDGET,
+        trial=1,
+    )
+    corrected = run_paired_review_trial(
+        manifest,
+        OfflineTextEnvironment(tmp_path / "corrected"),
+        _PromptScriptedAgent("fail", "pass"),
+        correction_budget=CORRECTION_BUDGET,
+        trial=2,
+    )
+
+    failed_artifact = build_self_review_artifact(
+        manifest, [scored_failure], CORRECTION_BUDGET
+    )
+    success_artifact = build_self_review_artifact(
+        manifest, [corrected], CORRECTION_BUDGET
+    )
+
+    assert failed_artifact["provenance"]["terminal_outcome"] == "verification_failed"
+    assert success_artifact["provenance"]["terminal_outcome"] == "success"
 
 
 def test_generated_repair_self_review_smoke_uses_existing_fixture(tmp_path):

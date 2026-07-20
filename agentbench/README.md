@@ -168,6 +168,9 @@ agentbench/.venv/bin/python -m agentbench.self_review \
 The compatible result artifact reports first-pass and final completion,
 corrected failures, introduced regressions, no-change outcomes, and lift. An
 infrastructure failure in either phase leaves lift undefined for that pair.
+First-pass completion and first-attempt usage include every non-infrastructure
+first attempt; final completion and lift use completed pairs only. Token and
+cost totals remain null whenever any contributing phase did not report them.
 
 Cheap live testing (7B-class models, harder tasks — expect <100% pass rate):
 

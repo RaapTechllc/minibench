@@ -252,7 +252,6 @@ def _legacy_trial(result: PairedReviewTrialResult) -> AgentTrialResult:
     phases = [result.first_attempt] + (
         [result.correction] if result.correction is not None else []
     )
-    costs = [phase.cost_usd for phase in phases if phase.cost_usd is not None]
     return AgentTrialResult(
         task_id=result.task_id,
         category=result.category,
@@ -264,19 +263,28 @@ def _legacy_trial(result: PairedReviewTrialResult) -> AgentTrialResult:
         termination_reason=final.termination_reason,
         turns=sum(phase.turns for phase in phases),
         wall_time_ms=sum(phase.wall_time_ms for phase in phases),
-        tokens_in=(
-            sum(phase.tokens_in or 0 for phase in phases)
-            if any(phase.tokens_in is not None for phase in phases)
-            else None
-        ),
-        tokens_out=(
-            sum(phase.tokens_out or 0 for phase in phases)
-            if any(phase.tokens_out is not None for phase in phases)
-            else None
-        ),
-        cost_usd=sum(costs) if costs else None,
+        tokens_in=_complete_sum([phase.tokens_in for phase in phases]),
+        tokens_out=_complete_sum([phase.tokens_out for phase in phases]),
+        cost_usd=_complete_sum([phase.cost_usd for phase in phases]),
         initial_state_sha256=result.initial_state_sha256,
         workspace_disposed=result.workspace_disposed,
+    )
+
+
+def _complete_sum(values: list[int | float | None]) -> int | float | None:
+    """Sum usage only when every contributing phase reported the field."""
+    if not values or any(value is None for value in values):
+        return None
+    return sum(value for value in values if value is not None)
+
+
+def _terminal_outcome(trials: list[PairedReviewTrialResult]) -> str:
+    if any(trial.infra_error for trial in trials):
+        return "infrastructure_failed"
+    return (
+        "success"
+        if trials and all(trial.passed for trial in trials)
+        else "verification_failed"
     )
 
 
@@ -295,16 +303,25 @@ def build_self_review_artifact(
 ) -> dict[str, Any]:
     """Build a legacy-loadable artifact with nested paired phase evidence."""
     artifact = build_agent_artifact(manifest, [_legacy_trial(trial) for trial in trials])
+    first_eligible = [trial for trial in trials if not trial.first_attempt.infra_error]
     complete = [trial for trial in trials if trial.pair_complete]
     count = len(complete)
-    first_passes = sum(trial.first_attempt.passed for trial in complete)
+    first_count = len(first_eligible)
+    first_passes = sum(trial.first_attempt.passed for trial in first_eligible)
+    paired_first_passes = sum(trial.first_attempt.passed for trial in complete)
     final_passes = sum(trial.passed for trial in complete)
-    first_rate = first_passes / count if count else None
+    first_rate = first_passes / first_count if first_count else None
+    paired_first_rate = paired_first_passes / count if count else None
     final_rate = final_passes / count if count else None
+    trial_costs = [_legacy_trial(trial).cost_usd for trial in trials]
+    if any(cost is None for cost in trial_costs):
+        artifact["summary"]["cost_usd_total"] = None
+        artifact["summary"]["cost_usd_per_task"] = None
     artifact["provenance"]["budgets"] = {
         "first_attempt": asdict(manifest.budget),
         "correction": asdict(correction_budget),
     }
+    artifact["provenance"]["terminal_outcome"] = _terminal_outcome(trials)
     artifact["summary"]["decoding"]["correction_budget"] = asdict(
         correction_budget
     )
@@ -316,17 +333,36 @@ def build_self_review_artifact(
                 + bool(trial.correction and trial.correction.infra_error)
                 for trial in trials
             ),
+            "n_first_attempts": first_count,
             "n_paired_trials": count,
             "first_pass_completion": first_rate,
+            "paired_first_pass_completion": paired_first_rate,
             "final_completion": final_rate,
+            "first_attempt_usage": {
+                "turns_total": sum(
+                    trial.first_attempt.turns for trial in first_eligible
+                ),
+                "wall_time_ms_total": sum(
+                    trial.first_attempt.wall_time_ms for trial in first_eligible
+                ),
+                "tokens_in_total": _complete_sum(
+                    [trial.first_attempt.tokens_in for trial in first_eligible]
+                ),
+                "tokens_out_total": _complete_sum(
+                    [trial.first_attempt.tokens_out for trial in first_eligible]
+                ),
+                "cost_usd_total": _complete_sum(
+                    [trial.first_attempt.cost_usd for trial in first_eligible]
+                ),
+            },
             "corrected_failures": sum(trial.corrected_failure for trial in complete),
             "introduced_regressions": sum(
                 trial.introduced_regression for trial in complete
             ),
             "no_change_outcomes": sum(trial.no_change for trial in complete),
             "self_correction_lift": (
-                final_rate - first_rate
-                if first_rate is not None and final_rate is not None
+                final_rate - paired_first_rate
+                if paired_first_rate is not None and final_rate is not None
                 else None
             ),
         }
@@ -406,9 +442,6 @@ def run_generated_offline(seed: int, trials: int, out: str | Path) -> int:
             "seed_sha256": fixture.seed_hash,
             "harness": HARNESS,
             "harness_version": AGENT_GRADER_VERSION,
-            "terminal_outcome": "success"
-            if all(result.passed for result in results)
-            else "verification_failed",
         }
     )
     destination = Path(out)
