@@ -63,8 +63,8 @@ const BANDS: { range: string; label: string; cls: string }[] = [
 
 const DEFENSES: ReactRow[] = [
   [
-    'Canary strings',
-    <>Published suite files embed per-task canary strings. A model that echoes one saw the benchmark in training: the run is flagged at grade time, quarantined as contaminated, and <span className="font-medium text-ink">publishing is refused</span> while any canary flags exist.</>,
+    'Leakage checks',
+    <>Non-public validation signals detect likely benchmark exposure. Flagged runs are quarantined as contaminated, and <span className="font-medium text-ink">publishing is refused</span> while any leakage signal exists.</>,
   ],
   [
     'Infra errors',
@@ -72,11 +72,11 @@ const DEFENSES: ReactRow[] = [
   ],
   [
     'Private split vs dev slice',
-    <>The committed dev slice is public and contamination-prone; official scores come from a private split regenerated from an uncommitted high-entropy seed, whose gold answers never touch disk. Leaderboard rows carry the badge: <ValidityBadge isPrivate={true} /> <ValidityBadge isPrivate={false} /></>,
+    <>The committed dev slice is public and contamination-prone; official scores come from a freshly generated, uncommitted private split whose gold answers never touch disk. Leaderboard rows carry the badge: <ValidityBadge isPrivate={true} /> <ValidityBadge isPrivate={false} /></>,
   ],
   [
     'Provenance',
-    <>Every results file records <Mono>seed_sha256</Mono> (proves two runs shared a seed without revealing it), <Mono>generator_sha256</Mono>, <Mono>git_commit</Mono>, <Mono>is_private_split</Mono>, and the grader version — sweeps are only comparable when these match.</>,
+    <>Every results file records non-secret reproducibility hashes, the source commit, split marker, and grader version — sweeps are only comparable when these match.</>,
   ],
   [
     'Pinned decoding',
@@ -237,8 +237,8 @@ export default function Methodology() {
         <div className="px-5 pb-5 text-[14px] leading-relaxed text-ink-2">
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              <span className="font-medium text-ink">Validity gate.</span> Runs with canary flags
-              (contamination) or infra-error trials never rank.
+              <span className="font-medium text-ink">Validity gate.</span> Runs flagged for
+              contamination or containing infra-error trials never rank.
             </li>
             <li>
               <span className="font-medium text-ink">Best single-model run per model.</span> Only
@@ -281,13 +281,13 @@ export default function Methodology() {
             </li>
             <li>
               <span className="font-medium text-ink">No ordering claims without significance.</span>{' '}
-              &ldquo;A beats B&rdquo; requires an exact McNemar test at p &lt; 0.05; everything else is
+              &ldquo;A beats B&rdquo; requires a predeclared paired test at p &lt; 0.05; everything else is
               reported as indistinguishable.
             </li>
             <li>
               <span className="font-medium text-ink">No score edits.</span> A suspected-contaminated
               outlier gets flagged — an asterisk, never a score edit — and runs are never re-graded,
-              re-seeded, or selectively rerun to move one model. Items are pruned by statistical
+              regenerated, or selectively rerun to move one model. Items are pruned by statistical
               discrimination only; expected orderings are checked last, as a sanity signal.
             </li>
           </ul>

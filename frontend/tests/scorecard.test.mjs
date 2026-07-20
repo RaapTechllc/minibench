@@ -12,6 +12,11 @@ import {
   CREDITS_ROLLING_MIN,
   DEFAULT_CABINET_SUITE,
 } from '../src/lib/scorecard.js';
+import {
+  cabinetPathForRun,
+  taskDisplayName,
+  taskScenario,
+} from '../src/lib/runDetail.js';
 
 test('tier bands at boundaries', () => {
   assert.equal(tierIdFromPassRate(35), 'insert-coin');
@@ -92,4 +97,33 @@ test('tierChromeClass maps each tier id to a stable CSS class', () => {
 test('tierChromeClass falls back for unknown ids', () => {
   assert.equal(tierChromeClass('unknown'), 'arcade-tier-insert-coin');
   assert.equal(tierChromeClass(''), 'arcade-tier-insert-coin');
+});
+
+test('run detail returns to the cabinet implied by model count', () => {
+  assert.equal(cabinetPathForRun({ models: ['openrouter/example/model'] }), '/models');
+  assert.equal(cabinetPathForRun({ models: ['openrouter/example/a', 'openrouter/example/b'] }), '/agents');
+  assert.equal(cabinetPathForRun({ models: ['openrouter/example/model'], self_moa: true }), '/agents');
+  assert.equal(cabinetPathForRun(null), '/models');
+});
+
+test('run detail uses typed metadata and preserves historical fallbacks', () => {
+  const current = {
+    task_id: 'mb2-code-01',
+    scenario_type: 'cursor',
+    task_description: 'Fix the failing parser.',
+  };
+  assert.deepEqual(taskScenario(current, 'coding'), { kind: 'cursor', fromMetadata: true });
+  assert.equal(taskDisplayName(current, 0), 'Fix the failing parser.');
+
+  const historical = { task_id: 'mbh-reason-01' };
+  assert.deepEqual(taskScenario(historical, 'reasoning'), {
+    kind: 'spreadsheet',
+    fromMetadata: false,
+  });
+  assert.equal(taskDisplayName(historical, 0), 'Mbh Reason 01');
+  assert.equal(taskDisplayName({ task_id: 'seed-canary-01' }, 2), 'Task 3');
+  assert.equal(
+    taskDisplayName({ task_id: 'ordinary-task', task_description: 'Inspect the seed identifier.' }, 3),
+    'Task 4',
+  );
 });

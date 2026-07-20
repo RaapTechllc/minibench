@@ -7,6 +7,7 @@
     {
       "id": "mb2-reason-01",
       "category": "reasoning",
+      "description": "Find an integer satisfying divisor and digit-sum constraints.",
       "prompt": "What is the smallest positive integer divisible by both 17 and 11 whose decimal digits sum to exactly 21? Answer with the number only.",
       "verification": {
         "type": "numeric_match",
@@ -21,6 +22,7 @@
     {
       "id": "mb2-reason-02",
       "category": "reasoning",
+      "description": "Project an account balance with compound interest and annual deposits.",
       "prompt": "An account starts with $869, earns 4% compound interest annually, and you deposit $165 at the end of each year (after interest). What is the balance after 4 years, rounded to 2 decimal places? Answer with the number only.",
       "verification": {
         "type": "numeric_match",
@@ -35,6 +37,7 @@
     {
       "id": "mb2-reason-03",
       "category": "reasoning",
+      "description": "Calculate a tank fill time with two inlets and one drain.",
       "prompt": "A tank is 25% full. Pipe A fills it in 27 min, pipe B in 47 min, and a drain empties a full tank in 74 min. With all three open, how many minutes until the tank is full? Round to 1 decimal. Answer with the number only.",
       "verification": {
         "type": "numeric_match",
@@ -49,6 +52,7 @@
     {
       "id": "mb2-reason-04",
       "category": "reasoning",
+      "description": "Compute a modular exponentiation remainder.",
       "prompt": "What is 2^8 mod 23? (The remainder when 2 raised to the 8th power is divided by 23.) Answer with the number only.",
       "verification": {
         "type": "numeric_match",
@@ -63,6 +67,7 @@
     {
       "id": "mb2-reason-05",
       "category": "reasoning",
+      "description": "Find the first consecutive-integer product divisible by a target.",
       "prompt": "What is the smallest positive integer n such that n \u00d7 (n+1) \u00d7 (n+2) is divisible by 20? Answer with n only.",
       "verification": {
         "type": "numeric_match",
@@ -77,6 +82,7 @@
     {
       "id": "mb2-struct-01",
       "category": "tool-use",
+      "description": "Summarize discounted order lines and identify the top customer.",
       "prompt": "Apply each line's percent discount to that line's gross (qty x unit). Round EACH discounted line total to 2 decimal places (half-up), THEN sum those rounded line totals for net_revenue (do not sum unrounded values and round once at the end). Respond with ONLY a JSON object with keys `n_lines` (integer), `net_revenue` (number, 2 decimals) and `top_customer` (string, highest net spend). Lines: Mia: 1 x $20.68 (5% off); Uma: 7 x $41.13 (10% off); Zoe: 1 x $26.24 (5% off); Liam: 7 x $19.28 (10% off); Mia: 5 x $36.47 (20% off); Uma: 4 x $30.21 (10% off)",
       "verification": {
         "type": "json_fields",
@@ -95,6 +101,7 @@
     {
       "id": "mb2-struct-02",
       "category": "tool-use",
+      "description": "Summarize service errors from a batch of log entries.",
       "prompt": "Analyze this log batch. Respond with ONLY a JSON object with keys `n_errors` (integer ERROR count), `worst_service` (string, most ERROR lines) and `median_error_code` (integer median of ERROR status codes only). Logs: [ERROR] search status=441 | [ERROR] search status=517 | [ERROR] search status=474 | [ERROR] search status=576 | [WARN] billing status=463 | [ERROR] inventory status=521 | [WARN] billing status=492 | [WARN] inventory status=425",
       "verification": {
         "type": "json_fields",
@@ -112,6 +119,7 @@
     {
       "id": "mb2-struct-03",
       "category": "tool-use",
+      "description": "Summarize discounted order lines and identify the top customer.",
       "prompt": "Apply each line's percent discount to that line's gross (qty x unit). Round EACH discounted line total to 2 decimal places (half-up), THEN sum those rounded line totals for net_revenue (do not sum unrounded values and round once at the end). Respond with ONLY a JSON object with keys `n_lines` (integer), `net_revenue` (number, 2 decimals) and `top_customer` (string, highest net spend). Lines: Liam: 5 x $35.31 (5% off); Ivy: 1 x $3.86 (15% off); Zoe: 7 x $18.82 (10% off); Noah: 6 x $13.87 (10% off); Liam: 3 x $30.43 (5% off); Ivy: 6 x $38.91 (5% off)",
       "verification": {
         "type": "json_fields",
@@ -130,6 +138,7 @@
     {
       "id": "mb2-struct-04",
       "category": "tool-use",
+      "description": "Summarize service errors from a batch of log entries.",
       "prompt": "Analyze this log batch. Respond with ONLY a JSON object with keys `n_errors` (integer ERROR count), `worst_service` (string, most ERROR lines) and `median_error_code` (integer median of ERROR status codes only). Logs: [ERROR] search status=412 | [ERROR] search status=400 | [ERROR] search status=514 | [ERROR] search status=414 | [WARN] checkout status=590 | [ERROR] billing status=468 | [WARN] checkout status=523 | [WARN] billing status=463",
       "verification": {
         "type": "json_fields",
@@ -147,6 +156,7 @@
     {
       "id": "mb2-struct-05",
       "category": "tool-use",
+      "description": "Summarize discounted order lines and identify the top customer.",
       "prompt": "Apply each line's percent discount to that line's gross (qty x unit). Round EACH discounted line total to 2 decimal places (half-up), THEN sum those rounded line totals for net_revenue (do not sum unrounded values and round once at the end). Respond with ONLY a JSON object with keys `n_lines` (integer), `net_revenue` (number, 2 decimals) and `top_customer` (string, highest net spend). Lines: Zoe: 7 x $16.51 (10% off); Liam: 5 x $27.87 (0% off); Noah: 1 x $28.37 (0% off); Mia: 8 x $21.43 (10% off); Zoe: 4 x $29.20 (0% off); Liam: 6 x $15.09 (5% off)",
       "verification": {
         "type": "json_fields",
@@ -165,6 +175,7 @@
     {
       "id": "mb2-format-01",
       "category": "instruction",
+      "description": "Sort words by length and alphabetical tie-break.",
       "prompt": "Sort these words by length (longest first), breaking ties alphabetically. Output them joined by semicolons with no spaces, single line only: ember willow meadow maple copper indigo python",
       "verification": {
         "type": "exact_match",
@@ -178,6 +189,7 @@
     {
       "id": "mb2-format-02",
       "category": "instruction",
+      "description": "Filter vowel-starting words and sort them alphabetically.",
       "prompt": "From this list, output only words that START with a vowel (a,e,i,o,u), sorted alphabetically, comma-separated, no spaces, single line: ember thunder maple falcon copper willow quartz harbor basil",
       "verification": {
         "type": "exact_match",
@@ -191,6 +203,7 @@
     {
       "id": "mb2-format-03",
       "category": "instruction",
+      "description": "Reverse words and apply a Caesar shift.",
       "prompt": "Reverse the word order, then apply Caesar shift +3 to each word (lowercase a-z, wrap). Output space-separated, single line only: maple thunder meadow willow python copper basil falcon signal",
       "verification": {
         "type": "exact_match",
@@ -204,6 +217,7 @@
     {
       "id": "mb2-format-04",
       "category": "instruction",
+      "description": "Sort words by length and alphabetical tie-break.",
       "prompt": "Sort these words by length (longest first), breaking ties alphabetically. Output them joined by semicolons with no spaces, single line only: ember indigo violet python falcon maple copper basil",
       "verification": {
         "type": "exact_match",
@@ -217,6 +231,7 @@
     {
       "id": "mb2-format-05",
       "category": "instruction",
+      "description": "Filter vowel-starting words and sort them alphabetically.",
       "prompt": "From this list, output only words that START with a vowel (a,e,i,o,u), sorted alphabetically, comma-separated, no spaces, single line: thunder harbor basil quartz python falcon ember",
       "verification": {
         "type": "exact_match",
@@ -230,6 +245,7 @@
     {
       "id": "mb2-code-01",
       "category": "coding",
+      "description": "Implement a k-th-largest array function.",
       "prompt": "Write `kth_largest(nums, k)` returning the k-th largest element (1-indexed; duplicates count). Return only a fenced python block.",
       "verification": {
         "type": "unit_test",
@@ -241,6 +257,7 @@
     {
       "id": "mb2-code-02",
       "category": "coding",
+      "description": "Implement balanced-bracket validation.",
       "prompt": "Write `is_valid(s)` returning True iff `s` has balanced (), [], {} brackets. Return only a fenced python block.",
       "verification": {
         "type": "unit_test",
@@ -252,6 +269,7 @@
     {
       "id": "mb2-code-03",
       "category": "coding",
+      "description": "Implement nested repetition-string decoding.",
       "prompt": "Write `decode_string(s)` decoding patterns like `3[a]2[bc]` \u2192 `aaabcbc` (digits = repeat count, brackets = repeat group). Return only a fenced python block.",
       "verification": {
         "type": "unit_test",
@@ -263,6 +281,7 @@
     {
       "id": "mb2-code-04",
       "category": "coding",
+      "description": "Implement product-except-self without division.",
       "prompt": "Write `product_except_self(nums)` returning an array where output[i] is the product of all elements except nums[i] (no division). Return only a fenced python block.",
       "verification": {
         "type": "unit_test",
@@ -274,6 +293,7 @@
     {
       "id": "mb2-code-05",
       "category": "coding",
+      "description": "Implement a k-th-largest array function.",
       "prompt": "Write `kth_largest(nums, k)` returning the k-th largest element (1-indexed; duplicates count). Return only a fenced python block.",
       "verification": {
         "type": "unit_test",

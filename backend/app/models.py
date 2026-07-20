@@ -154,6 +154,7 @@ class AgentRun(Base):
     n_tasks = Column(Integer, nullable=False)
     n_trials = Column(Integer, nullable=False)
     pass_rate = Column(Numeric(5, 2), nullable=False)     # 0–100 (%)
+    pass_format = Column(Numeric(5, 2))                   # canonical strict-format rate
     pass_hat_k = Column(Numeric(5, 2))                    # consistency across trials
     ci95_low = Column(Numeric(5, 2))
     ci95_high = Column(Numeric(5, 2))
@@ -188,8 +189,11 @@ class AgentTaskResult(Base):
     run_id = Column(UUID(as_uuid=True), ForeignKey("agent_runs.run_id"), nullable=False)
     task_id = Column(String(128), nullable=False)
     category = Column(String(64))
+    scenario_type = Column(String(32))
+    task_description = Column(Text)
     trial = Column(Integer)
     passed = Column(Boolean, nullable=False)
+    passed_format = Column(Boolean)
     score = Column(Numeric(6, 3))
     cost_usd = Column(Numeric(10, 5))
     latency_ms = Column(Integer)

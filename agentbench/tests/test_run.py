@@ -65,6 +65,39 @@ def test_to_agent_run_submit_scales_percentages():
     assert payload["pass_hat_k"] == 100.0
     assert payload["ci95_low"] is not None
     assert len(payload["results"]) == len(results)
+    assert payload["results"][0]["task_description"] is None
+
+
+def test_run_suite_carries_public_arcade_task_fields():
+    config = single_model_config("openrouter/x/y")
+    task = {
+        "id": "reason-word-problem",
+        "category": "instruction",
+        "prompt": "A trip takes 165 minutes. Answer with the duration only.",
+        "description": "Calculate the trip duration.",
+        "scenario_type": "slack",
+        "verification": {"type": "numeric_match", "expected": 165},
+    }
+
+    result = run_suite(config, [task], trials=1, model=None, stub=StubModel())[0]
+
+    assert result.scenario_type == "slack"
+    assert result.task_description == "Calculate the trip duration."
+
+
+def test_v2_public_description_reaches_submit_payload():
+    suite_path = Path(__file__).resolve().parents[1] / "tasks" / "minibench-v2.json"
+    suite, tasks = load_tasks(suite_path)
+    task = tasks[0]
+    config = single_model_config("openrouter/x/y")
+
+    result = run_suite(config, [task], trials=1, model=None, stub=StubModel())[0]
+    summary = summarize(config, suite, 1, [result])
+    payload = to_agent_run_submit(summary, [result], provider="openrouter")
+
+    assert task["description"]
+    assert result.task_description == task["description"]
+    assert payload["results"][0]["task_description"] == task["description"]
 
 
 def test_live_run_without_key_errors_cleanly(monkeypatch):
@@ -235,6 +268,7 @@ def test_private_split_redacts_gold_from_trial_detail(monkeypatch, tmp_path):
     assert "expected" not in text  # no "got N, expected M" leak
     for t in json.loads(text)["trials"]:
         assert t["detail"] in {"pass", "fail", "infra"}
+        assert t["task_description"] is None
 
 
 # ── pro axes surfacing (calibration + robustness) ─────────────────────────────
@@ -312,3 +346,63 @@ def test_summarize_reports_dual_capability_and_format():
     assert s["grader_version"] == "3"
     assert s["pass_rate"] == s["pass_capability"] == 0.5
     assert s["pass_format"] == 0.0
+
+
+def test_submit_payload_preserves_arcade_task_metadata_and_format_verdict():
+    config = single_model_config("openrouter/qwen/qwen-2.5-7b-instruct")
+    results = [
+        TrialResult(
+            "mb2-code-01",
+            "coding",
+            1,
+            True,
+            1.0,
+            0.01,
+            25,
+            10,
+            5,
+            detail="match",
+            passed_format=False,
+            scenario_type="cursor",
+            task_description="Fix the failing parser without changing its public API.",
+        )
+    ]
+
+    payload = to_agent_run_submit(
+        summarize(config, "minibench-v2", 1, results),
+        results,
+        provider="openrouter",
+    )
+
+    assert payload["results"][0]["scenario_type"] == "cursor"
+    assert payload["results"][0]["task_description"] == (
+        "Fix the failing parser without changing its public API."
+    )
+    assert payload["results"][0]["passed_format"] is False
+
+
+def test_submit_payload_uses_infra_and_axis_excluded_canonical_rates():
+    config = single_model_config("openrouter/qwen/qwen-2.5-7b-instruct")
+    results = [
+        TrialResult(
+            "binary", "coding", 1, True, 1.0, 0.01, 25, 10, 5,
+            detail="match", passed_format=False,
+        ),
+        TrialResult(
+            "infra", "coding", 1, False, 0.0, None, 0, 0, 0,
+            detail="infra", infra_error=True, passed_format=True,
+        ),
+        TrialResult(
+            "calibration", "calibration", 1, False, 0.75, 0.01, 25, 10, 5,
+            detail="brier", passed_format=False,
+        ),
+    ]
+
+    payload = to_agent_run_submit(
+        summarize(config, "minibench-pro-v1", 1, results),
+        results,
+        provider="openrouter",
+    )
+
+    assert payload["pass_rate"] == 100.0
+    assert payload["pass_format"] == 0.0

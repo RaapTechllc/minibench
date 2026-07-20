@@ -169,8 +169,11 @@ class StatsResponse(BaseModel):
 class AgentTaskResultSubmit(BaseModel):
     task_id: str = Field(..., max_length=128)
     category: Optional[str] = Field(None, max_length=64)
+    scenario_type: Optional[str] = Field(None, max_length=32)
+    task_description: Optional[str] = Field(None, max_length=2000)
     trial: Optional[int] = None
     passed: bool
+    passed_format: Optional[bool] = None
     score: Optional[Decimal] = None
     cost_usd: Optional[Decimal] = None
     latency_ms: Optional[int] = None
@@ -189,6 +192,7 @@ class AgentRunSubmit(BaseModel):
     n_tasks: int = Field(..., ge=1)
     n_trials: int = Field(..., ge=1)
     pass_rate: Decimal = Field(..., ge=0, le=100)
+    pass_format: Optional[Decimal] = Field(None, ge=0, le=100)
     pass_hat_k: Optional[Decimal] = Field(None, ge=0, le=100)
     ci95_low: Optional[Decimal] = None
     ci95_high: Optional[Decimal] = None
@@ -227,6 +231,7 @@ class AgentRunResponse(BaseModel):
     n_tasks: int
     n_trials: int
     pass_rate: Decimal
+    pass_format: Optional[Decimal] = None
     pass_hat_k: Optional[Decimal] = None
     ci95_low: Optional[Decimal] = None
     ci95_high: Optional[Decimal] = None
@@ -313,8 +318,11 @@ class ModelLeaderboardEntry(BaseModel):
 class AgentTaskResultResponse(BaseModel):
     task_id: str
     category: Optional[str] = None
+    scenario_type: Optional[str] = None
+    task_description: Optional[str] = None
     trial: Optional[int] = None
     passed: bool
+    passed_format: Optional[bool] = None
     score: Optional[Decimal] = None
     cost_usd: Optional[Decimal] = None
     latency_ms: Optional[int] = None

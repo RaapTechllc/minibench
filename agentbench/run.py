@@ -73,6 +73,10 @@ class TrialResult:
     format_detail: str = ""
     # Truncated model output on failures — harness debugging only (public splits).
     output_snippet: str = ""
+    # Public task presentation fields used by the Arcade manual. The canary and
+    # private verification data remain separate and are never copied here.
+    scenario_type: str | None = None
+    task_description: str | None = None
 
 
 class StubModel:
@@ -127,6 +131,8 @@ def run_suite(
 ) -> list[TrialResult]:
     results: list[TrialResult] = []
     for task in tasks:
+        scenario_type = task.get("scenario_type")
+        task_description = task.get("description")
         for trial in range(1, trials + 1):
             try:
                 if stub is not None:
@@ -150,6 +156,8 @@ def run_suite(
                         tokens_out=0,
                         detail=f"infra: {e}",
                         infra_error=True,
+                        scenario_type=scenario_type,
+                        task_description=task_description,
                     )
                 )
                 continue
@@ -175,6 +183,8 @@ def run_suite(
                     passed_format=g.passed_format if g.passed_format is not None else g.passed,
                     format_detail=g.format_detail or "",
                     output_snippet=snippet,
+                    scenario_type=scenario_type,
+                    task_description=task_description,
                 )
             )
     return results
@@ -355,6 +365,7 @@ def to_agent_run_submit(
         "n_tasks": summary["n_tasks"],
         "n_trials": summary["n_trials"],
         "pass_rate": pct(summary["pass_rate"]),
+        "pass_format": pct(summary.get("pass_format")),
         "pass_hat_k": pct(summary.get("pass_hat_k")),
         "ci95_low": pct(ci[0]),
         "ci95_high": pct(ci[1]),
@@ -379,6 +390,9 @@ def to_agent_run_submit(
                 "latency_ms": r.latency_ms,
                 "tokens_in": r.tokens_in,
                 "tokens_out": r.tokens_out,
+                "scenario_type": r.scenario_type,
+                "task_description": r.task_description,
+                "passed_format": r.passed_format,
             }
             for r in trials
         ],
@@ -525,6 +539,7 @@ def main(argv: list[str] | None = None) -> int:
             tr.detail = "pass" if tr.passed else ("infra" if tr.infra_error else "fail")
             tr.format_detail = ""
             tr.output_snippet = ""  # private split: never persist model text
+            tr.task_description = None  # private split: never persist the generated prompt
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dry_run": args.dry_run,

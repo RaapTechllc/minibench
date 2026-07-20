@@ -80,6 +80,16 @@ npm install
 npm run dev                                  # http://localhost:5173 (proxies to :3070)
 ```
 
+`create_all` creates new schemas but does not alter existing tables. Upgrade an
+existing database for Arcade manual task metadata and its canonical format rate
+before starting the updated backend. For the documented Docker database on host
+port 5438:
+
+```bash
+PGPASSWORD=minibench psql -h localhost -p 5438 -U minibench -d minibench \
+  -f backend/migrations/20260720_01_agent_task_arcade_fields.sql
+```
+
 ## CLI
 
 ```bash
