@@ -146,6 +146,15 @@ agentbench/.venv/bin/python -m agentbench.generated_repairs \
 Artifacts retain only the seed fingerprint, fixture version, mutation-template
 hash, budgets, harness, and terminal outcome.
 
+Generated data/SQL-repair tasks use the same Agent Cabinet lifecycle with an
+in-memory SQLite verifier and no network or API key. Seeds select join,
+aggregation/null, or incremental-processing defects:
+
+```bash
+agentbench/.venv/bin/python -m agentbench.generated_sql_repairs \
+    --seed 20260719 --trials 2 --out /tmp/minibench-generated-sql-repair.json
+```
+
 Cheap live testing (7B-class models, harder tasks — expect <100% pass rate):
 
 ```bash
