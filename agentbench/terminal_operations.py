@@ -547,7 +547,22 @@ def main(argv: list[str] | None = None) -> int:
     destination = Path(args.out)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"all_passed": payload["all_passed"], "tasks": len(trials)}))
+    print(
+        json.dumps(
+            {
+                "all_passed": payload["all_passed"],
+                "tasks": [
+                    {
+                        "task_id": trial.task_id,
+                        "outcome": trial.outcome,
+                        "detail": trial.detail[:500],
+                        "workspace_disposed": trial.workspace_disposed,
+                    }
+                    for trial in trials
+                ],
+            }
+        )
+    )
     return 0 if payload["all_passed"] else 1
 
 
