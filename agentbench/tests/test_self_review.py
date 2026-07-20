@@ -10,6 +10,7 @@ from agentbench.agent_tasks import (
     load_agent_manifest,
 )
 from agentbench.compare import ComparabilityError, _outcomes, check_comparable
+from agentbench.import_results import load_trials
 from agentbench.self_review import (
     CORRECTION_PROMPT_MARKER,
     build_self_review_artifact,
@@ -319,6 +320,31 @@ def test_self_review_artifact_round_trips_as_json(tmp_path):
     )
 
     assert json.loads(destination.read_text(encoding="utf-8")) == artifact
+
+
+def test_paired_rows_load_through_existing_result_importer(tmp_path):
+    manifest = load_agent_manifest(MANIFEST_PATH)
+    result = run_paired_review_trial(
+        manifest,
+        OfflineTextEnvironment(tmp_path),
+        _PromptScriptedAgent("fail", "pass"),
+        correction_budget=CORRECTION_BUDGET,
+        trial=1,
+    )
+    artifact = build_self_review_artifact(manifest, [result], CORRECTION_BUDGET)
+
+    loaded = load_trials(artifact["trials"])
+
+    assert len(loaded) == 1
+    assert loaded[0].task_id == manifest.task_id
+    assert loaded[0].passed is True
+    assert loaded[0].score == 1.0
+    assert loaded[0].infra_error is False
+    assert loaded[0].latency_ms >= 0
+    assert loaded[0].tokens_in == 4
+    assert loaded[0].tokens_out == 6
+    assert artifact["trials"][0]["first_attempt"]["passed"] is False
+    assert artifact["trials"][0]["correction"]["passed"] is True
 
 
 def test_generated_repair_self_review_smoke_uses_existing_fixture(tmp_path):

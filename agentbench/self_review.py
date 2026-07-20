@@ -280,6 +280,14 @@ def _legacy_trial(result: PairedReviewTrialResult) -> AgentTrialResult:
     )
 
 
+def _artifact_trial(result: PairedReviewTrialResult) -> dict[str, Any]:
+    """Keep paired evidence while satisfying the established import contract."""
+    legacy = asdict(_legacy_trial(result))
+    legacy["score"] = 1.0 if result.passed else 0.0
+    legacy["latency_ms"] = legacy["wall_time_ms"]
+    return {**legacy, **asdict(result)}
+
+
 def build_self_review_artifact(
     manifest: AgentTaskManifest,
     trials: list[PairedReviewTrialResult],
@@ -323,7 +331,7 @@ def build_self_review_artifact(
             ),
         }
     )
-    artifact["trials"] = [asdict(trial) for trial in trials]
+    artifact["trials"] = [_artifact_trial(trial) for trial in trials]
     return artifact
 
 
