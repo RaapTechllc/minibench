@@ -38,6 +38,7 @@ _MAX_RESULT_BYTES = 64 * 1024
 _MAX_RESULT_COLUMNS = 16
 _MAX_COMPOUND_SELECTS = 16
 _MAX_EXPRESSION_DEPTH = 100
+_ORACLE_VARIANT_COUNT = 3
 
 
 @dataclass(frozen=True)
@@ -469,6 +470,13 @@ def _matches_oracle(
     return actual == expected
 
 
+def _oracle_variants(fixture: GeneratedSqlRepairFixture) -> tuple[GeneratedSqlRepairFixture, ...]:
+    return tuple(
+        fixture.template.build(fixture.seed + offset * len(TEMPLATES))
+        for offset in range(_ORACLE_VARIANT_COUNT)
+    )
+
+
 class GeneratedSqlRepairEnvironment(TaskEnvironment):
     def __init__(self, fixture: GeneratedSqlRepairFixture, root: str | Path | None = None):
         self.fixture = fixture
@@ -523,8 +531,10 @@ class GeneratedSqlRepairEnvironment(TaskEnvironment):
                 if (handle.workspace / relative).read_text(encoding="utf-8") != expected:
                     raise ValueError("non-model fixture changed")
             sql = (handle.workspace / "models" / "fact_output.sql").read_text(encoding="utf-8")
-            columns, rows = _execute_candidate(self.fixture, sql)
-            passed = _matches_oracle(self.fixture, columns, rows)
+            passed = all(
+                _matches_oracle(variant, *_execute_candidate(variant, sql))
+                for variant in _oracle_variants(self.fixture)
+            )
         except BaseException:
             passed = False
         detail = "hidden table and invariant checks passed" if passed else "hidden table or invariant check failed"
@@ -584,6 +594,7 @@ def build_generated_sql_artifact(
                 "max_cost_usd": manifest.budget.max_cost_usd,
             },
             "terminal_outcome": "success" if all(trial.passed for trial in trials) else "verification_failed",
+            "oracle_variant_count": _ORACLE_VARIANT_COUNT,
         }
     )
     for trial in artifact["trials"]:

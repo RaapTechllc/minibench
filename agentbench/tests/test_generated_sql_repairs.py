@@ -46,6 +46,25 @@ def _run(tmp_path: Path, seed: int, agent) -> object:
     )
 
 
+def _sql_literal(value) -> str:
+    if value is None:
+        return "NULL"
+    if isinstance(value, str):
+        return "'" + value.replace("'", "''") + "'"
+    return str(value)
+
+
+def _literal_table_sql(fixture) -> str:
+    selects = []
+    for row_index, row in enumerate(fixture.expected_rows):
+        values = []
+        for column, value in zip(fixture.expected_columns, row, strict=True):
+            expression = _sql_literal(value)
+            values.append(f'{expression} AS "{column}"' if row_index == 0 else expression)
+        selects.append("SELECT " + ", ".join(values))
+    return "\nUNION ALL\n".join(selects)
+
+
 def test_seeded_generation_replays_and_covers_three_data_failure_modes():
     for seed in (0, 1, 2):
         assert generate_fixture(seed).public_snapshot() == generate_fixture(seed).public_snapshot()
@@ -115,6 +134,19 @@ def test_hard_coded_and_plausible_wrong_repairs_fail(tmp_path, seed):
 
     assert hard_coded.outcome == "verification_failed"
     assert plausible.outcome == "verification_failed"
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_exact_hidden_output_is_not_a_general_solution(tmp_path, seed):
+    fixture = generate_fixture(seed)
+
+    exact_output = _run(
+        tmp_path / "exact-output",
+        seed,
+        _SqlAgent(_literal_table_sql(fixture)),
+    )
+
+    assert exact_output.outcome == "verification_failed"
 
 
 def test_oracle_rejects_duplicate_keys_and_null_measures(tmp_path):
@@ -217,6 +249,7 @@ def test_artifact_uses_shared_shape_and_sanitizes_sql_provenance(tmp_path):
     assert artifact["provenance"]["seed_sha256"] == fixture.seed_hash
     assert artifact["provenance"]["harness"] == "agent-cabinet-generated-sql-repair"
     assert artifact["provenance"]["budgets"]["max_turns"] == 3
+    assert artifact["provenance"]["oracle_variant_count"] == 3
     assert artifact["provenance"]["terminal_outcome"] == "success"
     assert str(fixture.seed) not in encoded
     assert fixture.private_marker not in encoded
