@@ -155,6 +155,20 @@ agentbench/.venv/bin/python -m agentbench.generated_sql_repairs \
     --seed 20260719 --trials 2 --out /tmp/minibench-generated-sql-repair.json
 ```
 
+A paired self-review smoke reuses the same generated fixture and hidden oracle
+for a normal first attempt plus one independently budgeted correction. The
+correction receives only fixed, classified feedback; verifier detail and gold
+changes are never placed in the prompt or artifact:
+
+```bash
+agentbench/.venv/bin/python -m agentbench.self_review \
+    --seed 20260717 --trials 2 --out /tmp/minibench-self-review.json
+```
+
+The compatible result artifact reports first-pass and final completion,
+corrected failures, introduced regressions, no-change outcomes, and lift. An
+infrastructure failure in either phase leaves lift undefined for that pair.
+
 Cheap live testing (7B-class models, harder tasks — expect <100% pass rate):
 
 ```bash
