@@ -335,11 +335,12 @@ def _agent_result_payload(result: Any) -> bytes:
     if not isinstance(result, AgentResult):
         return b'{"kind":"malformed"}'
     try:
-        return json.dumps(
+        payload = json.dumps(
             {"kind": "result", "result": asdict(result)},
             separators=(",", ":"),
             allow_nan=False,
         ).encode("utf-8")
+        return payload if len(payload) <= _RESULT_PAYLOAD_LIMIT else b'{"kind":"malformed"}'
     except (TypeError, ValueError):
         return b'{"kind":"malformed"}'
 

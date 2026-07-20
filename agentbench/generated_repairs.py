@@ -15,6 +15,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -176,35 +178,66 @@ def _is_runtime_artifact(path: Path) -> bool:
 
 def _probe_comparator_child(connection, request: bytes, template_name: str, expected: Any) -> None:
     passed = False
+    process = None
+    timer = None
     try:
-        with tempfile.TemporaryFile() as output:
-            completed = subprocess.run(
-                [sys.executable, "-I", "-c", _CANDIDATE_PROBE_PROGRAM],
-                input=request,
-                stdout=output,
-                stderr=subprocess.DEVNULL,
-                timeout=_PRIVATE_PROBE_TIMEOUT_SECONDS,
-                check=False,
-            )
-            if completed.returncode == 0 and output.tell() <= _PRIVATE_PROBE_LIMIT:
-                output.seek(0)
-                payload = json.loads(output.read().decode("utf-8"))
-                if (
-                    isinstance(payload, dict)
-                    and payload.get("completed") is True
-                    and isinstance(payload.get("outputs"), list)
-                    and set(payload) == {"completed", "outputs"}
-                ):
-                    outputs = payload["outputs"]
-                    passed = (
-                        outputs[0] != outputs[1]
-                        and outputs[0] == outputs[2]
-                        and outputs[0] != outputs[3]
-                        if template_name == "locale-cache-key"
-                        else outputs == expected
-                    )
+        process = subprocess.Popen(
+            [sys.executable, "-I", "-c", _CANDIDATE_PROBE_PROGRAM],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        timed_out = threading.Event()
+
+        def terminate() -> None:
+            timed_out.set()
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+        timer = threading.Timer(_PRIVATE_PROBE_TIMEOUT_SECONDS, terminate)
+        timer.start()
+        process.stdin.write(request)
+        process.stdin.close()
+        raw = process.stdout.read(_PRIVATE_PROBE_LIMIT + 1)
+        oversized = len(raw) > _PRIVATE_PROBE_LIMIT
+        if oversized:
+            process.kill()
+        returncode = process.wait()
+        if not timed_out.is_set() and not oversized and returncode == 0:
+            payload = json.loads(raw.decode("utf-8"))
+            if (
+                isinstance(payload, dict)
+                and payload.get("completed") is True
+                and isinstance(payload.get("outputs"), list)
+                and set(payload) == {"completed", "outputs"}
+            ):
+                outputs = payload["outputs"]
+                passed = (
+                    outputs[0] != outputs[1]
+                    and outputs[0] == outputs[2]
+                    and outputs[0] != outputs[3]
+                    if template_name == "locale-cache-key"
+                    else outputs == expected
+                )
     except BaseException:
         pass
+    finally:
+        if timer is not None:
+            timer.cancel()
+        if process is not None:
+            if process.poll() is None:
+                with suppress(OSError):
+                    process.kill()
+            with suppress(OSError):
+                process.wait()
+            if process.stdin is not None:
+                with suppress(OSError):
+                    process.stdin.close()
+            if process.stdout is not None:
+                with suppress(OSError):
+                    process.stdout.close()
     try:
         connection.send_bytes(b"1" if passed else b"0")
     finally:

@@ -297,6 +297,29 @@ def test_candidate_frames_cannot_forge_private_probe_ipc(tmp_path):
     assert result.outcome == "verification_failed"
 
 
+def test_private_probe_stops_candidate_while_output_exceeds_limit(tmp_path):
+    fixture = generate_fixture(1)
+    marker = tmp_path / "continued-after-output-limit"
+    hostile = """import pathlib
+import sys
+sys.stdout.buffer.write(b'x' * 10_000_000)
+sys.stdout.buffer.flush()
+pathlib.Path(%r).write_text('continued')
+def fields(line):
+    return line.split(',')
+""" % str(marker)
+
+    result = run_agent_trial(
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path / "workspace"),
+        _WriteAgent({"app/records.py": hostile}),
+        trial=1,
+    )
+
+    assert result.outcome == "verification_failed"
+    assert not marker.exists()
+
+
 def test_generated_repair_agent_cannot_discover_private_parent_heap(tmp_path):
     fixture = generate_fixture(0)
     marker = tmp_path / "private-heap-found"

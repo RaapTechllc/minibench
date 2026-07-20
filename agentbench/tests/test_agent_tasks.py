@@ -43,6 +43,11 @@ class _ExecutableResultAgent:
         return _ExecutableResult(self.marker)
 
 
+class _OversizedResultAgent:
+    def execute(self, prompt, workspace, budget):
+        return AgentResult(termination_reason="x" * 5000)
+
+
 class _ClaimOnlyAgent:
     def execute(self, prompt, workspace, budget):
         return AgentResult(termination_reason="completed", claimed_success=True)
@@ -224,6 +229,17 @@ def test_agent_result_transport_never_executes_reduce_in_parent(tmp_path):
 
     assert trial.outcome == "malformed_agent_result"
     assert not marker.exists()
+
+
+def test_oversized_agent_result_is_malformed_not_infrastructure_failure(tmp_path):
+    trial = run_agent_trial(
+        load_agent_manifest(MANIFEST_PATH),
+        OfflineTextEnvironment(tmp_path),
+        _OversizedResultAgent(),
+        trial=1,
+    )
+
+    assert trial.outcome == "malformed_agent_result"
 
 
 @pytest.mark.parametrize(
