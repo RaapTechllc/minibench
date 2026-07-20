@@ -466,6 +466,8 @@ def _gen_coding_hard(rng: random.Random, n: int) -> list[dict[str, Any]]:
 # core-v1 saturates at 100% for frontier models; hard-v1 still tops out ~87%.
 # v2 chains multiple operations per task, adds misleading context, and tightens
 # format constraints while keeping the same four categories + executable oracles.
+# Descriptions are explicitly public display copy. Keep them concise and fixed;
+# never derive them from prompts, generated values, or unpublished split data.
 
 def _smallest_with_digit_sum_and_divisors(digit_sum: int, divisors: list[int]) -> int:
     x = 1
@@ -480,6 +482,7 @@ def _gen_reasoning_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
     for i in range(n):
         kind = i % 5
         if kind == 0:
+            description = "Find an integer satisfying divisor and digit-sum constraints."
             d1, d2 = rng.sample([7, 11, 13, 17], 2)
             digit_sum = rng.randint(18, 26)
             expected = float(_smallest_with_digit_sum_and_divisors(digit_sum, [d1, d2]))
@@ -489,6 +492,7 @@ def _gen_reasoning_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
             )
             tol = 1e-6
         elif kind == 1:
+            description = "Project an account balance with compound interest and annual deposits."
             principal = rng.randint(800, 2500)
             rate = rng.choice([4, 5, 6, 8])
             years = rng.randint(4, 7)
@@ -505,6 +509,7 @@ def _gen_reasoning_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
             )
             tol = 0.011
         elif kind == 2:
+            description = "Calculate a tank fill time with two inlets and one drain."
             fill_a, fill_b = rng.randint(18, 50), rng.randint(18, 50)
             drain = rng.randint(70, 200)
             initial_pct = rng.choice([15, 20, 25]) / 100
@@ -518,6 +523,7 @@ def _gen_reasoning_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
             )
             tol = 0.06
         elif kind == 3:
+            description = "Compute a modular exponentiation remainder."
             a, b, m = rng.randint(2, 9), rng.randint(4, 9), rng.choice([17, 19, 23, 29])
             expected = float(pow(a, b, m))
             prompt = (
@@ -526,6 +532,7 @@ def _gen_reasoning_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
             )
             tol = 1e-6
         else:
+            description = "Find the first consecutive-integer product divisible by a target."
             k = rng.choice([12, 15, 18, 20])
             start = 1
             while (start * (start + 1) * (start + 2)) % k != 0:
@@ -539,6 +546,7 @@ def _gen_reasoning_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
         tasks.append({
             "id": f"mb2-reason-{i+1:02d}",
             "category": "reasoning",
+            "description": description,
             "prompt": prompt,
             "verification": {"type": "numeric_match", "expected": expected, "tol": tol},
             "_gold": str(expected),
@@ -550,6 +558,7 @@ def _gen_structured_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
     tasks = []
     for i in range(n):
         if i % 2 == 0:
+            description = "Summarize discounted order lines and identify the top customer."
             customers = rng.sample(FIRST_NAMES, 4)
             lines, net_by_customer = [], {}
             total_net = Decimal("0.00")
@@ -592,6 +601,7 @@ def _gen_structured_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
                 "tol": 0.01,
             }
         else:
+            description = "Summarize service errors from a batch of log entries."
             services = rng.sample(SERVICES, 3)
             worst = services[0]
             entries, err_codes = [], []
@@ -618,6 +628,7 @@ def _gen_structured_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
         tasks.append({
             "id": f"mb2-struct-{i+1:02d}",
             "category": "tool-use",
+            "description": description,
             "prompt": prompt,
             "verification": verification,
             "_gold": json.dumps(required),
@@ -630,6 +641,7 @@ def _gen_format_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
     for i in range(n):
         words = rng.sample(WORDS, rng.randint(7, 10))
         if i % 3 == 0:
+            description = "Sort words by length and alphabetical tie-break."
             expected = ";".join(sorted(words, key=lambda w: (-len(w), w)))
             prompt = (
                 "Sort these words by length (longest first), breaking ties alphabetically. "
@@ -637,6 +649,7 @@ def _gen_format_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
                 + " ".join(words)
             )
         elif i % 3 == 1:
+            description = "Filter vowel-starting words and sort them alphabetically."
             vowel_words = sorted(w for w in words if w[0] in "aeiou")
             if not vowel_words:
                 # Ban empty exact_match gold without consuming extra RNG (coding
@@ -651,6 +664,7 @@ def _gen_format_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
                 + " ".join(words)
             )
         else:
+            description = "Reverse words and apply a Caesar shift."
             shift = rng.randint(3, 11)
 
             def _caesar(w: str) -> str:
@@ -668,6 +682,7 @@ def _gen_format_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
         tasks.append({
             "id": f"mb2-format-{i+1:02d}",
             "category": "instruction",
+            "description": description,
             "prompt": prompt,
             "verification": {"type": "exact_match", "expected": expected},
             "_gold": expected,
@@ -679,6 +694,7 @@ def _gen_coding_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
     tasks = []
     for i in range(n):
         if i % 4 == 0:
+            description = "Implement a k-th-largest array function."
             cases = []
             for _ in range(4):
                 nums = [rng.randint(-20, 40) for _ in range(rng.randint(5, 9))]
@@ -697,6 +713,7 @@ def _gen_coding_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
             gold = ("```python\ndef kth_largest(nums, k):\n"
                     "    return sorted(nums, reverse=True)[k - 1]\n```")
         elif i % 4 == 1:
+            description = "Implement balanced-bracket validation."
             pairs = ["()", "[]", "{}", "(]", "([)]", "({[]})"]
             valid = ["()", "[]", "{}", "({[]})"]
             asserts = "\n".join(
@@ -719,6 +736,7 @@ def _gen_coding_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
                     "            stack.pop()\n"
                     "    return not stack\n```")
         elif i % 4 == 2:
+            description = "Implement nested repetition-string decoding."
             cases = [
                 ("3[a]2[bc]", "aaabcbc"),
                 ("3[a2[c]]", "accaccacc"),
@@ -747,6 +765,7 @@ def _gen_coding_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
                     "            cur += ch\n"
                     "    return cur\n```")
         else:
+            description = "Implement product-except-self without division."
             cases = []
             for _ in range(3):
                 nums = [rng.randint(1, 9) for _ in range(rng.randint(4, 6))]
@@ -783,6 +802,7 @@ def _gen_coding_v2(rng: random.Random, n: int) -> list[dict[str, Any]]:
         tasks.append({
             "id": f"mb2-code-{i+1:02d}",
             "category": "coding",
+            "description": description,
             "prompt": prompt,
             "verification": {"type": "unit_test", "test_source": test_source},
             "_gold": gold,

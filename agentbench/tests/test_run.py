@@ -85,6 +85,21 @@ def test_run_suite_carries_public_arcade_task_fields():
     assert result.task_description == "Calculate the trip duration."
 
 
+def test_v2_public_description_reaches_submit_payload():
+    suite_path = Path(__file__).resolve().parents[1] / "tasks" / "minibench-v2.json"
+    suite, tasks = load_tasks(suite_path)
+    task = tasks[0]
+    config = single_model_config("openrouter/x/y")
+
+    result = run_suite(config, [task], trials=1, model=None, stub=StubModel())[0]
+    summary = summarize(config, suite, 1, [result])
+    payload = to_agent_run_submit(summary, [result], provider="openrouter")
+
+    assert task["description"]
+    assert result.task_description == task["description"]
+    assert payload["results"][0]["task_description"] == task["description"]
+
+
 def test_live_run_without_key_errors_cleanly(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr("agentbench.run._load_env_files", lambda: None)

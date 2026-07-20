@@ -4,6 +4,7 @@ The bad-answer checks below ARE the brief's "pilot each grader against a
 deliberately-bad answer" guardrail, encoded as a permanent test.
 """
 import json
+import re
 
 import pytest
 
@@ -141,3 +142,17 @@ def test_v2_tasks_have_arcade_scenario_types():
             assert scenario_type == "spreadsheet"
 
     assert {scenario_type_for_task(t) for t in tasks} == SCENARIO_TYPES
+
+
+def test_v2_tasks_have_safe_public_descriptions():
+    from agentbench.minibench_gen import V2_DEV_SEED
+
+    tasks = generate_tasks(V2_DEV_SEED, suite="v2")
+    for task in tasks:
+        description = task.get("description")
+        assert isinstance(description, str) and description.strip(), task["id"]
+        assert len(description) <= 120, task["id"]
+        assert description != task["prompt"], task["id"]
+        assert not re.search(
+            r"\b(?:canary|seed|private|gold)\b", description, re.I
+        ), task["id"]
