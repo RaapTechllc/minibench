@@ -34,6 +34,10 @@ HARNESS = "agent-cabinet-generated-sql-repair"
 _BUDGET = AgentBudget(max_turns=3, wall_time_seconds=5, max_tokens=300, max_cost_usd=0.0)
 _QUERY_STEP_LIMIT = 100_000
 _MAX_QUERY_BYTES = 64 * 1024
+_MAX_RESULT_BYTES = 64 * 1024
+_MAX_RESULT_COLUMNS = 16
+_MAX_COMPOUND_SELECTS = 16
+_MAX_EXPRESSION_DEPTH = 100
 
 
 @dataclass(frozen=True)
@@ -386,6 +390,16 @@ def manifest_for(fixture: GeneratedSqlRepairFixture) -> AgentTaskManifest:
 
 def _load_private_database(fixture: GeneratedSqlRepairFixture) -> sqlite3.Connection:
     connection = sqlite3.connect(":memory:")
+    limits = {
+        "SQLITE_LIMIT_LENGTH": _MAX_RESULT_BYTES,
+        "SQLITE_LIMIT_SQL_LENGTH": _MAX_QUERY_BYTES,
+        "SQLITE_LIMIT_COLUMN": max(_MAX_RESULT_COLUMNS, len(fixture.expected_columns)),
+        "SQLITE_LIMIT_COMPOUND_SELECT": _MAX_COMPOUND_SELECTS,
+        "SQLITE_LIMIT_EXPR_DEPTH": _MAX_EXPRESSION_DEPTH,
+    }
+    for name, value in limits.items():
+        if (category := getattr(sqlite3, name, None)) is not None:
+            connection.setlimit(category, value)
     connection.executescript(fixture.public_files["schema.sql"])
     for table, rows in fixture.private_rows.items():
         if not rows:
@@ -426,7 +440,10 @@ def _execute_candidate(fixture: GeneratedSqlRepairFixture, sql: str) -> tuple[tu
         if cursor.description is None:
             raise ValueError("candidate must return a table")
         columns = tuple(column[0] for column in cursor.description)
-        rows = tuple(tuple(row) for row in cursor.fetchall())
+        rows = tuple(
+            tuple(row)
+            for row in cursor.fetchmany(len(fixture.expected_rows) + 1)
+        )
         return columns, rows
     finally:
         connection.close()

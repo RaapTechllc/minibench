@@ -1,4 +1,5 @@
 import json
+import sqlite3
 from dataclasses import replace
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from agentbench.generated_sql_repairs import (
     FIXTURE_VERSION,
     GeneratedSqlRepairEnvironment,
     GeneratedSqlRepairGoldAgent,
+    _execute_candidate,
     build_generated_sql_artifact,
     generate_fixture,
     manifest_for,
@@ -132,6 +134,32 @@ GROUP BY a.account_id
 
     assert _run(tmp_path / "duplicates", 0, _SqlAgent(duplicate_rows)).outcome == "verification_failed"
     assert _run(tmp_path / "nulls", 1, _SqlAgent(null_measure)).outcome == "verification_failed"
+
+
+def test_candidate_result_materialization_is_bounded():
+    fixture = generate_fixture(1)
+    oversized_rows = """
+WITH RECURSIVE sequence(value) AS (
+    SELECT 1
+    UNION ALL
+    SELECT value + 1 FROM sequence WHERE value < 100
+)
+SELECT value AS account_id, 0 AS collected_cents
+FROM sequence
+"""
+
+    columns, rows = _execute_candidate(fixture, oversized_rows)
+
+    assert columns == fixture.expected_columns
+    assert len(rows) == len(fixture.expected_rows) + 1
+
+
+def test_candidate_cell_size_is_limited_before_materialization():
+    fixture = generate_fixture(1)
+    oversized_cell = "SELECT 1 AS account_id, zeroblob(70000) AS collected_cents"
+
+    with pytest.raises(sqlite3.DataError, match="too big"):
+        _execute_candidate(fixture, oversized_cell)
 
 
 def test_repeated_trials_get_identical_clean_isolated_workspaces(tmp_path):
