@@ -12,7 +12,11 @@ import hashlib
 import json
 import multiprocessing
 import shutil
+import subprocess
+import sys
 import tempfile
+import threading
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -39,6 +43,19 @@ HARNESS = "agent-cabinet-generated-repair"
 _BUDGET = AgentBudget(max_turns=3, wall_time_seconds=5, max_tokens=300, max_cost_usd=0.0)
 _IGNORED_RUNTIME_PATH_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 _PRIVATE_PROBE_TIMEOUT_SECONDS = 1
+_PRIVATE_PROBE_LIMIT = 4096
+_PRIVATE_PROBE_WRAPPER_SECONDS = 4
+_CANDIDATE_PROBE_PROGRAM = r"""
+import json
+import sys
+
+request = json.loads(sys.stdin.buffer.read())
+namespace = {}
+exec(compile(request["source"], request["target"], "exec"), namespace)
+function = namespace[request["symbol"]]
+outputs = [function(*args) for args in request["calls"]]
+sys.stdout.buffer.write(json.dumps({"completed": True, "outputs": outputs}, separators=(",", ":")).encode())
+"""
 
 
 @dataclass(frozen=True)
@@ -159,21 +176,70 @@ def _is_runtime_artifact(path: Path) -> bool:
     return any(part in _IGNORED_RUNTIME_PATH_PARTS for part in path.parts)
 
 
-def _candidate_probe_child(connection, target: str, source: str, symbol: str, calls: tuple[tuple[Any, ...], ...]) -> None:
+def _probe_comparator_child(connection, request: bytes, template_name: str, expected: Any) -> None:
+    passed = False
+    process = None
+    timer = None
     try:
-        namespace: dict[str, Any] = {}
-        exec(compile(source, target, "exec"), namespace)
-        function = namespace[symbol]
-        # Never pickle candidate-controlled values across the trust boundary.
-        # JSON encoding happens in the killable child and the parent accepts a
-        # small bytes payload containing JSON primitives only.
-        payload = json.dumps(
-            {"completed": True, "outputs": [function(*args) for args in calls]},
-            separators=(",", ":"),
-        ).encode("utf-8")
-        connection.send_bytes(payload)
+        process = subprocess.Popen(
+            [sys.executable, "-I", "-c", _CANDIDATE_PROBE_PROGRAM],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+        timed_out = threading.Event()
+
+        def terminate() -> None:
+            timed_out.set()
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+        timer = threading.Timer(_PRIVATE_PROBE_TIMEOUT_SECONDS, terminate)
+        timer.start()
+        process.stdin.write(request)
+        process.stdin.close()
+        raw = process.stdout.read(_PRIVATE_PROBE_LIMIT + 1)
+        oversized = len(raw) > _PRIVATE_PROBE_LIMIT
+        if oversized:
+            process.kill()
+        returncode = process.wait()
+        if not timed_out.is_set() and not oversized and returncode == 0:
+            payload = json.loads(raw.decode("utf-8"))
+            if (
+                isinstance(payload, dict)
+                and payload.get("completed") is True
+                and isinstance(payload.get("outputs"), list)
+                and set(payload) == {"completed", "outputs"}
+            ):
+                outputs = payload["outputs"]
+                passed = (
+                    outputs[0] != outputs[1]
+                    and outputs[0] == outputs[2]
+                    and outputs[0] != outputs[3]
+                    if template_name == "locale-cache-key"
+                    else outputs == expected
+                )
     except BaseException:
-        connection.send_bytes(b'{"completed":false,"outputs":[]}')
+        pass
+    finally:
+        if timer is not None:
+            timer.cancel()
+        if process is not None:
+            if process.poll() is None:
+                with suppress(OSError):
+                    process.kill()
+            with suppress(OSError):
+                process.wait()
+            if process.stdin is not None:
+                with suppress(OSError):
+                    process.stdin.close()
+            if process.stdout is not None:
+                with suppress(OSError):
+                    process.stdout.close()
+    try:
+        connection.send_bytes(b"1" if passed else b"0")
     finally:
         connection.close()
 
@@ -194,36 +260,35 @@ def _run_private_probe(template_name: str, target: str, source: str, repaired_so
         calls = (("u", "en"), ("u", "fr"), ("u", "en"), ("v", "en"))
         expected = None
 
-    # Spawn is intentional: fork would inherit fixture/gold data in the
-    # untrusted candidate's object graph and expose it through introspection.
+    request = json.dumps(
+        {"target": target, "source": source, "symbol": symbol, "calls": calls},
+        separators=(",", ":"),
+    ).encode("utf-8")
     context = multiprocessing.get_context("spawn")
     parent, child = context.Pipe(duplex=False)
-    process = context.Process(target=_candidate_probe_child, args=(child, target, source, symbol, calls), daemon=True)
-    process.start()
-    child.close()
-    if not parent.poll(_PRIVATE_PROBE_TIMEOUT_SECONDS):
-        process.terminate()
-        process.join()
-        parent.close()
-        return False
+    process = context.Process(
+        target=_probe_comparator_child,
+        args=(child, request, template_name, list(expected) if expected is not None else None),
+        daemon=True,
+    )
     try:
-        payload = json.loads(parent.recv_bytes(4096).decode("utf-8"))
-        if (
-            not isinstance(payload, dict)
-            or payload.get("completed") is not True
-            or not isinstance(payload.get("outputs"), list)
-            or set(payload) != {"completed", "outputs"}
-        ):
+        process.start()
+        child.close()
+        if not parent.poll(_PRIVATE_PROBE_WRAPPER_SECONDS):
+            process.terminate()
+            process.join()
             return False
-        outputs = payload["outputs"]
-        if template_name == "locale-cache-key":
-            return outputs[0] != outputs[1] and outputs[0] == outputs[2] and outputs[0] != outputs[3]
-        return tuple(outputs) == expected
-    except (EOFError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return parent.recv_bytes(1) == b"1"
+    except (EOFError, OSError):
         return False
     finally:
         parent.close()
-        process.join()
+        child.close()
+        if process.pid is not None:
+            process.join(timeout=1)
+            if process.is_alive():
+                process.terminate()
+                process.join()
 
 
 class GeneratedRepairEnvironment(TaskEnvironment):
@@ -257,12 +322,14 @@ class GeneratedRepairEnvironment(TaskEnvironment):
             raise
 
     def execute(self, agent: AgentAdapter, handle: EnvironmentHandle, prompt: str, budget: AgentBudget) -> AgentResult:
-        return execute_agent_with_budget(agent, prompt, handle.workspace, budget)
+        return execute_agent_with_budget(
+            agent, prompt, handle.workspace, budget, start_method="spawn"
+        )
 
     def verify(self, handle: EnvironmentHandle) -> VerificationResult:
         try:
             actual = {
-                str(path.relative_to(handle.workspace)): path.read_text(encoding="utf-8")
+                path.relative_to(handle.workspace).as_posix(): path.read_text(encoding="utf-8")
                 for path in handle.workspace.rglob("*")
                 if path.is_file() and not _is_runtime_artifact(path.relative_to(handle.workspace))
             }
@@ -300,14 +367,26 @@ class GeneratedRepairEnvironment(TaskEnvironment):
 class GeneratedRepairGoldAgent:
     """Offline-only reference agent; it is never used to grade model output."""
 
-    def __init__(self, fixture: GeneratedRepairFixture):
-        self.fixture = fixture
-
     def execute(self, prompt: str, workspace: Path, budget: AgentBudgetGuard) -> AgentResult:
         budget.consume(turns=1)
-        target = {path for path, content in self.fixture.broken_files.items() if self.fixture.repaired_files[path] != content}
-        for path in target:
-            (workspace / path).write_text(self.fixture.repaired_files[path], encoding="utf-8")
+        if (target := workspace / "app/config.py").exists():
+            source = target.read_text(encoding="utf-8")
+            default = source.partition(" or ")[2].strip()
+            target.write_text(
+                f"def timeout(value=None):\n    return {default} if value is None else value\n",
+                encoding="utf-8",
+            )
+        elif (target := workspace / "app/records.py").exists():
+            target.write_text(
+                target.read_text(encoding="utf-8").replace("split(';')", "split(',')"),
+                encoding="utf-8",
+            )
+        else:
+            target = workspace / "app/cache.py"
+            target.write_text(
+                target.read_text(encoding="utf-8").replace("f'{user}'", "f'{user}:{locale}'"),
+                encoding="utf-8",
+            )
         return AgentResult("completed", claimed_success=True, turns=1, tokens_in=0, tokens_out=0, cost_usd=0.0)
 
 
@@ -333,7 +412,7 @@ def run_offline(seed: int, trials: int, out: str | Path) -> int:
     fixture = generate_fixture(seed)
     manifest = manifest_for(fixture)
     environment = GeneratedRepairEnvironment(fixture)
-    results = [run_agent_trial(manifest, environment, GeneratedRepairGoldAgent(fixture), trial=i) for i in range(1, trials + 1)]
+    results = [run_agent_trial(manifest, environment, GeneratedRepairGoldAgent(), trial=i) for i in range(1, trials + 1)]
     artifact = build_generated_artifact(manifest, fixture, results)
     Path(out).write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(artifact["summary"], indent=2))

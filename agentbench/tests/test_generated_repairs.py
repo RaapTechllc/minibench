@@ -1,4 +1,5 @@
 import hashlib
+import gc
 import json
 import time
 from dataclasses import replace
@@ -16,6 +17,79 @@ from agentbench.generated_repairs import (
     manifest_for,
     run_offline,
 )
+
+
+class _ForgedProbeAgent:
+    def execute(self, prompt, workspace, budget):
+        budget.consume(turns=1)
+        (workspace / "app/cache.py").write_text(
+            """import inspect
+def cache_key(user, locale):
+    frame = inspect.currentframe()
+    while frame is not None:
+        for value in frame.f_locals.values():
+            if hasattr(value, 'send_bytes'):
+                value.send_bytes(b'{\"completed\":true,\"outputs\":[\"x\",\"y\",\"x\",\"z\"]}')
+                return 'broken'
+        frame = frame.f_back
+    return 'broken'
+""",
+            encoding="utf-8",
+        )
+        return AgentResult("completed", claimed_success=True)
+
+
+class _PrivateHeapAgent:
+    def __init__(self, marker):
+        self.marker = marker
+
+    def execute(self, prompt, workspace, budget):
+        budget.consume(turns=1)
+        for candidate in gc.get_objects():
+            if type(candidate).__name__ == "GeneratedRepairFixture":
+                self.marker.write_text("private fixture found", encoding="utf-8")
+                for path, repaired in candidate.repaired_files.items():
+                    if candidate.broken_files[path] != repaired:
+                        (workspace / path).write_text(repaired, encoding="utf-8")
+                break
+        return AgentResult("completed", claimed_success=True)
+
+
+class _NoOpAgent:
+    def execute(self, prompt, workspace, budget):
+        return AgentResult("completed", claimed_success=True)
+
+
+class _WriteAgent:
+    def __init__(self, writes):
+        self.writes = writes
+
+    def execute(self, prompt, workspace, budget):
+        budget.consume(turns=1)
+        for relative, content in self.writes.items():
+            target = workspace / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(content, bytes):
+                target.write_bytes(content)
+            else:
+                target.write_text(content, encoding="utf-8")
+        return AgentResult("completed", claimed_success=True)
+
+
+class _SlowAgent:
+    def execute(self, prompt, workspace, budget):
+        time.sleep(2)
+        return AgentResult("completed", claimed_success=True)
+
+
+class _CacheRepairAgent(_WriteAgent):
+    def execute(self, prompt, workspace, budget):
+        result = super().execute(prompt, workspace, budget)
+        (workspace / "app" / "__pycache__").mkdir(parents=True)
+        (workspace / "app" / "__pycache__" / "records.cpython-312.pyc").write_bytes(b"cache")
+        (workspace / ".pytest_cache").mkdir()
+        (workspace / ".pytest_cache" / "README.md").write_text("cache\n", encoding="utf-8")
+        return result
 
 
 def test_seeded_generation_replays_byte_for_byte_and_varies_validly():
@@ -73,19 +147,15 @@ def test_gold_repair_passes_and_noop_fails(tmp_path):
     passed = run_agent_trial(
         manifest,
         GeneratedRepairEnvironment(fixture, tmp_path / "pass"),
-        GeneratedRepairGoldAgent(fixture),
+        GeneratedRepairGoldAgent(),
         trial=1,
     )
     assert passed.passed is True
 
-    class NoOp:
-        def execute(self, prompt, workspace, budget):
-            return AgentResult("completed", claimed_success=True)
-
     failed = run_agent_trial(
         manifest,
         GeneratedRepairEnvironment(fixture, tmp_path / "noop"),
-        NoOp(),
+        _NoOpAgent(),
         trial=1,
     )
     assert failed.outcome == "verification_failed"
@@ -102,21 +172,16 @@ def test_gold_repair_passes_and_noop_fails(tmp_path):
 def test_oracle_accepts_behaviorally_equivalent_non_gold_repairs(tmp_path, seed, equivalent_source):
     fixture = generate_fixture(seed)
 
-    class EquivalentRepair:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            target = next(
-                path for path, content in fixture.repaired_files.items()
-                if fixture.broken_files[path] != content
-            )
-            assert equivalent_source != fixture.repaired_files[target]
-            (workspace / target).write_text(equivalent_source, encoding="utf-8")
-            return AgentResult("completed", claimed_success=True)
+    target = next(
+        path for path, content in fixture.repaired_files.items()
+        if fixture.broken_files[path] != content
+    )
+    assert equivalent_source != fixture.repaired_files[target]
 
     result = run_agent_trial(
         manifest_for(fixture),
         GeneratedRepairEnvironment(fixture, tmp_path / str(seed)),
-        EquivalentRepair(),
+        _WriteAgent({target: equivalent_source}),
         trial=1,
     )
 
@@ -126,17 +191,11 @@ def test_oracle_accepts_behaviorally_equivalent_non_gold_repairs(tmp_path, seed,
 def test_oracle_rejects_changed_seed_specific_default(tmp_path):
     fixture = generate_fixture(0)
 
-    class ChangedDefault:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            (workspace / "app/config.py").write_text(
-                "def timeout(value=None):\n    return 44 if value is None else value\n",
-                encoding="utf-8",
-            )
-            return AgentResult("completed", claimed_success=True)
-
     result = run_agent_trial(
-        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), ChangedDefault(), trial=1
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path),
+        _WriteAgent({"app/config.py": "def timeout(value=None):\n    return 44 if value is None else value\n"}),
+        trial=1,
     )
     assert result.outcome == "verification_failed"
 
@@ -144,14 +203,11 @@ def test_oracle_rejects_changed_seed_specific_default(tmp_path):
 def test_oracle_treats_probe_errors_as_failed_repairs(tmp_path):
     fixture = generate_fixture(1)
 
-    class MissingSymbol:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            (workspace / "app/records.py").write_text("def unrelated():\n    return []\n", encoding="utf-8")
-            return AgentResult("completed", claimed_success=True)
-
     result = run_agent_trial(
-        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), MissingSymbol(), trial=1
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path),
+        _WriteAgent({"app/records.py": "def unrelated():\n    return []\n"}),
+        trial=1,
     )
     assert result.outcome == "verification_failed"
 
@@ -162,32 +218,25 @@ def test_oracle_treats_probe_errors_as_failed_repairs(tmp_path):
 )
 def test_oracle_bounds_private_probe_and_converts_child_failures(tmp_path, source):
     fixture = generate_fixture(1)
-
-    class HostileCandidate:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            (workspace / "app/records.py").write_text(source, encoding="utf-8")
-            return AgentResult("completed", claimed_success=True)
-
+    environment = GeneratedRepairEnvironment(fixture, tmp_path)
+    prepared = environment.prepare(manifest_for(fixture), trial=1)
+    (prepared.handle.workspace / "app/records.py").write_text(source, encoding="utf-8")
     started = time.monotonic()
-    result = run_agent_trial(
-        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), HostileCandidate(), trial=1
-    )
-    assert result.outcome == "verification_failed"
-    assert time.monotonic() - started < 1.8
+    result = environment.verify(prepared.handle)
+    environment.dispose(prepared.handle)
+
+    assert result.passed is False
+    assert time.monotonic() - started < 5
 
 
 def test_oracle_converts_unreadable_candidate_to_verification_failure(tmp_path):
     fixture = generate_fixture(1)
 
-    class NonUtf8Candidate:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            (workspace / "app/records.py").write_bytes(b"\xff\xfe")
-            return AgentResult("completed", claimed_success=True)
-
     result = run_agent_trial(
-        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), NonUtf8Candidate(), trial=1
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path),
+        _WriteAgent({"app/records.py": b"\xff\xfe"}),
+        trial=1,
     )
     assert result.outcome == "verification_failed"
 
@@ -205,14 +254,11 @@ def timeout(value=None):
     return -1
 """ % gold
 
-    class FrameInspector:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            (workspace / "app/config.py").write_text(hostile, encoding="utf-8")
-            return AgentResult("completed", claimed_success=True)
-
     result = run_agent_trial(
-        manifest_for(fixture), GeneratedRepairEnvironment(fixture, tmp_path), FrameInspector(), trial=1
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path),
+        _WriteAgent({"app/config.py": hostile}),
+        trial=1,
     )
     assert result.outcome == "verification_failed"
 
@@ -228,18 +274,63 @@ def fields(line):
     return Hostile()
 """ % f"touch {marker}"
 
-    class PicklePayload:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            (workspace / "app/records.py").write_text(hostile, encoding="utf-8")
-            return AgentResult("completed", claimed_success=True)
+    result = run_agent_trial(
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path / "workspace"),
+        _WriteAgent({"app/records.py": hostile}),
+        trial=1,
+    )
+    assert result.outcome == "verification_failed"
+    assert not marker.exists()
+
+
+def test_candidate_frames_cannot_forge_private_probe_ipc(tmp_path):
+    fixture = generate_fixture(2)
+
+    result = run_agent_trial(
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path),
+        _ForgedProbeAgent(),
+        trial=1,
+    )
+
+    assert result.outcome == "verification_failed"
+
+
+def test_private_probe_stops_candidate_while_output_exceeds_limit(tmp_path):
+    fixture = generate_fixture(1)
+    marker = tmp_path / "continued-after-output-limit"
+    hostile = """import pathlib
+import sys
+sys.stdout.buffer.write(b'x' * 10_000_000)
+sys.stdout.buffer.flush()
+pathlib.Path(%r).write_text('continued')
+def fields(line):
+    return line.split(',')
+""" % str(marker)
 
     result = run_agent_trial(
         manifest_for(fixture),
         GeneratedRepairEnvironment(fixture, tmp_path / "workspace"),
-        PicklePayload(),
+        _WriteAgent({"app/records.py": hostile}),
         trial=1,
     )
+
+    assert result.outcome == "verification_failed"
+    assert not marker.exists()
+
+
+def test_generated_repair_agent_cannot_discover_private_parent_heap(tmp_path):
+    fixture = generate_fixture(0)
+    marker = tmp_path / "private-heap-found"
+
+    result = run_agent_trial(
+        manifest_for(fixture),
+        GeneratedRepairEnvironment(fixture, tmp_path / "workspace"),
+        _PrivateHeapAgent(marker),
+        trial=1,
+    )
+
     assert result.outcome == "verification_failed"
     assert not marker.exists()
 
@@ -270,7 +361,7 @@ def test_digest_mismatch_fails_preparation_and_cleans_workspace(tmp_path):
     result = run_agent_trial(
         mismatched,
         GeneratedRepairEnvironment(fixture, tmp_path),
-        GeneratedRepairGoldAgent(fixture),
+        GeneratedRepairGoldAgent(),
         trial=1,
     )
     assert result.outcome == "preparation_failed"
@@ -283,16 +374,11 @@ def test_generated_harness_terminates_agent_at_wall_time_budget(tmp_path):
     manifest = manifest_for(fixture)
     manifest = replace(manifest, budget=replace(manifest.budget, wall_time_seconds=1))
 
-    class SlowAgent:
-        def execute(self, prompt, workspace, budget):
-            time.sleep(2)
-            return AgentResult("completed", claimed_success=True)
-
     started = time.monotonic()
     result = run_agent_trial(
         manifest,
         GeneratedRepairEnvironment(fixture, tmp_path),
-        SlowAgent(),
+        _SlowAgent(),
         trial=1,
     )
 
@@ -305,24 +391,15 @@ def test_oracle_ignores_runtime_cache_artifacts(tmp_path):
     fixture = generate_fixture(1)
     manifest = manifest_for(fixture)
 
-    class CorrectRepairWithCaches:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            target = next(
-                path for path, content in fixture.repaired_files.items()
-                if fixture.broken_files[path] != content
-            )
-            (workspace / target).write_text(fixture.repaired_files[target], encoding="utf-8")
-            (workspace / "app" / "__pycache__").mkdir(parents=True)
-            (workspace / "app" / "__pycache__" / "records.cpython-312.pyc").write_bytes(b"cache")
-            (workspace / ".pytest_cache").mkdir()
-            (workspace / ".pytest_cache" / "README.md").write_text("cache\n", encoding="utf-8")
-            return AgentResult("completed", claimed_success=True)
+    target = next(
+        path for path, content in fixture.repaired_files.items()
+        if fixture.broken_files[path] != content
+    )
 
     result = run_agent_trial(
         manifest,
         GeneratedRepairEnvironment(fixture, tmp_path),
-        CorrectRepairWithCaches(),
+        _CacheRepairAgent({target: fixture.repaired_files[target]}),
         trial=1,
     )
 
@@ -334,18 +411,12 @@ def test_oracle_rejects_symptom_only_and_collateral_repairs(tmp_path, seed):
     fixture = generate_fixture(seed)
     manifest = manifest_for(fixture)
 
-    class BadRepair:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            target = next(path for path in fixture.repaired_files if path.startswith("app/"))
-            (workspace / target).write_text(fixture.repaired_files[target], encoding="utf-8")
-            (workspace / "README.md").write_text("symptom hidden\n", encoding="utf-8")
-            return AgentResult("completed", claimed_success=True)
+    target = next(path for path in fixture.repaired_files if path.startswith("app/"))
 
     result = run_agent_trial(
         manifest,
         GeneratedRepairEnvironment(fixture, tmp_path / str(seed)),
-        BadRepair(),
+        _WriteAgent({target: fixture.repaired_files[target], "README.md": "symptom hidden\n"}),
         trial=1,
     )
     assert result.outcome == "verification_failed"
@@ -355,18 +426,10 @@ def test_oracle_rejects_test_only_symptom_suppression(tmp_path):
     fixture = generate_fixture(1)
     manifest = manifest_for(fixture)
 
-    class SymptomOnly:
-        def execute(self, prompt, workspace, budget):
-            budget.consume(turns=1)
-            test_file = workspace / "tests" / "test_symptom.py"
-            test_file.parent.mkdir()
-            test_file.write_text("def test_symptom_is_gone():\n    assert True\n", encoding="utf-8")
-            return AgentResult("completed", claimed_success=True)
-
     result = run_agent_trial(
         manifest,
         GeneratedRepairEnvironment(fixture, tmp_path / "test-only"),
-        SymptomOnly(),
+        _WriteAgent({"tests/test_symptom.py": "def test_symptom_is_gone():\n    assert True\n"}),
         trial=1,
     )
     assert result.outcome == "verification_failed"
@@ -378,7 +441,7 @@ def test_artifact_has_sanitized_generated_provenance(tmp_path):
     trial = run_agent_trial(
         manifest,
         GeneratedRepairEnvironment(fixture, tmp_path / "artifact"),
-        GeneratedRepairGoldAgent(fixture),
+        GeneratedRepairGoldAgent(),
         trial=1,
     )
     artifact = build_generated_artifact(manifest, fixture, [trial])
