@@ -74,6 +74,9 @@ def test_legacy_artifact_maps_to_submit_payload():
     assert "seed_sha256" not in payload  # no provenance block → nothing forwarded
     assert len(payload["results"]) == 2
     assert payload["results"][0]["task_id"] == "mb-reason-01"
+    assert payload["results"][0]["scenario_type"] is None
+    assert payload["results"][0]["task_description"] is None
+    assert payload["results"][0]["passed_format"] is None
 
 
 def test_load_trials_fills_grader_v3_defaults_and_drops_unknown_keys():
@@ -81,6 +84,7 @@ def test_load_trials_fills_grader_v3_defaults_and_drops_unknown_keys():
     t = trials[0]
     assert t.infra_error is False and t.canary_flag is False
     assert t.passed_format is None and t.output_snippet == ""
+    assert t.scenario_type is None and t.task_description is None
 
 
 def test_dry_run_artifact_refused_without_override():

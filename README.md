@@ -80,6 +80,14 @@ npm install
 npm run dev                                  # http://localhost:5173 (proxies to :3070)
 ```
 
+`create_all` creates new schemas but does not alter existing tables. Upgrade an
+existing database for Arcade manual task metadata before starting the updated
+backend:
+
+```bash
+psql -d minibench -f backend/migrations/20260720_01_agent_task_arcade_fields.sql
+```
+
 ## CLI
 
 ```bash

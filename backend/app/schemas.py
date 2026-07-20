@@ -169,8 +169,11 @@ class StatsResponse(BaseModel):
 class AgentTaskResultSubmit(BaseModel):
     task_id: str = Field(..., max_length=128)
     category: Optional[str] = Field(None, max_length=64)
+    scenario_type: Optional[str] = Field(None, max_length=32)
+    task_description: Optional[str] = Field(None, max_length=2000)
     trial: Optional[int] = None
     passed: bool
+    passed_format: Optional[bool] = None
     score: Optional[Decimal] = None
     cost_usd: Optional[Decimal] = None
     latency_ms: Optional[int] = None
@@ -313,8 +316,11 @@ class ModelLeaderboardEntry(BaseModel):
 class AgentTaskResultResponse(BaseModel):
     task_id: str
     category: Optional[str] = None
+    scenario_type: Optional[str] = None
+    task_description: Optional[str] = None
     trial: Optional[int] = None
     passed: bool
+    passed_format: Optional[bool] = None
     score: Optional[Decimal] = None
     cost_usd: Optional[Decimal] = None
     latency_ms: Optional[int] = None

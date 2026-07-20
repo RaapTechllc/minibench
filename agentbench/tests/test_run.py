@@ -67,6 +67,23 @@ def test_to_agent_run_submit_scales_percentages():
     assert len(payload["results"]) == len(results)
 
 
+def test_run_suite_carries_public_arcade_task_fields():
+    config = single_model_config("openrouter/x/y")
+    task = {
+        "id": "reason-word-problem",
+        "category": "instruction",
+        "prompt": "A trip takes 165 minutes. Answer with the duration only.",
+        "description": "Calculate the trip duration.",
+        "scenario_type": "slack",
+        "verification": {"type": "numeric_match", "expected": 165},
+    }
+
+    result = run_suite(config, [task], trials=1, model=None, stub=StubModel())[0]
+
+    assert result.scenario_type == "slack"
+    assert result.task_description == "Calculate the trip duration."
+
+
 def test_live_run_without_key_errors_cleanly(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr("agentbench.run._load_env_files", lambda: None)
@@ -235,6 +252,7 @@ def test_private_split_redacts_gold_from_trial_detail(monkeypatch, tmp_path):
     assert "expected" not in text  # no "got N, expected M" leak
     for t in json.loads(text)["trials"]:
         assert t["detail"] in {"pass", "fail", "infra"}
+        assert t["task_description"] is None
 
 
 # ── pro axes surfacing (calibration + robustness) ─────────────────────────────
@@ -312,3 +330,36 @@ def test_summarize_reports_dual_capability_and_format():
     assert s["grader_version"] == "3"
     assert s["pass_rate"] == s["pass_capability"] == 0.5
     assert s["pass_format"] == 0.0
+
+
+def test_submit_payload_preserves_arcade_task_metadata_and_format_verdict():
+    config = single_model_config("openrouter/qwen/qwen-2.5-7b-instruct")
+    results = [
+        TrialResult(
+            "mb2-code-01",
+            "coding",
+            1,
+            True,
+            1.0,
+            0.01,
+            25,
+            10,
+            5,
+            detail="match",
+            passed_format=False,
+            scenario_type="cursor",
+            task_description="Fix the failing parser without changing its public API.",
+        )
+    ]
+
+    payload = to_agent_run_submit(
+        summarize(config, "minibench-v2", 1, results),
+        results,
+        provider="openrouter",
+    )
+
+    assert payload["results"][0]["scenario_type"] == "cursor"
+    assert payload["results"][0]["task_description"] == (
+        "Fix the failing parser without changing its public API."
+    )
+    assert payload["results"][0]["passed_format"] is False

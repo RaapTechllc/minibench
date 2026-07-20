@@ -112,8 +112,11 @@ export interface AgentLeaderboardEntry {
 export interface AgentTaskResult {
   task_id: string;
   category: string | null;
+  scenario_type: string | null;
+  task_description: string | null;
   trial: number | null;
   passed: boolean;
+  passed_format: boolean | null;
   score: number | null;
   cost_usd: number | null;
   latency_ms: number | null;

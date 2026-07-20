@@ -9,6 +9,12 @@ import {
 } from '../components/ui';
 import { fmtPct, fmtCost } from '../components/chart';
 import { categoryDisplayName, formatScorecard, orderCategoryKeys } from '../lib/scorecard.js';
+import {
+  cabinetPathForModels,
+  summarizeTaskVerdicts,
+  taskDisplayName,
+  taskScenario,
+} from '../lib/runDetail.js';
 
 function fmtDate(value: string | null): string {
   if (!value) return '—';
@@ -16,22 +22,13 @@ function fmtDate(value: string | null): string {
   return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
 }
 
-type ScenarioKind = 'spreadsheet' | 'cursor' | 'slack';
-
-const CATEGORY_SCENARIO_FALLBACK: Record<string, ScenarioKind> = {
-  reasoning: 'spreadsheet',
-  'tool-use': 'spreadsheet',
-  instruction: 'slack',
-  coding: 'cursor',
-};
-
-const SCENARIO_LABELS: Record<ScenarioKind, string> = {
+const SCENARIO_LABELS = {
   spreadsheet: 'Spreadsheet',
   cursor: 'Cursor',
   slack: 'Slack',
 };
 
-const SCENARIO_CLASSES: Record<ScenarioKind, string> = {
+const SCENARIO_CLASSES = {
   spreadsheet: 'border-cyan-400/40 bg-cyan-400/10 text-cyan-200',
   cursor: 'border-violet-400/40 bg-violet-400/10 text-violet-200',
   slack: 'border-amber-400/40 bg-amber-400/10 text-amber-200',
@@ -47,76 +44,6 @@ function groupByCategory(results: AgentTaskResult[]): Map<string, AgentTaskResul
   return groups;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function optionalString(source: unknown, key: string): string | null {
-  if (!isRecord(source)) return null;
-  const value = source[key];
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
-}
-
-function optionalNumber(source: unknown, key: string): number | null {
-  if (!isRecord(source)) return null;
-  const value = source[key];
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-  return null;
-}
-
-function optionalBoolean(source: unknown, key: string): boolean | null {
-  if (!isRecord(source)) return null;
-  const value = source[key];
-  return typeof value === 'boolean' ? value : null;
-}
-
-function optionalMetric(source: unknown, keys: string[]): string | null {
-  for (const key of keys) {
-    const bool = optionalBoolean(source, key);
-    if (bool !== null) return bool ? 'PASS' : 'FAIL';
-
-    const num = optionalNumber(source, key);
-    if (num !== null) {
-      const pct = Math.abs(num) <= 1 ? num * 100 : num;
-      return fmtPct(pct);
-    }
-
-    const text = optionalString(source, key);
-    if (text) return text;
-  }
-  return null;
-}
-
-function nestedMetadata(source: unknown): unknown {
-  return isRecord(source) ? source.metadata : null;
-}
-
-function taskScenario(result: AgentTaskResult, category: string): { kind: ScenarioKind; fromMetadata: boolean } {
-  const metadata = nestedMetadata(result);
-  const raw =
-    optionalString(result, 'scenario_type') ??
-    optionalString(result, 'scenarioType') ??
-    optionalString(metadata, 'scenario_type') ??
-    optionalString(metadata, 'scenarioType');
-
-  if (raw) {
-    const normalized = raw.toLowerCase().replace(/[\s_]+/g, '-');
-    if (normalized.includes('cursor') || normalized.includes('ide') || normalized.includes('code')) {
-      return { kind: 'cursor', fromMetadata: true };
-    }
-    if (normalized.includes('slack') || normalized.includes('chat') || normalized.includes('thread')) {
-      return { kind: 'slack', fromMetadata: true };
-    }
-    return { kind: 'spreadsheet', fromMetadata: true };
-  }
-
-  return { kind: CATEGORY_SCENARIO_FALLBACK[category] ?? 'spreadsheet', fromMetadata: false };
-}
-
 function ScenarioBadge({ result, category }: { result: AgentTaskResult; category: string }) {
   const scenario = taskScenario(result, category);
   return (
@@ -127,45 +54,6 @@ function ScenarioBadge({ result, category }: { result: AgentTaskResult; category
       {SCENARIO_LABELS[scenario.kind]}
     </span>
   );
-}
-
-function humanizeTaskId(taskId: string, index: number): string {
-  if (/canary|seed/i.test(taskId)) return `Task ${index + 1}`;
-  const cleaned = taskId
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .trim();
-  return cleaned || `Task ${index + 1}`;
-}
-
-function taskDisplayName(result: AgentTaskResult, index: number): string {
-  const metadata = nestedMetadata(result);
-  return (
-    optionalString(result, 'description') ??
-    optionalString(result, 'task_description') ??
-    optionalString(result, 'display_name') ??
-    optionalString(result, 'title') ??
-    optionalString(metadata, 'description') ??
-    optionalString(metadata, 'display_name') ??
-    humanizeTaskId(result.task_id, index)
-  );
-}
-
-const FORMAT_KEYS = ['pass_format', 'passed_format', 'format_pass', 'format_passed', 'score_format'];
-const CAPABILITY_KEYS = [
-  'pass_capability',
-  'passed_capability',
-  'capability_pass',
-  'capability_passed',
-  'score_capability',
-];
-
-function formatMetric(source: unknown): string | null {
-  return optionalMetric(source, FORMAT_KEYS);
-}
-
-function capabilityMetric(source: unknown): string | null {
-  return optionalMetric(source, CAPABILITY_KEYS);
 }
 
 function TechReadout({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -190,8 +78,8 @@ function CategoryPassRate({ results }: { results: AgentTaskResult[] }) {
 }
 
 const BackLink = ({ run }: { run?: AgentRunDetail | null }) => {
-  const to = run ? (run.moa_config ? '/agents' : '/models') : '/agents';
-  const label = run ? (run.moa_config ? 'Back to Multiplayer Cabinet' : 'Back to Solo Cabinet') : 'Back to leaderboard';
+  const to = cabinetPathForModels(run?.moa_config?.models ?? []);
+  const label = to === '/agents' ? 'Back to Multiplayer Cabinet' : 'Back to Solo Cabinet';
   return (
     <Link to={to} className="inline-flex items-center gap-1.5 text-accent hover:text-accent-strong text-sm">
       <ArrowLeft className="w-4 h-4" /> {label}
@@ -201,16 +89,7 @@ const BackLink = ({ run }: { run?: AgentRunDetail | null }) => {
 
 function TechnicianPanel({ run }: { run: AgentRunDetail }) {
   const hasCI = run.ci95_low != null && run.ci95_high != null;
-  const runFormat = formatMetric(run);
-  const runCapability = capabilityMetric(run);
-  const resultMetrics = run.results
-    .map((result, index) => ({
-      result,
-      index,
-      format: formatMetric(result) ?? formatMetric(nestedMetadata(result)),
-      capability: capabilityMetric(result) ?? capabilityMetric(nestedMetadata(result)),
-    }))
-    .filter((row) => row.format !== null || row.capability !== null);
+  const verdicts = summarizeTaskVerdicts(run.results);
 
   return (
     <Card className="border-emerald-400/30 bg-slate-950 p-5 font-mono text-emerald-100 shadow-none">
@@ -236,8 +115,8 @@ function TechnicianPanel({ run }: { run: AgentRunDetail }) {
         <TechReadout label="Trial grid" value={`${run.n_tasks} tasks x ${run.n_trials} trials`} />
         <TechReadout
           label="Format / capability"
-          value={runFormat || runCapability ? `${runFormat ?? '—'} / ${runCapability ?? '—'}` : '—'}
-          sub={runFormat || runCapability ? 'strict format vs extractable answer' : 'not included in payload'}
+          value={`${verdicts.formatPercent == null ? '—' : `${verdicts.formatPercent}%`} / ${verdicts.capabilityPercent == null ? '—' : `${verdicts.capabilityPercent}%`}`}
+          sub={verdicts.formatCount ? 'strict format vs extractable answer' : 'format verdicts unavailable for this historical run'}
         />
       </div>
 
@@ -248,7 +127,7 @@ function TechnicianPanel({ run }: { run: AgentRunDetail }) {
         </div>
       )}
 
-      {resultMetrics.length > 0 && (
+      {run.results.length > 0 && (
         <div className="mt-4 overflow-x-auto rounded-lg border border-emerald-400/20">
           <table className="w-full text-left text-[12px]">
             <thead className="border-b border-emerald-400/20 text-[10px] uppercase tracking-[0.14em] text-emerald-400/70">
@@ -259,11 +138,13 @@ function TechnicianPanel({ run }: { run: AgentRunDetail }) {
               </tr>
             </thead>
             <tbody>
-              {resultMetrics.map(({ result, index, format, capability }) => (
+              {run.results.map((result, index) => (
                 <tr key={`${result.task_id}-${result.trial ?? index}`} className="border-t border-emerald-400/10">
                   <td className="px-3 py-2 text-emerald-100">{taskDisplayName(result, index)}</td>
-                  <td className="tnum px-3 py-2 text-emerald-200/80">{format ?? '—'}</td>
-                  <td className="tnum px-3 py-2 text-emerald-200/80">{capability ?? '—'}</td>
+                  <td className="tnum px-3 py-2 text-emerald-200/80">
+                    {result.passed_format == null ? '—' : result.passed_format ? 'PASS' : 'FAIL'}
+                  </td>
+                  <td className="tnum px-3 py-2 text-emerald-200/80">{result.passed ? 'PASS' : 'FAIL'}</td>
                 </tr>
               ))}
             </tbody>

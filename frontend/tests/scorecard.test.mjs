@@ -12,6 +12,12 @@ import {
   CREDITS_ROLLING_MIN,
   DEFAULT_CABINET_SUITE,
 } from '../src/lib/scorecard.js';
+import {
+  cabinetPathForModels,
+  summarizeTaskVerdicts,
+  taskDisplayName,
+  taskScenario,
+} from '../src/lib/runDetail.js';
 
 test('tier bands at boundaries', () => {
   assert.equal(tierIdFromPassRate(35), 'insert-coin');
@@ -92,4 +98,43 @@ test('tierChromeClass maps each tier id to a stable CSS class', () => {
 test('tierChromeClass falls back for unknown ids', () => {
   assert.equal(tierChromeClass('unknown'), 'arcade-tier-insert-coin');
   assert.equal(tierChromeClass(''), 'arcade-tier-insert-coin');
+});
+
+test('run detail returns to the cabinet implied by model count', () => {
+  assert.equal(cabinetPathForModels(['openrouter/example/model']), '/models');
+  assert.equal(cabinetPathForModels(['openrouter/example/a', 'openrouter/example/b']), '/agents');
+  assert.equal(cabinetPathForModels([]), '/models');
+});
+
+test('run detail uses typed metadata and preserves historical fallbacks', () => {
+  const current = {
+    task_id: 'mb2-code-01',
+    scenario_type: 'cursor',
+    task_description: 'Fix the failing parser.',
+  };
+  assert.deepEqual(taskScenario(current, 'coding'), { kind: 'cursor', fromMetadata: true });
+  assert.equal(taskDisplayName(current, 0), 'Fix the failing parser.');
+
+  const historical = { task_id: 'mbh-reason-01' };
+  assert.deepEqual(taskScenario(historical, 'reasoning'), {
+    kind: 'spreadsheet',
+    fromMetadata: false,
+  });
+  assert.equal(taskDisplayName(historical, 0), 'Mbh Reason 01');
+  assert.equal(taskDisplayName({ task_id: 'seed-canary-01' }, 2), 'Task 3');
+});
+
+test('technician verdict split is computed only from available format verdicts', () => {
+  assert.deepEqual(
+    summarizeTaskVerdicts([
+      { passed: true, passed_format: false },
+      { passed: true, passed_format: true },
+      { passed: false, passed_format: null },
+    ]),
+    { capabilityPercent: 66.7, formatPercent: 50, formatCount: 2 },
+  );
+  assert.deepEqual(
+    summarizeTaskVerdicts([{ passed: true, passed_format: null }]),
+    { capabilityPercent: 100, formatPercent: null, formatCount: 0 },
+  );
 });
