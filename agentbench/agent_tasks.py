@@ -265,7 +265,7 @@ class OfflineTextEnvironment:
         try:
             workspace.mkdir(parents=True, exist_ok=False)
             fixture = workspace / "service.conf"
-            fixture.write_text(_INITIAL_CONTENT, encoding="utf-8")
+            fixture.write_bytes(_INITIAL_CONTENT.encode("utf-8"))
             digest = "sha256:" + hashlib.sha256(fixture.read_bytes()).hexdigest()
             if digest != manifest.fixture.digest:
                 raise RuntimeError("prepared fixture does not match its declared digest")
@@ -320,13 +320,39 @@ class DeterministicFakeAgent:
         )
 
 
+_RESULT_PAYLOAD_LIMIT = 4096
+_RESULT_FIELDS = {
+    "termination_reason",
+    "claimed_success",
+    "turns",
+    "tokens_in",
+    "tokens_out",
+    "cost_usd",
+}
+
+
+def _agent_result_payload(result: Any) -> bytes:
+    if not isinstance(result, AgentResult):
+        return b'{"kind":"malformed"}'
+    try:
+        return json.dumps(
+            {"kind": "result", "result": asdict(result)},
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError):
+        return b'{"kind":"malformed"}'
+
+
 def _execute_agent_child(connection, agent, prompt, workspace, budget) -> None:
     try:
-        connection.send(("result", agent.execute(prompt, workspace, AgentBudgetGuard(budget))))
+        connection.send_bytes(
+            _agent_result_payload(agent.execute(prompt, workspace, AgentBudgetGuard(budget)))
+        )
     except TimeoutError:
-        connection.send(("timeout", None))
+        connection.send_bytes(b'{"kind":"timeout"}')
     except BaseException:
-        connection.send(("error", None))
+        connection.send_bytes(b'{"kind":"error"}')
     finally:
         connection.close()
 
@@ -336,28 +362,52 @@ def execute_agent_with_budget(
     prompt: str,
     workspace: Path,
     budget: AgentBudget,
+    *,
+    start_method: str | None = None,
 ) -> AgentResult:
-    parent, child = multiprocessing.get_context("fork").Pipe(duplex=False)
-    process = multiprocessing.get_context("fork").Process(
+    method = start_method or ("fork" if "fork" in multiprocessing.get_all_start_methods() else "spawn")
+    context = multiprocessing.get_context(method)
+    parent, child = context.Pipe(duplex=False)
+    process = context.Process(
         target=_execute_agent_child,
         args=(child, agent, prompt, workspace, budget),
         daemon=True,
     )
-    process.start()
+    try:
+        process.start()
+    except BaseException:
+        parent.close()
+        child.close()
+        raise
     child.close()
     if not parent.poll(budget.wall_time_seconds):
         process.terminate()
         process.join()
         parent.close()
         raise TimeoutError("wall-time budget exceeded")
-    kind, payload = parent.recv()
-    parent.close()
-    process.join()
+    try:
+        payload = json.loads(parent.recv_bytes(_RESULT_PAYLOAD_LIMIT).decode("utf-8"))
+    except (EOFError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+        payload = {"kind": "error"}
+    finally:
+        parent.close()
+        process.join(timeout=1)
+        if process.is_alive():
+            process.terminate()
+            process.join()
+    if not isinstance(payload, dict) or not isinstance(payload.get("kind"), str):
+        raise RuntimeError("invalid agent result protocol")
+    kind = payload["kind"]
     if kind == "timeout":
         raise TimeoutError("agent reported timeout")
     if kind == "error":
         raise RuntimeError("agent execution failed")
-    return payload
+    if kind == "malformed":
+        return None
+    raw_result = payload.get("result")
+    if kind != "result" or set(payload) != {"kind", "result"} or not isinstance(raw_result, dict) or set(raw_result) != _RESULT_FIELDS:
+        return None
+    return AgentResult(**raw_result)
 
 
 def _valid_agent_result(result: Any) -> bool:

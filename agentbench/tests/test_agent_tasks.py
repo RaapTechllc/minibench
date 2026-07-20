@@ -27,6 +27,62 @@ MANIFEST_PATH = (
 )
 
 
+class _ExecutableResult:
+    def __init__(self, marker):
+        self.marker = marker
+
+    def __reduce__(self):
+        return eval, (f"open({str(self.marker)!r}, 'w').write('owned')",)
+
+
+class _ExecutableResultAgent:
+    def __init__(self, marker):
+        self.marker = marker
+
+    def execute(self, prompt, workspace, budget):
+        return _ExecutableResult(self.marker)
+
+
+class _ClaimOnlyAgent:
+    def execute(self, prompt, workspace, budget):
+        return AgentResult(termination_reason="completed", claimed_success=True)
+
+
+class _ScriptedAgent:
+    def __init__(self, mode):
+        self.mode = mode
+
+    def execute(self, prompt, workspace, budget):
+        if self.mode == "timeout":
+            raise TimeoutError("budget exceeded")
+        return {"claimed_success": True}
+
+
+class _OverBudgetAgent:
+    def execute(self, prompt, workspace, budget):
+        return AgentResult(termination_reason="completed", turns=budget.max_turns + 1)
+
+
+class _SlowAgent:
+    def execute(self, prompt, workspace, budget):
+        time.sleep(2)
+        return AgentResult(termination_reason="completed")
+
+
+class _InvalidRepairAgent:
+    def execute(self, prompt, workspace, budget):
+        (workspace / "service.conf").write_text("status=READY\n", encoding="utf-8")
+        return AgentResult(termination_reason="", turns=-1, claimed_success=True)
+
+
+class _ResultAgent:
+    def __init__(self, result):
+        self.result = result
+
+    def execute(self, prompt, workspace, budget):
+        return self.result
+
+
 def test_manifest_loads_versioned_offline_task():
     manifest = load_agent_manifest(MANIFEST_PATH)
 
@@ -82,14 +138,10 @@ def test_offline_trial_succeeds_and_disposes_workspace(tmp_path):
 
 
 def test_verifier_ignores_agent_success_claim_and_disposes(tmp_path):
-    class ClaimOnlyAgent:
-        def execute(self, prompt, workspace, budget):
-            return AgentResult(termination_reason="completed", claimed_success=True)
-
     trial = run_agent_trial(
         load_agent_manifest(MANIFEST_PATH),
         OfflineTextEnvironment(tmp_path),
-        ClaimOnlyAgent(),
+        _ClaimOnlyAgent(),
         trial=1,
     )
 
@@ -102,21 +154,17 @@ def test_verifier_ignores_agent_success_claim_and_disposes(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "agent, expected_outcome",
+    "mode, expected_outcome",
     [
-        (lambda: (_ for _ in ()).throw(TimeoutError("budget exceeded")), "timeout"),
-        (lambda: {"claimed_success": True}, "malformed_agent_result"),
+        ("timeout", "timeout"),
+        ("malformed", "malformed_agent_result"),
     ],
 )
-def test_terminal_agent_failures_are_explicit_and_disposed(tmp_path, agent, expected_outcome):
-    class ScriptedAgent:
-        def execute(self, prompt, workspace, budget):
-            return agent()
-
+def test_terminal_agent_failures_are_explicit_and_disposed(tmp_path, mode, expected_outcome):
     trial = run_agent_trial(
         load_agent_manifest(MANIFEST_PATH),
         OfflineTextEnvironment(tmp_path),
-        ScriptedAgent(),
+        _ScriptedAgent(mode),
         trial=1,
     )
 
@@ -127,14 +175,10 @@ def test_terminal_agent_failures_are_explicit_and_disposed(tmp_path, agent, expe
 
 
 def test_agent_result_over_turn_budget_is_timeout(tmp_path):
-    class OverBudgetAgent:
-        def execute(self, prompt, workspace, budget):
-            return AgentResult(termination_reason="completed", turns=budget.max_turns + 1)
-
     trial = run_agent_trial(
         load_agent_manifest(MANIFEST_PATH),
         OfflineTextEnvironment(tmp_path),
-        OverBudgetAgent(),
+        _OverBudgetAgent(),
         trial=1,
     )
 
@@ -143,17 +187,12 @@ def test_agent_result_over_turn_budget_is_timeout(tmp_path):
 
 
 def test_harness_terminates_agent_at_wall_time_budget(tmp_path):
-    class SlowAgent:
-        def execute(self, prompt, workspace, budget):
-            time.sleep(2)
-            return AgentResult(termination_reason="completed")
-
     manifest = load_agent_manifest(MANIFEST_PATH)
     manifest = replace(manifest, budget=replace(manifest.budget, wall_time_seconds=1))
 
     started = time.monotonic()
     trial = run_agent_trial(
-        manifest, OfflineTextEnvironment(tmp_path), SlowAgent(), trial=1
+        manifest, OfflineTextEnvironment(tmp_path), _SlowAgent(), trial=1
     )
 
     assert trial.outcome == "timeout"
@@ -162,20 +201,29 @@ def test_harness_terminates_agent_at_wall_time_budget(tmp_path):
 
 
 def test_invalid_agent_result_is_malformed_even_if_fixture_was_repaired(tmp_path):
-    class InvalidAgent:
-        def execute(self, prompt, workspace, budget):
-            (workspace / "service.conf").write_text("status=READY\n", encoding="utf-8")
-            return AgentResult(termination_reason="", turns=-1, claimed_success=True)
-
     trial = run_agent_trial(
         load_agent_manifest(MANIFEST_PATH),
         OfflineTextEnvironment(tmp_path),
-        InvalidAgent(),
+        _InvalidRepairAgent(),
         trial=1,
     )
 
     assert trial.outcome == "malformed_agent_result"
     assert trial.passed is False
+
+
+def test_agent_result_transport_never_executes_reduce_in_parent(tmp_path):
+    marker = tmp_path / "deserialized"
+
+    trial = run_agent_trial(
+        load_agent_manifest(MANIFEST_PATH),
+        OfflineTextEnvironment(tmp_path),
+        _ExecutableResultAgent(marker),
+        trial=1,
+    )
+
+    assert trial.outcome == "malformed_agent_result"
+    assert not marker.exists()
 
 
 @pytest.mark.parametrize(
@@ -189,14 +237,10 @@ def test_invalid_agent_result_is_malformed_even_if_fixture_was_repaired(tmp_path
     ],
 )
 def test_malformed_agent_result_types_are_classified_explicitly(tmp_path, invalid):
-    class InvalidAgent:
-        def execute(self, prompt, workspace, budget):
-            return invalid
-
     trial = run_agent_trial(
         load_agent_manifest(MANIFEST_PATH),
         OfflineTextEnvironment(tmp_path),
-        InvalidAgent(),
+        _ResultAgent(invalid),
         trial=1,
     )
 
