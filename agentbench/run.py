@@ -57,8 +57,8 @@ class TrialResult:
     score: float
     cost_usd: float | None
     latency_ms: int
-    tokens_in: int
-    tokens_out: int
+    tokens_in: int | None
+    tokens_out: int | None
     detail: str
     # True when the trial died on transient infrastructure (rate limit / 5xx /
     # timeout after retries). Excluded from every capability denominator.
@@ -348,8 +348,18 @@ def to_agent_run_submit(
     def pct(x: float | None) -> float | None:
         return round(x * 100, 4) if x is not None else None
 
-    tokens_in = sum(r.tokens_in for r in trials)
-    tokens_out = sum(r.tokens_out for r in trials)
+    token_inputs = [r.tokens_in for r in trials]
+    token_outputs = [r.tokens_out for r in trials]
+    tokens_in = (
+        sum(value for value in token_inputs if value is not None)
+        if all(value is not None for value in token_inputs)
+        else None
+    )
+    tokens_out = (
+        sum(value for value in token_outputs if value is not None)
+        if all(value is not None for value in token_outputs)
+        else None
+    )
 
     return {
         "harness": harness,
