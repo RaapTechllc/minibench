@@ -1,0 +1,32 @@
+{
+  "manifest_version": "1",
+  "suite": "minibench-agent-v1",
+  "task_id": "mba-terminal-http-banner-001",
+  "category": "terminal-operation",
+  "scenario_type": "terminal-operation",
+  "scenario_id": "http-banner",
+  "fixture": {
+    "reference": "terminal-http-banner@1",
+    "digest": "sha256:0d3a08bcfe1f167f9495b0b6c01e2dd445ac161d4adcdc7e74cfeac58e7e7216"
+  },
+  "public_prompt": "Inspect the local service configuration. Persist the service on port 8080 with message READY, start it, and confirm its loopback response before finishing.",
+  "preparation": {"strategy": "docker-terminal-v1"},
+  "verification": {"strategy": "docker-terminal-v1"},
+  "required_capabilities": ["terminal", "filesystem", "local-process", "loopback-http"],
+  "budget": {
+    "max_turns": 6,
+    "wall_time_seconds": 20,
+    "max_tokens": 0,
+    "max_cost_usd": 0.0
+  },
+  "private": false,
+  "container": {
+    "runtime": "docker",
+    "image": "alpine@sha256:c64c687cbea9300178b30c95835354e34c4e4febc4badfe27102879de0483b5e",
+    "platform": "linux/amd64",
+    "cpu_limit": 0.5,
+    "memory_mb": 64,
+    "pids_limit": 32,
+    "network": "none"
+  }
+}

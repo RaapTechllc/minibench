@@ -134,6 +134,24 @@ python -m agentbench.agent_tasks \
     --trials 2 --out /tmp/minibench-agent-smoke.json
 ```
 
+Terminal-operation smoke uses Docker for real CPU, memory, PID, filesystem, and
+network isolation. Pull the immutable fixture image once, then both task
+containers run with `--network none`; when Docker or the image is unavailable,
+the command exits successfully with an explicit `SKIP` reason.
+
+Phase 1 accepts only frozen declarative procedures for offline gold and negative
+regressions. Arbitrary Python/provider adapters are rejected rather than treated
+as sandboxed; a real provider terminal adapter is deferred until it can preserve
+the same container-only untrusted execution boundary.
+
+```bash
+docker pull alpine@sha256:c64c687cbea9300178b30c95835354e34c4e4febc4badfe27102879de0483b5e
+python -m agentbench.terminal_operations \
+    --manifest agentbench/tasks/minibench-terminal-http-banner.json \
+    --manifest agentbench/tasks/minibench-terminal-health-endpoint.json \
+    --out /tmp/minibench-terminal-smoke.json
+```
+
 Generated repository-repair smoke is also deterministic and fully offline. It
 creates a fresh repository-shaped fixture, runs the reference repair adapter,
 and writes a sanitized artifact without a model or API key:

@@ -60,6 +60,13 @@ jobs:
       - name: Unit tests (offline, no keys)
         working-directory: agentbench
         run: pytest -q
+      - name: Terminal-operation isolation smoke
+        run: |
+          docker pull alpine@sha256:c64c687cbea9300178b30c95835354e34c4e4febc4badfe27102879de0483b5e
+          python -m agentbench.terminal_operations \
+            --manifest agentbench/tasks/minibench-terminal-http-banner.json \
+            --manifest agentbench/tasks/minibench-terminal-health-endpoint.json \
+            --out /tmp/minibench-terminal-smoke.json
       - name: Dry-run smoke (catches config/task drift)
         run: |
           python -m agentbench.run \
