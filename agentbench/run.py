@@ -132,7 +132,7 @@ def run_suite(
     results: list[TrialResult] = []
     for task in tasks:
         scenario_type = task.get("scenario_type")
-        task_description = task.get("description") or task.get("prompt")
+        task_description = task.get("description")
         for trial in range(1, trials + 1):
             try:
                 if stub is not None:
@@ -365,6 +365,7 @@ def to_agent_run_submit(
         "n_tasks": summary["n_tasks"],
         "n_trials": summary["n_trials"],
         "pass_rate": pct(summary["pass_rate"]),
+        "pass_format": pct(summary.get("pass_format")),
         "pass_hat_k": pct(summary.get("pass_hat_k")),
         "ci95_low": pct(ci[0]),
         "ci95_high": pct(ci[1]),

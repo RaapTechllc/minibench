@@ -10,8 +10,7 @@ import {
 import { fmtPct, fmtCost } from '../components/chart';
 import { categoryDisplayName, formatScorecard, orderCategoryKeys } from '../lib/scorecard.js';
 import {
-  cabinetPathForModels,
-  summarizeTaskVerdicts,
+  cabinetPathForRun,
   taskDisplayName,
   taskScenario,
 } from '../lib/runDetail.js';
@@ -78,7 +77,7 @@ function CategoryPassRate({ results }: { results: AgentTaskResult[] }) {
 }
 
 const BackLink = ({ run }: { run?: AgentRunDetail | null }) => {
-  const to = cabinetPathForModels(run?.moa_config?.models ?? []);
+  const to = cabinetPathForRun(run?.moa_config ?? null);
   const label = to === '/agents' ? 'Back to Multiplayer Cabinet' : 'Back to Solo Cabinet';
   return (
     <Link to={to} className="inline-flex items-center gap-1.5 text-accent hover:text-accent-strong text-sm">
@@ -89,7 +88,6 @@ const BackLink = ({ run }: { run?: AgentRunDetail | null }) => {
 
 function TechnicianPanel({ run }: { run: AgentRunDetail }) {
   const hasCI = run.ci95_low != null && run.ci95_high != null;
-  const verdicts = summarizeTaskVerdicts(run.results);
 
   return (
     <Card className="border-emerald-400/30 bg-slate-950 p-5 font-mono text-emerald-100 shadow-none">
@@ -115,8 +113,8 @@ function TechnicianPanel({ run }: { run: AgentRunDetail }) {
         <TechReadout label="Trial grid" value={`${run.n_tasks} tasks x ${run.n_trials} trials`} />
         <TechReadout
           label="Format / capability"
-          value={`${verdicts.formatPercent == null ? '—' : `${verdicts.formatPercent}%`} / ${verdicts.capabilityPercent == null ? '—' : `${verdicts.capabilityPercent}%`}`}
-          sub={verdicts.formatCount ? 'strict format vs extractable answer' : 'format verdicts unavailable for this historical run'}
+          value={`${run.pass_format == null ? '—' : fmtPct(run.pass_format)} / ${fmtPct(run.pass_rate)}`}
+          sub={run.pass_format == null ? 'format verdict unavailable for this historical run' : 'strict format vs extractable answer'}
         />
       </div>
 

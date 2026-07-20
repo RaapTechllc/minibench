@@ -13,8 +13,7 @@ import {
   DEFAULT_CABINET_SUITE,
 } from '../src/lib/scorecard.js';
 import {
-  cabinetPathForModels,
-  summarizeTaskVerdicts,
+  cabinetPathForRun,
   taskDisplayName,
   taskScenario,
 } from '../src/lib/runDetail.js';
@@ -101,9 +100,10 @@ test('tierChromeClass falls back for unknown ids', () => {
 });
 
 test('run detail returns to the cabinet implied by model count', () => {
-  assert.equal(cabinetPathForModels(['openrouter/example/model']), '/models');
-  assert.equal(cabinetPathForModels(['openrouter/example/a', 'openrouter/example/b']), '/agents');
-  assert.equal(cabinetPathForModels([]), '/models');
+  assert.equal(cabinetPathForRun({ models: ['openrouter/example/model'] }), '/models');
+  assert.equal(cabinetPathForRun({ models: ['openrouter/example/a', 'openrouter/example/b'] }), '/agents');
+  assert.equal(cabinetPathForRun({ models: ['openrouter/example/model'], self_moa: true }), '/agents');
+  assert.equal(cabinetPathForRun(null), '/models');
 });
 
 test('run detail uses typed metadata and preserves historical fallbacks', () => {
@@ -122,19 +122,8 @@ test('run detail uses typed metadata and preserves historical fallbacks', () => 
   });
   assert.equal(taskDisplayName(historical, 0), 'Mbh Reason 01');
   assert.equal(taskDisplayName({ task_id: 'seed-canary-01' }, 2), 'Task 3');
-});
-
-test('technician verdict split is computed only from available format verdicts', () => {
-  assert.deepEqual(
-    summarizeTaskVerdicts([
-      { passed: true, passed_format: false },
-      { passed: true, passed_format: true },
-      { passed: false, passed_format: null },
-    ]),
-    { capabilityPercent: 66.7, formatPercent: 50, formatCount: 2 },
-  );
-  assert.deepEqual(
-    summarizeTaskVerdicts([{ passed: true, passed_format: null }]),
-    { capabilityPercent: 100, formatPercent: null, formatCount: 0 },
+  assert.equal(
+    taskDisplayName({ task_id: 'ordinary-task', task_description: 'Inspect the seed identifier.' }, 3),
+    'Task 4',
   );
 });

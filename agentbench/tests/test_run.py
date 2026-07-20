@@ -65,6 +65,7 @@ def test_to_agent_run_submit_scales_percentages():
     assert payload["pass_hat_k"] == 100.0
     assert payload["ci95_low"] is not None
     assert len(payload["results"]) == len(results)
+    assert payload["results"][0]["task_description"] is None
 
 
 def test_run_suite_carries_public_arcade_task_fields():
@@ -363,3 +364,30 @@ def test_submit_payload_preserves_arcade_task_metadata_and_format_verdict():
         "Fix the failing parser without changing its public API."
     )
     assert payload["results"][0]["passed_format"] is False
+
+
+def test_submit_payload_uses_infra_and_axis_excluded_canonical_rates():
+    config = single_model_config("openrouter/qwen/qwen-2.5-7b-instruct")
+    results = [
+        TrialResult(
+            "binary", "coding", 1, True, 1.0, 0.01, 25, 10, 5,
+            detail="match", passed_format=False,
+        ),
+        TrialResult(
+            "infra", "coding", 1, False, 0.0, None, 0, 0, 0,
+            detail="infra", infra_error=True, passed_format=True,
+        ),
+        TrialResult(
+            "calibration", "calibration", 1, False, 0.75, 0.01, 25, 10, 5,
+            detail="brier", passed_format=False,
+        ),
+    ]
+
+    payload = to_agent_run_submit(
+        summarize(config, "minibench-pro-v1", 1, results),
+        results,
+        provider="openrouter",
+    )
+
+    assert payload["pass_rate"] == 100.0
+    assert payload["pass_format"] == 0.0

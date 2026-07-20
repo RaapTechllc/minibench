@@ -72,6 +72,7 @@ async def submit_agent_run(data: AgentRunSubmit, db: AsyncSession = Depends(get_
         n_tasks=data.n_tasks,
         n_trials=data.n_trials,
         pass_rate=data.pass_rate,
+        pass_format=data.pass_format,
         pass_hat_k=data.pass_hat_k,
         ci95_low=data.ci95_low,
         ci95_high=data.ci95_high,

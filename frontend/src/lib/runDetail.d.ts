@@ -8,13 +8,12 @@ export interface ArcadeTaskResult {
   passed_format: boolean | null;
 }
 
-export interface TaskVerdictSummary {
-  capabilityPercent: number | null;
-  formatPercent: number | null;
-  formatCount: number;
+export interface RunCabinetConfig {
+  models?: string[];
+  self_moa?: boolean;
 }
 
-export function cabinetPathForModels(models: string[]): '/models' | '/agents';
+export function cabinetPathForRun(config: RunCabinetConfig | null): '/models' | '/agents';
 export function taskScenario(
   result: Pick<ArcadeTaskResult, 'scenario_type'>,
   category: string,
@@ -23,6 +22,3 @@ export function taskDisplayName(
   result: Pick<ArcadeTaskResult, 'task_id' | 'task_description'>,
   index: number,
 ): string;
-export function summarizeTaskVerdicts(
-  results: Array<Pick<ArcadeTaskResult, 'passed' | 'passed_format'>>,
-): TaskVerdictSummary;

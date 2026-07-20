@@ -135,6 +135,7 @@ export interface AgentRunDetail {
   n_tasks: number;
   n_trials: number;
   pass_rate: number;
+  pass_format: number | null;
   pass_hat_k: number | null;
   ci95_low: number | null;
   ci95_high: number | null;

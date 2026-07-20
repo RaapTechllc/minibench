@@ -192,6 +192,7 @@ class AgentRunSubmit(BaseModel):
     n_tasks: int = Field(..., ge=1)
     n_trials: int = Field(..., ge=1)
     pass_rate: Decimal = Field(..., ge=0, le=100)
+    pass_format: Optional[Decimal] = Field(None, ge=0, le=100)
     pass_hat_k: Optional[Decimal] = Field(None, ge=0, le=100)
     ci95_low: Optional[Decimal] = None
     ci95_high: Optional[Decimal] = None
@@ -230,6 +231,7 @@ class AgentRunResponse(BaseModel):
     n_tasks: int
     n_trials: int
     pass_rate: Decimal
+    pass_format: Optional[Decimal] = None
     pass_hat_k: Optional[Decimal] = None
     ci95_low: Optional[Decimal] = None
     ci95_high: Optional[Decimal] = None

@@ -154,6 +154,7 @@ class AgentRun(Base):
     n_tasks = Column(Integer, nullable=False)
     n_trials = Column(Integer, nullable=False)
     pass_rate = Column(Numeric(5, 2), nullable=False)     # 0–100 (%)
+    pass_format = Column(Numeric(5, 2))                   # canonical strict-format rate
     pass_hat_k = Column(Numeric(5, 2))                    # consistency across trials
     ci95_low = Column(Numeric(5, 2))
     ci95_high = Column(Numeric(5, 2))

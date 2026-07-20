@@ -7,8 +7,8 @@ const CATEGORY_SCENARIO_FALLBACK = {
 
 const SCENARIO_TYPES = new Set(['spreadsheet', 'cursor', 'slack']);
 
-export function cabinetPathForModels(models) {
-  return models.length > 1 ? '/agents' : '/models';
+export function cabinetPathForRun(config) {
+  return config?.self_moa || (config?.models?.length ?? 0) > 1 ? '/agents' : '/models';
 }
 
 export function taskScenario(result, category) {
@@ -24,22 +24,13 @@ export function taskScenario(result, category) {
 
 export function taskDisplayName(result, index) {
   const description = result.task_description?.trim();
+  if (/canary|seed/i.test(result.task_id) || (description && /canary|seed/i.test(description))) {
+    return `Task ${index + 1}`;
+  }
   if (description) return description;
-  if (/canary|seed/i.test(result.task_id)) return `Task ${index + 1}`;
   const cleaned = result.task_id
     .replace(/[-_]/g, ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase())
     .trim();
   return cleaned || `Task ${index + 1}`;
-}
-
-export function summarizeTaskVerdicts(results) {
-  const capabilityPercent = results.length
-    ? Math.round((results.filter((result) => result.passed).length / results.length) * 1000) / 10
-    : null;
-  const formatResults = results.filter((result) => result.passed_format !== null);
-  const formatPercent = formatResults.length
-    ? Math.round((formatResults.filter((result) => result.passed_format).length / formatResults.length) * 1000) / 10
-    : null;
-  return { capabilityPercent, formatPercent, formatCount: formatResults.length };
 }

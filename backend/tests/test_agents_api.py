@@ -10,6 +10,7 @@ def _run_payload(**overrides):
         "n_tasks": 4,
         "n_trials": 3,
         "pass_rate": 75.0,
+        "pass_format": 50.0,
         "pass_hat_k": 60.0,
         "ci95_low": 55.0,
         "ci95_high": 90.0,
@@ -45,6 +46,7 @@ def test_submit_run_returns_run_id_and_persists(client):
     assert body["run_id"]
     assert body["benchmark_suite"] == "our-coding-v1"
     assert float(body["pass_rate"]) == 75.0
+    assert float(body["pass_format"]) == 50.0
 
     # Detail endpoint returns the child task results.
     detail = client.get(f"/api/v1/agents/runs/{body['run_id']}").json()
@@ -56,6 +58,7 @@ def test_submit_run_returns_run_id_and_persists(client):
     assert detail["results"][1]["scenario_type"] is None
     assert detail["results"][1]["task_description"] is None
     assert detail["results"][1]["passed_format"] is None
+    assert float(detail["pass_format"]) == 50.0
 
 
 def test_missing_run_returns_404(client):
