@@ -145,7 +145,7 @@ as sandboxed; a real provider terminal adapter is deferred until it can preserve
 the same container-only untrusted execution boundary.
 
 ```bash
-docker pull alpine@sha256:c64c687cbea9300178b30c95835354e34c4e4febc4badfe27102879de0483b5e
+docker pull busybox@sha256:3c6ae8008e2c2eedd141725c30b20d9c36b026eb796688f88205845ef17aa213
 python -m agentbench.terminal_operations \
     --manifest agentbench/tasks/minibench-terminal-http-banner.json \
     --manifest agentbench/tasks/minibench-terminal-health-endpoint.json \

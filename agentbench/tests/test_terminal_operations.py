@@ -15,6 +15,7 @@ from agentbench.terminal_operations import (
     runtime_skip_reason,
     TerminalTaskManifest,
     TerminalProcedureAgent,
+    _run_command,
 )
 
 
@@ -48,14 +49,16 @@ class FakeDocker:
         if action == "inspect":
             return subprocess.CompletedProcess(argv, 0 if self.running else 1, "true\n" if self.running else "", "")
         if action == "top":
-            processes = "COMMAND COMMAND\nsleep sleep 600\n"
-            if self.service_running:
-                processes += f"httpd {self.httpd_args}\n"
-            if self.leaked:
-                processes += "sleep sleep 600\n"
-            return subprocess.CompletedProcess(argv, 0, processes, "")
+            raise AssertionError("verify uses container ps, not docker top")
         if action == "exec":
             command = argv[3:]
+            if command == ["ps", "-o", "comm,args"]:
+                processes = "COMMAND COMMAND\nsleep sleep 600\n"
+                if self.service_running:
+                    processes += f"httpd {self.httpd_args}\n"
+                if self.leaked:
+                    processes += "sleep sleep 600\n"
+                return subprocess.CompletedProcess(argv, 0, processes, "")
             if command[:2] == ["pidof", "httpd"]:
                 return subprocess.CompletedProcess(argv, 0 if self.service_running else 1, "2\n" if self.service_running else "", "")
             if command and command[0] == "wget":
@@ -159,9 +162,9 @@ def test_terminal_manifests_declare_immutable_isolation_contracts():
 @pytest.mark.parametrize(
     "image",
     [
-        "alpine@sha256:abc",
-        "alpine@sha256:" + "g" * 64,
-        "alpine@sha256:" + "a" * 64 + "trailing",
+        "busybox@sha256:abc",
+        "busybox@sha256:" + "g" * 64,
+        "busybox@sha256:" + "a" * 64 + "trailing",
     ],
 )
 def test_terminal_manifest_rejects_malformed_image_digest_before_runtime_probe(image):
@@ -175,8 +178,8 @@ def test_terminal_manifest_rejects_malformed_image_digest_before_runtime_probe(i
 @pytest.mark.parametrize(
     "image",
     [
-        "example.invalid/alpine@sha256:c64c687cbea9300178b30c95835354e34c4e4febc4badfe27102879de0483b5e",
-        "alpine@sha256:" + "b" * 64,
+        "example.invalid/busybox@sha256:3c6ae8008e2c2eedd141725c30b20d9c36b026eb796688f88205845ef17aa213",
+        "busybox@sha256:" + "b" * 64,
     ],
 )
 def test_terminal_manifest_rejects_unapproved_valid_image_reference(image):
@@ -185,6 +188,20 @@ def test_terminal_manifest_rejects_unapproved_valid_image_reference(image):
 
     with pytest.raises(ValueError, match="not approved for phase 1"):
         TerminalTaskManifest.from_dict(raw)
+
+
+def test_pinned_phase1_image_contains_required_busybox_binaries():
+    """Regression: the approved image must natively supply httpd and wget under read-only/nonroot constraints."""
+    from agentbench.terminal_operations import _PHASE1_IMAGE
+    reason = runtime_skip_reason(image=_PHASE1_IMAGE)
+    if reason:
+        pytest.skip(reason)
+    # httpd is the service binary the scenarios depend on
+    httpd = _run_command(["docker", "run", "--rm", "--platform", "linux/amd64", _PHASE1_IMAGE, "httpd", "-v"])
+    assert httpd.returncode == 0, "httpd binary missing from approved image"
+    # wget fetches the loopback verification response
+    wget = _run_command(["docker", "run", "--rm", "--platform", "linux/amd64", _PHASE1_IMAGE, "wget", "--help"])
+    assert wget.returncode == 0, "wget binary missing from approved image"
 
 
 @pytest.mark.parametrize(

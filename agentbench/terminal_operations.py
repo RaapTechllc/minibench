@@ -34,7 +34,7 @@ from agentbench.terminal_worker import RPC_LIMIT, run_terminal_procedure
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
 HARNESS = "agent-cabinet-terminal-operation"
 _OUTPUT_LIMIT = 16_384
-_PHASE1_IMAGE = "alpine@sha256:c64c687cbea9300178b30c95835354e34c4e4febc4badfe27102879de0483b5e"
+_PHASE1_IMAGE = "busybox@sha256:3c6ae8008e2c2eedd141725c30b20d9c36b026eb796688f88205845ef17aa213"
 
 
 def _run_command(argv: list[str], *, timeout: float | None = None) -> subprocess.CompletedProcess[str]:
@@ -432,12 +432,17 @@ class DockerTerminalEnvironment:
         if not self._is_running(handle):
             return VerificationResult(False, "killed_process: service container is not running")
 
-        top = self._docker("top", handle.container_name, "-eo", "comm,args")
+        top = self._docker("exec", handle.container_name, "ps", "-o", "comm,args")
         processes = []
         for line in top.stdout.splitlines():
             parts = line.strip().lower().split(maxsplit=1)
             if parts and parts[0] != "command":
-                processes.append((parts[0], parts[1] if len(parts) == 2 else ""))
+                command = parts[0]
+                args = parts[1] if len(parts) == 2 else ""
+                # The ps command itself is a transient observer, not the agent's payload.
+                if command == "ps":
+                    continue
+                processes.append((command, args))
         service_root = "/workspace/" + str(Path(self.scenario.response_file).parent).replace("\\", "/")
         sleeper_count = sum(
             command == "sleep" and args in {"600", "sleep 600"}

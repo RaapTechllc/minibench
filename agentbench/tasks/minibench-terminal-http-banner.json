@@ -22,7 +22,7 @@
   "private": false,
   "container": {
     "runtime": "docker",
-    "image": "alpine@sha256:c64c687cbea9300178b30c95835354e34c4e4febc4badfe27102879de0483b5e",
+    "image": "busybox@sha256:3c6ae8008e2c2eedd141725c30b20d9c36b026eb796688f88205845ef17aa213",
     "platform": "linux/amd64",
     "cpu_limit": 0.5,
     "memory_mb": 64,
