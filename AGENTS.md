@@ -1,35 +1,32 @@
-# AGENTS.md
+# MiniBench agent context
 
-## Cursor Cloud specific instructions
+Setup, run, and component details live in `README.md` and `agentbench/README.md`.
 
-Standard setup/test/run commands live in `README.md` (root) and `agentbench/README.md`.
-The notes below only cover things that differ in the Cursor Cloud VM or are easy to get wrong.
+## Environment
 
-### Services
+- `./scripts/setup-dev.sh` creates the three Python virtualenvs and installs frontend dependencies.
+- The FastAPI backend runs on port 3070. Vite runs on 5173 and proxies `/api` and `/health` to 3070.
+- PostgreSQL must be reachable for the backend. The documented Docker mapping is host port 5438; the documented local-Postgres example uses 5432.
+- Run `agentbench` modules from the repository root. `--dry-run` is offline; live OpenRouter runs require `OPENROUTER_API_KEY` from the root `.env`.
+- `minibench run` requires an Ollama daemon. `--publish` writes results to the configured backend.
 
-| Service | How to run | Port |
-|---------|-----------|------|
-| PostgreSQL 16 | native apt install (no Docker) — see below | **5432** |
-| Backend API (FastAPI) | `cd backend && . .venv/bin/activate && uvicorn app.main:app --reload --port 3070` (creates tables + seeds on startup) | 3070 |
-| Frontend (Vite dev) | `cd frontend && npm run dev` (proxies `/api` + `/health` → `:3070`) | 5173 |
+## Verification
 
-### Non-obvious caveats
+These are the repository's CI-equivalent checks:
 
-- **No Docker in this VM.** Ignore the `docker compose up` instructions in the README.
-  PostgreSQL is installed natively. It is **not** auto-started — start it each session with:
-  `sudo pg_ctlcluster 16 main start` (verify with `pg_isready` / `pg_lsclusters`).
-- **Postgres runs on port 5432, not 5438.** The README/docker examples assume `5438`. Here the
-  role `minibench` (password `minibench`, CREATEDB) and databases `minibench` + `minibench_test`
-  already exist on `localhost:5432`. The committed `.env`, `backend/.env`, and `agentbench/.env`
-  already point at `5432`.
-- **Backend tests** need Postgres and default to port `5438`, so override it:
-  `cd backend && MINIBENCH_TEST_PG_HOST=127.0.0.1 MINIBENCH_TEST_PG_PORT=5432 pytest`.
-- **Per-component Python venvs** live at `backend/.venv`, `cli/.venv`, and `agentbench/.venv`.
-  Activate the relevant one (or call its `.venv/bin/python`) before running Python commands; there
-  is no shared/root venv. The startup update script (re)creates them and runs `npm ci` in `frontend/`.
-- **agentbench must be run as a module from the repo root**, e.g.
-  `python -m agentbench.run --config agentbench/presets/moa-v1.yaml --tasks agentbench/tasks/coding-v1.json --trials 2 --dry-run`.
-  Running it from inside `agentbench/` fails with `No module named 'agentbench'`. Use `agentbench/.venv/bin/python`.
-- Live agent/MoA runs and `--publish` need `OPENROUTER_API_KEY`; `--dry-run` works offline. The CLI
-  `minibench run` needs a local Ollama daemon (not installed here) — use the API `POST /api/v1/submit`
-  to create benchmark data without Ollama.
+```bash
+cd backend && pytest
+cd agentbench && pytest -q
+cd cli && pytest
+cd frontend && npm run lint && npm test && npm run build
+python -m agentbench.run --config agentbench/presets/moa-v1.yaml --tasks agentbench/tasks/coding-v1.json --trials 2 --dry-run --out /tmp/dryrun.json
+```
+
+Backend tests require PostgreSQL; set `MINIBENCH_TEST_PG_HOST` and `MINIBENCH_TEST_PG_PORT` when the listener is not the documented Docker default.
+
+## Hard invariants
+
+- Never commit credentials or represent dry-run or synthetic benchmark data as live results.
+- Paid live model calls, publishing, deployment, and external communication require explicit owner authorization.
+
+<!-- unhobbled 2026-07-28; re-ablate after 2027-01-28 -->

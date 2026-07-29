@@ -2,34 +2,26 @@
 description: Run the next MiniBench era — an autonomous, self-verifying goal run that seeds its successor
 ---
 
-Run one full **era** against this repo, following the protocol in
-`eras/GOAL-LOOP.md` exactly. That file is the contract; this command is only
-the ignition.
+Run one bounded MiniBench era: choose the highest-value improvement supported by current repository evidence, complete it, verify it, and leave one evidence-backed candidate for the next era. Treat the arguments below as steering.
 
-Steps:
+Hard guardrails:
 
-1. **Orient.** Read `eras/GOAL-LOOP.md`, then the highest-numbered
-   `eras/era-N/RECAP.md` (its final section is the seed for this era) and that
-   era's `LEDGER.md` (landmines + verify-first). If no era exists yet, this is
-   Era 1 — derive candidate goals from `docs/SPRINT-PLAN-FABLE5.md`,
-   `.claude/audit-state.md`, and fresh recon instead of a seed.
-2. **Open the era.** Create `eras/era-N+1/LEDGER.md` first, then work the
-   phases: Bootstrap → Recon → Goal selection (write `MISSION.md`) → Build →
-   Red team → Recap + fresh-agent audit → Ship + seed. Update the era index
-   table in `eras/GOAL-LOOP.md`.
-3. **Hold the guardrails.** No new spending; nothing published outside the
-   repo; no fabricated benchmark data (dry-run/synthetic always labeled);
-   never ask the owner questions — log question, answer, and rationale in the
-   ledger instead.
-4. **Verify adversarially.** Fan out scout agents in recon, run skeptic +
-   completeness-critic agents before closing, and finish with a fresh-agent
-   audit that built nothing and defaults to "fail".
-5. **Close = seed.** The era is done only when the definition-of-done
-   checklist in `GOAL-LOOP.md` passes and `RECAP.md` ends with the
-   `## Era N+2 seed` section. Ship on a dedicated branch with a draft PR.
+- Never commit credentials or present dry-run or synthetic data as live benchmark results.
+- Do not incur new spending, deploy, post, or message people. Use offline verification.
+- A dedicated branch and draft pull request are the only shipping surface.
 
-If the user passed arguments, treat them as steering for goal selection
-(e.g. `/goal focus on the hardware product`) — they constrain Phase 2, not
-the protocol.
+Repository verification commands:
+
+```bash
+cd backend && pytest
+cd agentbench && pytest -q
+cd cli && pytest
+cd frontend && npm run lint && npm test && npm run build
+python -m agentbench.run --config agentbench/presets/moa-v1.yaml --tasks agentbench/tasks/coding-v1.json --trials 2 --dry-run --out /tmp/dryrun.json
+```
+
+Backend tests require a reachable PostgreSQL instance. Report any current environment failure without treating it as a regression from unrelated work.
 
 $ARGUMENTS
+
+<!-- unhobbled 2026-07-28; re-ablate after 2027-01-28 -->
