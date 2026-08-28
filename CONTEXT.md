@@ -61,6 +61,24 @@ Canonical terms for the benchmark product. Use these words consistently in code,
 | **Cursor-paste test** | Task authoring rule: "Would I paste this prompt into Cursor?" If no, rewrite surface. |
 | **Scenario type** | Surface badge: spreadsheet worker, Cursor session, or Slack message. |
 
+## OpenRouter Usage Board (Mode A)
+
+A daily-fresh **republisher** of OpenRouter's public Data API. Not a Mini PC hardware board, not an Arena clone, not a live inference proxy.
+
+| Term | Meaning |
+|------|---------|
+| **Usage Board** | Joined view of usage, price, official eval, and task share for OpenRouter models. Headline product for "what should I call today?" |
+| **Mode A** | GET-only poll of documented Data API paths. No `/chat/completions`, no `/analytics`, no live agentbench runs. |
+| **Mode B** | Hermes / paid live bench. **Parked.** Do not start. |
+| **as_of** | Timestamp from OpenRouter response `meta.as_of` (or the poll's cited equivalent). Every published number carries it. |
+| **Citation** | Exact string: `Source: OpenRouter (openrouter.ai/rankings), as of {as_of}. CC BY 4.0.` |
+| **Recommend** | Read-only compare over the **cached** Usage Board. Inputs: `task`, `budget`, `max_latency_ms`. Returns one cited pick. Never live-calls OpenRouter. Never accepts a client-supplied key. |
+| **Data API paths** | Only `/models`, `/datasets/rankings-daily`, `/benchmarks`, `/classifications/task`. |
+| **Compare routes** | Usage Board views: **best-by-$**, **best-by-task**, **best-by-latency**. Deep-link each row to the OpenRouter model page. |
+| **Blended price** | Prompt + completion token prices from `/models`, expressed per 1M tokens at a 1:3 in:out mix unless a row already publishes a single price. Used only for ranking, still cited as OpenRouter pricing. |
+| **Official eval** | A score from OpenRouter `/benchmarks` (Artificial Analysis, Design Arena, or OpenRouter's own evals). Not MiniBench cabinet pass rate. |
+| **Task share** | Market-share fraction from `/classifications/task` for a classification tag (e.g. `code:general_impl`). Sampled; not an absolute volume. |
+
 ## Anti-patterns (what we refuse)
 
 | Failure | Response |

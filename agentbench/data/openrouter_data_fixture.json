@@ -1,0 +1,139 @@
+{
+  "live": false,
+  "note": "Synthetic OpenRouter Data API replay for CI/dog-food. Not a live poll. CC BY 4.0 attribution still applies to the schema/citation we republish.",
+  "models": {
+    "data": [
+      {
+        "id": "anthropic/claude-haiku-4.5",
+        "name": "Anthropic: Claude Haiku 4.5",
+        "pricing": { "prompt": "0.0000008", "completion": "0.000004" },
+        "context_length": 200000
+      },
+      {
+        "id": "openai/gpt-4o",
+        "name": "OpenAI: GPT-4o",
+        "pricing": { "prompt": "0.0000025", "completion": "0.00001" },
+        "context_length": 128000
+      },
+      {
+        "id": "anthropic/claude-sonnet-5",
+        "name": "Anthropic: Claude Sonnet 5",
+        "pricing": { "prompt": "0.000003", "completion": "0.000015" },
+        "context_length": 200000
+      }
+    ]
+  },
+  "rankings": {
+    "data": [
+      {
+        "date": "2026-08-27",
+        "model_permaslug": "openai/gpt-4o",
+        "total_tokens": "987654321"
+      },
+      {
+        "date": "2026-08-27",
+        "model_permaslug": "anthropic/claude-sonnet-5",
+        "total_tokens": "555000000"
+      },
+      {
+        "date": "2026-08-27",
+        "model_permaslug": "anthropic/claude-haiku-4.5",
+        "total_tokens": "321000000"
+      },
+      {
+        "date": "2026-08-27",
+        "model_permaslug": "other",
+        "total_tokens": "111000000"
+      }
+    ],
+    "meta": {
+      "as_of": "2026-08-28T02:00:00Z",
+      "end_date": "2026-08-27",
+      "start_date": "2026-07-28",
+      "version": "v1"
+    }
+  },
+  "benchmarks": {
+    "data": [
+      {
+        "source": "artificial-analysis",
+        "model_permaslug": "openai/gpt-4o",
+        "display_name": "GPT-4o",
+        "intelligence_index": 71.2,
+        "coding_index": 65.8,
+        "agentic_index": 58.3
+      },
+      {
+        "source": "artificial-analysis",
+        "model_permaslug": "anthropic/claude-sonnet-5",
+        "display_name": "Claude Sonnet 5",
+        "intelligence_index": 78.0,
+        "coding_index": 74.1,
+        "agentic_index": 70.0
+      },
+      {
+        "source": "artificial-analysis",
+        "model_permaslug": "anthropic/claude-haiku-4.5",
+        "display_name": "Claude Haiku 4.5",
+        "intelligence_index": 62.0,
+        "coding_index": 61.5,
+        "agentic_index": 50.0
+      },
+      {
+        "source": "openrouter",
+        "model_permaslug": "openai/gpt-4o",
+        "display_name": "GPT-4o",
+        "benchmark_type": "search_browsecomp",
+        "primary_metric": "accuracy",
+        "primary_score": 0.72,
+        "avg_latency_per_task_ms": 3200,
+        "avg_cost_per_task": 0.031,
+        "total_tasks": 100,
+        "last_run_timestamp": "2026-07-28T13:38:18Z"
+      },
+      {
+        "source": "design-arena",
+        "model_permaslug": "anthropic/claude-haiku-4.5",
+        "display_name": "Claude Haiku 4.5",
+        "avg_generation_time_ms": 1200,
+        "elo": 1301,
+        "category": "codecategories"
+      },
+      {
+        "source": "design-arena",
+        "model_permaslug": "anthropic/claude-sonnet-5",
+        "display_name": "Claude Sonnet 5",
+        "avg_generation_time_ms": 8000,
+        "elo": 1423,
+        "category": "codecategories"
+      }
+    ],
+    "meta": {
+      "as_of": "2026-08-27T12:00:00Z",
+      "version": "v1"
+    }
+  },
+  "classifications": {
+    "data": {
+      "as_of": "2026-08-27",
+      "window_days": 7,
+      "classifications": [
+        {
+          "tag": "code:general_impl",
+          "display_name": "Code Generation",
+          "macro_category": "code",
+          "usage_share": 0.23,
+          "token_share": 0.31,
+          "models": [
+            { "id": "anthropic/claude-haiku-4.5", "tag_usage_share": 0.40, "tag_token_share": 0.38 },
+            { "id": "anthropic/claude-sonnet-5", "tag_usage_share": 0.35, "tag_token_share": 0.40 },
+            { "id": "openai/gpt-4o", "tag_usage_share": 0.10, "tag_token_share": 0.12 }
+          ]
+        }
+      ],
+      "macro_categories": [
+        { "key": "code", "label": "Code", "token_share": 0.52, "usage_share": 0.45 }
+      ]
+    }
+  }
+}

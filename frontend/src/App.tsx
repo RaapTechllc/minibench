@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Gauge, BarChart3, Database, Bot, Calculator, Trophy, BookOpen, Menu, X } from 'lucide-react';
+import { Gauge, BarChart3, Database, Bot, Calculator, Trophy, BookOpen, Activity, Menu, X } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Compare from './pages/Compare';
 import Submit from './pages/Submit';
@@ -12,10 +12,12 @@ import RunDetail from './pages/RunDetail';
 import MoaCalculator from './pages/MoaCalculator';
 import Models from './pages/Models';
 import Methodology from './pages/Methodology';
+import UsageBoard from './pages/UsageBoard';
 
 const NAV = [
   { path: '/', label: 'Overview', icon: BarChart3 },
   { path: '/models', label: 'Models', icon: Trophy },
+  { path: '/usage/cost', label: 'Usage', icon: Activity },
   { path: '/agents', label: 'Agents', icon: Bot },
   { path: '/moa-calculator', label: 'MoA Calculator', icon: Calculator },
   { path: '/hardware', label: 'Test Rigs', icon: Database },
@@ -26,7 +28,7 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
   return (
     <>
       {NAV.map(({ path, label, icon: Icon }) => {
-        const active = pathname === path;
+        const active = pathname === path || (path === '/usage/cost' && pathname.startsWith('/usage'));
         return (
           <Link
             key={path}
@@ -85,6 +87,10 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/models" element={<Models />} />
+          <Route path="/usage" element={<UsageBoard />} />
+          <Route path="/usage/cost" element={<UsageBoard />} />
+          <Route path="/usage/task" element={<UsageBoard />} />
+          <Route path="/usage/latency" element={<UsageBoard />} />
           <Route path="/leaderboard" element={<LegacyLeaderboardRedirect />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/agents/runs/:runId" element={<RunDetail />} />
