@@ -5,6 +5,7 @@ No Docker, no live keys, no scrape. Publication tests use in-memory
 """
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
