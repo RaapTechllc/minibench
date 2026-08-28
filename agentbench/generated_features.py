@@ -54,7 +54,18 @@ _CANDIDATE_PROBE_PROGRAM = r"""
 import json
 import sys
 
+def _scrub_main():
+    main = sys.modules.get("__main__")
+    if main is None:
+        return
+    for name, value in list(vars(main).items()):
+        if name in {"request", "payload"} or (
+            isinstance(value, dict) and ("notes" in value or "tag_query" in value or "sku_a" in value or "client_a" in value)
+        ):
+            delattr(main, name)
+
 def _run(payload):
+    _scrub_main()
     workspace = payload["workspace"]
     kind = payload["kind"]
     sys.path.insert(0, workspace)
@@ -104,10 +115,16 @@ def _run(payload):
         raise ValueError("unsupported probe")
     sys.stdout.buffer.write(json.dumps({"completed": True, "outputs": outputs}, separators=(",", ":")).encode())
 
-if __name__ == "__main__":
+def _main():
     payload = json.loads(sys.stdin.buffer.read())
     sys.stdin.close()
-    _run(payload)
+    try:
+        _run(payload)
+    finally:
+        payload.clear()
+        _scrub_main()
+
+_main()
 """
 
 

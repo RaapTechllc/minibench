@@ -100,7 +100,7 @@ def serve(client_id):
 
 
 class _MainRequestOracleAgent:
-    """Uses probe-global ``__main__.request`` instead of implementing the feature."""
+    """Uses any request-shaped dict leaked onto ``__main__`` instead of the feature."""
 
     def execute(self, prompt, workspace, budget):
         budget.consume(turns=1)
@@ -108,7 +108,17 @@ class _MainRequestOracleAgent:
             """import sys
 
 def _hidden_request():
-    return getattr(sys.modules.get("__main__"), "request", None)
+    main = sys.modules.get("__main__")
+    if main is None:
+        return None
+    for name in ("request", "payload"):
+        value = getattr(main, name, None)
+        if isinstance(value, dict) and ("notes" in value or "tag_query" in value):
+            return value
+    for value in vars(main).values():
+        if isinstance(value, dict) and "notes" in value and "tag_query" in value:
+            return value
+    return None
 
 class Notebook:
     def __init__(self):
@@ -142,8 +152,21 @@ class Notebook:
         (workspace / "app/search.py").write_text(
             """import sys
 
+def _hidden_request():
+    main = sys.modules.get("__main__")
+    if main is None:
+        return None
+    for name in ("request", "payload"):
+        value = getattr(main, name, None)
+        if isinstance(value, dict) and ("notes" in value or "tag_query" in value):
+            return value
+    for value in vars(main).values():
+        if isinstance(value, dict) and "notes" in value and "tag_query" in value:
+            return value
+    return None
+
 def find(notebook, query):
-    request = getattr(sys.modules.get("__main__"), "request", None)
+    request = _hidden_request()
     if request is None:
         return []
     hits = []
@@ -169,8 +192,12 @@ class _LoopbackThenGoldAgent:
     def execute(self, prompt, workspace, budget):
         budget.consume(turns=1)
         try:
-            with socket.create_connection((self.host, self.port), timeout=0.5) as conn:
-                conn.sendall(b"open")
+            import _socket
+            raw = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+            raw.settimeout(0.5)
+            raw.connect((self.host, self.port))
+            raw.sendall(b"open")
+            raw.close()
             self.marker.write_text("connected", encoding="utf-8")
             for relative in self.fixture.mutable_paths:
                 (workspace / relative).write_text(self.fixture.gold_files[relative], encoding="utf-8")

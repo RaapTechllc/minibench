@@ -348,6 +348,7 @@ def _agent_result_payload(result: Any) -> bytes:
 def _install_denied_network_policy() -> None:
     """Replace socket constructors in the spawned agent process."""
     import socket
+    import _socket
 
     def _denied(*_args: Any, **_kwargs: Any) -> Any:
         raise OSError("network denied")
@@ -361,6 +362,7 @@ def _install_denied_network_policy() -> None:
     socket.create_connection = _denied  # type: ignore[assignment]
     if hasattr(socket, "create_server"):
         socket.create_server = _denied  # type: ignore[assignment]
+    _socket.socket = _DeniedSocket  # type: ignore[misc, assignment]
 
 
 def _execute_agent_child(connection, agent, prompt, workspace, budget, network_policy=None) -> None:
