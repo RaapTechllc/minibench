@@ -1,0 +1,72 @@
+{
+  "live": false,
+  "meta": {
+    "as_of": "2026-08-27T00:00:00Z",
+    "citation": "Source: OpenRouter (openrouter.ai/rankings), as of 2026-08-27T00:00:00Z. CC BY 4.0.",
+    "live": false,
+    "source": "fixture",
+    "row_count": 3
+  },
+  "rows": [
+    {
+      "id": "anthropic/claude-haiku-4.5",
+      "name": "Anthropic: Claude Haiku 4.5",
+      "openrouter_url": "https://openrouter.ai/anthropic/claude-haiku-4.5",
+      "prompt_price": 8e-07,
+      "completion_price": 4e-06,
+      "blended_per_million": 3.2,
+      "daily_tokens": 321000000,
+      "ranking_date": "2026-08-27",
+      "eval_score": 62.0,
+      "eval_source": "artificial-analysis",
+      "eval_task": "intelligence_index",
+      "latency_ms": 1200,
+      "task_shares": {
+        "code:general_impl": 0.4,
+        "code": 0.4
+      },
+      "citation": "Source: OpenRouter (openrouter.ai/rankings), as of 2026-08-27T00:00:00Z. CC BY 4.0.",
+      "as_of": "2026-08-27T00:00:00Z"
+    },
+    {
+      "id": "anthropic/claude-sonnet-5",
+      "name": "Anthropic: Claude Sonnet 5",
+      "openrouter_url": "https://openrouter.ai/anthropic/claude-sonnet-5",
+      "prompt_price": 3e-06,
+      "completion_price": 1.5e-05,
+      "blended_per_million": 12.0,
+      "daily_tokens": 555000000,
+      "ranking_date": "2026-08-27",
+      "eval_score": 78.0,
+      "eval_source": "artificial-analysis",
+      "eval_task": "intelligence_index",
+      "latency_ms": 8000,
+      "task_shares": {
+        "code:general_impl": 0.35,
+        "code": 0.35
+      },
+      "citation": "Source: OpenRouter (openrouter.ai/rankings), as of 2026-08-27T00:00:00Z. CC BY 4.0.",
+      "as_of": "2026-08-27T00:00:00Z"
+    },
+    {
+      "id": "openai/gpt-4o",
+      "name": "OpenAI: GPT-4o",
+      "openrouter_url": "https://openrouter.ai/openai/gpt-4o",
+      "prompt_price": 2.5e-06,
+      "completion_price": 1e-05,
+      "blended_per_million": 8.125,
+      "daily_tokens": 987654321,
+      "ranking_date": "2026-08-27",
+      "eval_score": 71.2,
+      "eval_source": "artificial-analysis",
+      "eval_task": "intelligence_index",
+      "latency_ms": 3200,
+      "task_shares": {
+        "code:general_impl": 0.1,
+        "code": 0.1
+      },
+      "citation": "Source: OpenRouter (openrouter.ai/rankings), as of 2026-08-27T00:00:00Z. CC BY 4.0.",
+      "as_of": "2026-08-27T00:00:00Z"
+    }
+  ]
+}

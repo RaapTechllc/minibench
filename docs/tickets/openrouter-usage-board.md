@@ -12,10 +12,10 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** None — can start immediately.
 
-- [ ] Allowlist rejects any path outside the four documented GETs
-- [ ] Missing key does not open a socket; fixture loads
-- [ ] Key never appears in raised errors, logs, or returned payloads
-- [ ] Offline tests use a fake transport (tracker prior art)
+- [x] Allowlist rejects any path outside the four documented GETs
+- [x] Missing key does not open a socket; fixture loads
+- [x] Key never appears in raised errors, logs, or returned payloads
+- [x] Offline tests use a fake transport (tracker prior art)
 
 ## T2 — Board join + poller + daily cron — #50
 
@@ -23,10 +23,10 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** T1
 
-- [ ] Snapshot rows carry price, daily usage, official eval, task shares, optional latency, `as_of`, citation
-- [ ] `other` ranking rows are not treated as a model
-- [ ] Fixture-labelled snapshots are never presented as live
-- [ ] Scheduled workflow does not fail the repo when no secret is set
+- [x] Snapshot rows carry price, daily usage, official eval, task shares, optional latency, `as_of`, citation
+- [x] `other` ranking rows are not treated as a model
+- [x] Fixture-labelled snapshots are never presented as live
+- [x] Scheduled workflow does not fail the repo when no secret is set
 
 ## T3 — Recommend MCP + localhost REST + dog-food — #51
 
@@ -34,10 +34,10 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** T2
 
-- [ ] Same compare function serves MCP and REST
-- [ ] REST binds 127.0.0.1 and is not mounted on the CORS `*` app
-- [ ] Client-supplied key is rejected; response has no secret
-- [ ] Honest miss when no row fits; fixture dog-food shows a cited pick
+- [x] Same compare function serves MCP and REST
+- [x] REST binds 127.0.0.1 and is not mounted on the CORS `*` app
+- [x] Client-supplied key is rejected; response has no secret
+- [x] Honest miss when no row fits; fixture dog-food shows a cited pick
 
 ## T4 — Public board API + Usage Board compare routes — #52
 
@@ -45,10 +45,10 @@ Work the **frontier**: any ticket whose blockers are all done.
 
 **Blocked by:** T2
 
-- [ ] Main API serves cache only — no live OpenRouter, no recommend
-- [ ] Every payload includes the citation + `as_of`
-- [ ] Frontend ranking helpers are unit-tested
-- [ ] Deep-links go to the OpenRouter model page
+- [x] Main API serves cache only — no live OpenRouter, no recommend
+- [x] Every payload includes the citation + `as_of`
+- [x] Frontend ranking helpers are unit-tested
+- [x] Deep-links go to the OpenRouter model page
 
 ---
 

@@ -19,3 +19,4 @@ agentbench/results/*.json
 !agentbench/results/*minibench-pro-v1*.json
 
 .firecrawl/
+agentbench/data/openrouter_board.json

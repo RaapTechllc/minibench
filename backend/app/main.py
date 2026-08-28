@@ -27,6 +27,7 @@ from app.schemas import (
 )
 from app.seed import run_seed
 from app.agents_router import router as agents_router
+from app.openrouter_board import router as openrouter_board_router
 
 
 @asynccontextmanager
@@ -65,6 +66,8 @@ app.add_middleware(
 
 # Agent-benchmark product (additive; separate router + tables).
 app.include_router(agents_router)
+# Cached OpenRouter Usage Board (CC BY 4.0 republish). No recommend, no live hop.
+app.include_router(openrouter_board_router)
 
 
 def compute_hei(tokens_per_second: Decimal, model_quality_score: Optional[Decimal], hardware_price_usd: Optional[Decimal]) -> Optional[float]:

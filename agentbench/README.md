@@ -350,6 +350,23 @@ python -m agentbench.import_results agentbench/results/*.json --check
 python -m agentbench.import_results agentbench/results/*.json --api http://localhost:3070
 ```
 
+## Mode A Usage Board (OpenRouter Data API)
+
+GET-only poll of `/models`, `/datasets/rankings-daily`, `/benchmarks`, and
+`/classifications/task`. No `/chat/completions`. Missing `OPENROUTER_API_KEY`
+loads `agentbench/data/openrouter_data_fixture.json` (not live).
+
+```bash
+python -m agentbench.poll_openrouter --fixture --out /tmp/board.json
+python -m agentbench.recommend --dogfood --task code --budget 5
+```
+
+Recommend MCP (`python -m agentbench.mcp_recommend`) and localhost REST
+(`python -m agentbench.recommend_http` → `127.0.0.1:3072`) compare the cached
+board only. They are not mounted on the FastAPI app that sets CORS `*`.
+
+Cite every number: `Source: OpenRouter (openrouter.ai/rankings), as of {as_of}. CC BY 4.0.`
+
 The importer reuses the exact live-path payload builder and applies the same
 honesty gates: `dry_run` artifacts are refused unconditionally (no override),
 canary-flagged runs are refused, and infra-error runs are refused unless

@@ -131,6 +131,7 @@ Set the API target with `MINIBENCH_API_URL` (default `http://localhost:3070`).
 | `/benchmarks/:id` | Single-benchmark detail (full hardware/software/performance breakdown) |
 | `/compare` | Side-by-side comparison of two benchmarks |
 | `/moa-calculator` | MoA cost calculator |
+| `/usage/cost` `/usage/task` `/usage/latency` | OpenRouter Usage Board — best-by-$, best-by-task, best-by-latency (CC BY 4.0) |
 | `/hardware` | Test-rig reference profiles + hardware specs |
 | `/submit` | Submit results — CLI instructions and manual form |
 | `/leaderboard` | Legacy route — redirects to `/models` |
@@ -147,7 +148,27 @@ Set the API target with `MINIBENCH_API_URL` (default `http://localhost:3070`).
 | GET | `/api/v1/compare?a={id}&b={id}` | Side-by-side comparison |
 | GET | `/api/v1/stats` | Aggregate stats |
 | GET | `/api/v1/models` | Model quality table |
+| GET | `/api/v1/openrouter/board` | Cached OpenRouter Usage Board snapshot (no live hop, no recommend) |
+| GET | `/api/v1/openrouter/compare/best-by-cost` | Snapshot rows cheapest-first |
+| GET | `/api/v1/openrouter/compare/best-by-task?task=` | Snapshot rows by task share |
+| GET | `/api/v1/openrouter/compare/best-by-latency` | Snapshot rows fastest-first |
 | GET | `/health` | Health check |
+
+Recommend is **not** on this API (CORS includes `*`). Local compare:
+
+```bash
+python -m agentbench.recommend --dogfood --task code --budget 5
+python -m agentbench.mcp_recommend   # stdio MCP
+python -m agentbench.recommend_http  # GET http://127.0.0.1:3072/recommend?task=code
+```
+
+Poll (GET-only Data API; fixture if `OPENROUTER_API_KEY` is unset):
+
+```bash
+python -m agentbench.poll_openrouter --fixture --out /tmp/board.json
+```
+
+Every Usage Board number is cited: `Source: OpenRouter (openrouter.ai/rankings), as of {as_of}. CC BY 4.0.`
 
 ### Submission validation
 - `tokens_per_second` in `0.1–500`, `test_duration_secs ≥ 10`, `prompt + completion tokens ≥ 100`.

@@ -197,6 +197,35 @@ export interface ModelLeaderboardEntry {
   robustness_correct: number | null;
 }
 
+export interface UsageBoardRow {
+  id: string;
+  name: string;
+  openrouter_url: string;
+  prompt_price: number | null;
+  completion_price: number | null;
+  blended_per_million: number | null;
+  daily_tokens: number | null;
+  ranking_date: string | null;
+  eval_score: number | null;
+  eval_source: string | null;
+  eval_task: string | null;
+  latency_ms: number | null;
+  task_shares: Record<string, number>;
+  citation: string;
+  as_of: string;
+}
+
+export interface UsageBoardPayload {
+  meta: {
+    as_of: string;
+    citation: string;
+    live: boolean;
+    source?: string;
+    row_count?: number;
+  };
+  rows: UsageBoardRow[];
+}
+
 export interface ReferenceProfile {
   id: number;
   profile_key: string;
@@ -271,4 +300,10 @@ export const api = {
     return fetchJSON<ModelLeaderboardEntry[]>(`/api/v1/agents/models/leaderboard${qs}`);
   },
   getAgentRun: (runId: string) => fetchJSON<AgentRunDetail>(`/api/v1/agents/runs/${runId}`),
+  getOpenRouterBoard: () => fetchJSON<UsageBoardPayload>('/api/v1/openrouter/board'),
+  getOpenRouterCompare: (by: 'cost' | 'task' | 'latency', task?: string) => {
+    const path = `/api/v1/openrouter/compare/best-by-${by}`;
+    const qs = by === 'task' && task ? `?task=${encodeURIComponent(task)}` : '';
+    return fetchJSON<UsageBoardPayload>(`${path}${qs}`);
+  },
 };
