@@ -173,6 +173,17 @@ agentbench/.venv/bin/python -m agentbench.generated_sql_repairs \
     --seed 20260719 --trials 2 --out /tmp/minibench-generated-sql-repair.json
 ```
 
+Generated feature-implementation tasks are a separate family from repository
+repair, SQL/data repair, and terminal operations. A seed selects a working
+repository plus a bounded cross-file request; hidden checks grade the new
+behavior, regressions, and collateral edits without a model or API key.
+Network access is denied by default:
+
+```bash
+agentbench/.venv/bin/python -m agentbench.generated_features \
+    --seed 20260828 --trials 2 --out /tmp/minibench-generated-feature.json
+```
+
 A paired self-review smoke reuses the same generated fixture and hidden oracle
 for a normal first attempt plus one independently budgeted correction. The
 correction receives only fixed, classified feedback; verifier detail and gold
