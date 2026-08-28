@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Gauge, BarChart3, Database, Bot, Calculator, Trophy, BookOpen, Activity, Menu, X } from 'lucide-react';
+import { Gauge, BarChart3, Database, Bot, Briefcase, Calculator, Trophy, BookOpen, Activity, Menu, X } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Compare from './pages/Compare';
 import Submit from './pages/Submit';
@@ -8,6 +8,8 @@ import Hardware from './pages/Hardware';
 import LegacyLeaderboardRedirect from './pages/LegacyLeaderboardRedirect';
 import BenchmarkDetail from './pages/BenchmarkDetail';
 import Agents from './pages/Agents';
+import AgentCabinet from './pages/AgentCabinet';
+import AgentCabinetRun from './pages/AgentCabinetRun';
 import RunDetail from './pages/RunDetail';
 import MoaCalculator from './pages/MoaCalculator';
 import Models from './pages/Models';
@@ -19,6 +21,7 @@ const NAV = [
   { path: '/models', label: 'Models', icon: Trophy },
   { path: '/usage/cost', label: 'Usage', icon: Activity },
   { path: '/agents', label: 'Agents', icon: Bot },
+  { path: '/agent-cabinet', label: 'Agent Cabinet', icon: Briefcase },
   { path: '/moa-calculator', label: 'MoA Calculator', icon: Calculator },
   { path: '/hardware', label: 'Test Rigs', icon: Database },
   { path: '/methodology', label: 'Methodology', icon: BookOpen },
@@ -28,7 +31,9 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
   return (
     <>
       {NAV.map(({ path, label, icon: Icon }) => {
-        const active = pathname === path || (path === '/usage/cost' && pathname.startsWith('/usage'));
+        const active = pathname === path
+          || (path === '/usage/cost' && pathname.startsWith('/usage'))
+          || (path === '/agent-cabinet' && pathname.startsWith('/agent-cabinet'));
         return (
           <Link
             key={path}
@@ -94,6 +99,8 @@ export default function App() {
           <Route path="/leaderboard" element={<LegacyLeaderboardRedirect />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/agents/runs/:runId" element={<RunDetail />} />
+          <Route path="/agent-cabinet" element={<AgentCabinet />} />
+          <Route path="/agent-cabinet/runs/:runId" element={<AgentCabinetRun />} />
           <Route path="/benchmarks/:id" element={<BenchmarkDetail />} />
           <Route path="/compare" element={<Compare />} />
           <Route path="/moa-calculator" element={<MoaCalculator />} />

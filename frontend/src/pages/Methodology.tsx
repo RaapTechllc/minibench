@@ -169,6 +169,22 @@ export default function Methodology() {
         <SectionTable head={['Grader', 'Pass semantics']} rows={GRADERS} />
         <div className="space-y-3 px-5 pb-5 text-[14px] leading-relaxed text-ink-2">
           <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3">
+            Real-Work Agent Cabinet
+          </h3>
+          <p>
+            The{' '}
+            <Link to="/agent-cabinet" className="font-medium text-accent hover:text-accent-strong">
+              Real-Work Agent Cabinet
+            </Link>{' '}
+            scores agent harnesses on pinned real-work fixtures — it is not Solo Cabinet
+            (single-model capability) and not Multiplayer Cabinet (MoA), and its scores are never
+            combined into a composite. Listed runs hold the task snapshot, tools, limits,
+            verification, and trials constant; the changed variables (model route, harness) are
+            stated explicitly, and Technician mode exposes the full provenance receipt.
+          </p>
+        </div>
+        <div className="space-y-3 px-5 pb-5 text-[14px] leading-relaxed text-ink-2">
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3">
             Trials and uncertainty
           </h3>
           <p>

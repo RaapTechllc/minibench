@@ -287,6 +287,13 @@ export default function Dashboard() {
             See model rankings →
           </Link>
         </p>
+        <p className="mt-3 text-[15px] leading-relaxed text-ink-2">
+          Agent harnesses scored on pinned real-work fixtures — never mixed with Solo or
+          Multiplayer scores — live in the{' '}
+          <Link to="/agent-cabinet" className="text-accent hover:text-accent-strong font-medium">
+            Real-Work Agent Cabinet →
+          </Link>
+        </p>
       </section>
 
       {/* Stat strip */}

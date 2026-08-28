@@ -241,6 +241,68 @@ export interface ReferenceProfile {
   representative_system: string | null;
 }
 
+/* ── Real-Work Agent Cabinet (/api/v1/agent-cabinet) ───────────────────────
+   Distinct board for published agent-harness runs. Read-only product surface;
+   these types mirror backend/app/agent_cabinet_present.py and never mix with
+   the Solo (/models) or Multiplayer (/agents) contracts above. */
+
+export interface AgentCabinetListItem {
+  run_id: string;
+  submitted_at: string;
+  suite: string | null;
+  model_route: string | null;
+  harness: string | null;
+  harness_version: string | null;
+  /** 0–100. */
+  completion: number;
+  /** Same value as completion; carried for contract parity. */
+  pass_rate: number;
+  /** Raw backend category keys → completion 0–100 (never Arcade labels). */
+  category_completion: Record<string, number>;
+  cost_usd_per_task: number | null;
+  latency_p50_ms: number | null;
+  private_split: boolean;
+}
+
+export interface AgentCabinetTechnician {
+  model: string | null;
+  provider: string | null;
+  model_route: string | null;
+  harness: string | null;
+  harness_version: string | null;
+  tool_contract: string[] | null;
+  tool_contract_sha256: string | null;
+  prompt_config_sha256: string | null;
+  fixture_reference: string | null;
+  fixture_digest: string | null;
+  generator_sha256: string | null;
+  suite: string | null;
+  task_set_sha256: string | null;
+  budgets: Record<string, number> | null;
+  git_commit: string | null;
+  grader_version: string | null;
+  private_split: boolean | null;
+  private_split_id: string | null;
+  policy_version: string | null;
+  /** Raw 0–1 fractions from the run summary (null when not measured). */
+  false_verification_rate: number | null;
+  regression_rate: number | null;
+  termination_reasons: Record<string, number>;
+  /** 0–100 (backend pre-scales these). */
+  pass_hat_k: number | null;
+  ci95_low: number | null;
+  ci95_high: number | null;
+  pass_rate_ci95: (number | null)[];
+  pass_rate_ci95_boot: (number | null)[];
+  trials: Record<string, unknown>[];
+}
+
+export interface AgentCabinetDetail extends AgentCabinetListItem {
+  technician: AgentCabinetTechnician;
+  held_constant: string[];
+  changed_variables: string;
+}
+
 async function fetchJSON<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -306,4 +368,7 @@ export const api = {
     const qs = by === 'task' && task ? `?task=${encodeURIComponent(task)}` : '';
     return fetchJSON<UsageBoardPayload>(`${path}${qs}`);
   },
+  getAgentCabinetRuns: () => fetchJSON<AgentCabinetListItem[]>('/api/v1/agent-cabinet/runs'),
+  getAgentCabinetRun: (runId: string) =>
+    fetchJSON<AgentCabinetDetail>(`/api/v1/agent-cabinet/runs/${runId}`),
 };
