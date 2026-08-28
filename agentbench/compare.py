@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from agentbench.agent_cabinet import comparability_receipt, is_agent_cabinet_artifact
 from agentbench.stats import bootstrap_ci_by_task, mcnemar_exact
 
 ALPHA = 0.05
@@ -65,6 +66,21 @@ def check_comparable(runs: list[dict[str, Any]]) -> None:
             raise ComparabilityError(
                 f"{_model_name(run)} vs {_model_name(ref)}: task/trial sets differ"
             )
+
+    agent_flags = [is_agent_cabinet_artifact(run) for run in runs]
+    if any(agent_flags) and not all(agent_flags):
+        raise ComparabilityError(
+            "evaluation_type differs — agent cabinet cannot be compared to model-only/MoA"
+        )
+    if all(agent_flags):
+        for run in runs[1:]:
+            receipt = comparability_receipt(ref, run)
+            if not receipt["comparable"]:
+                fields = ", ".join(receipt["failing_fields"])
+                raise ComparabilityError(
+                    f"{_model_name(run)} vs {_model_name(ref)}: agent cabinet "
+                    f"incomparable ({fields})"
+                )
 
 
 # Axis-only categories excluded from binary/McNemar ranking: calibration is

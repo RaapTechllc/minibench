@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
+from agentbench.agent_cabinet import apply_agent_cabinet_to_artifact, default_generator_sha256
 from agentbench.stats import bootstrap_ci_by_task, pass_hat_k, percentile, wilson_ci
 
 
@@ -558,7 +559,7 @@ def build_agent_artifact(
     total_cost = sum(costs) if costs else None
     latencies = [float(trial.wall_time_ms) for trial in scored]
     effective_k = count
-    return {
+    artifact = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "dry_run": True,
         "provenance": {
@@ -608,6 +609,28 @@ def build_agent_artifact(
         },
         "trials": [asdict(trial) for trial in trials],
     }
+    apply_agent_cabinet_to_artifact(
+        artifact,
+        model="deterministic-fake-agent",
+        provider="offline",
+        harness="minibench-reference",
+        harness_version="1",
+        tool_contract=list(manifest.required_capabilities),
+        fixture_reference=manifest.fixture.reference,
+        fixture_digest=manifest.fixture.digest,
+        generator_sha256=default_generator_sha256(
+            preparation_strategy=manifest.preparation.strategy,
+            verification_strategy=manifest.verification.strategy,
+            fixture_reference=manifest.fixture.reference,
+        ),
+        suite=manifest.suite,
+        task_ids=[trial.task_id for trial in trials] or [manifest.task_id],
+        budgets=asdict(manifest.budget),
+        grader_version=AGENT_GRADER_VERSION,
+        private_split=manifest.private,
+        public_prompt=manifest.public_prompt,
+    )
+    return artifact
 
 
 def write_agent_artifact(
