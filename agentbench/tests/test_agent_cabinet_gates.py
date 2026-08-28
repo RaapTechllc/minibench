@@ -241,8 +241,10 @@ def test_comparability_rejects_each_incompatibility(tmp_path, field):
     right = deepcopy(left)
     if field == "budgets":
         right["provenance"]["budgets"] = {**right["provenance"]["budgets"], "max_turns": 99}
-    elif field == "private_split":
-        right["provenance"]["private_split"] = True
+    elif field == "fixture_reference":
+        right["provenance"]["fixture_reference"] = "offline-text-repair@9"
+    elif field == "fixture_digest":
+        right["provenance"]["fixture_digest"] = "sha256:" + "ab" * 32
     elif isinstance(right["provenance"].get(field), bool):
         right["provenance"][field] = not right["provenance"][field]
     else:
@@ -332,6 +334,7 @@ def test_mixed_agent_and_solo_are_not_comparable(tmp_path):
     solo["summary"]["suite"] = agent["summary"]["suite"]
     solo["summary"]["grader_version"] = agent["summary"]["grader_version"]
     solo["summary"]["decoding"] = agent["summary"]["decoding"]
+    solo["provenance"]["seed_sha256"] = (agent.get("provenance") or {}).get("seed_sha256")
     with pytest.raises(ComparabilityError, match="evaluation_type"):
         check_comparable([solo, agent])
 

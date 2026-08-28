@@ -10,7 +10,7 @@ from agentbench.agent_tasks import (
     load_agent_manifest,
 )
 from agentbench.compare import ComparabilityError, _outcomes, check_comparable
-from agentbench.import_results import artifact_to_payload, load_trials
+from agentbench.import_results import ImportRefused, artifact_to_payload, load_trials
 from agentbench.self_review import (
     CORRECTION_PROMPT_MARKER,
     build_self_review_artifact,
@@ -337,13 +337,13 @@ def test_lift_uses_only_complete_pairs_while_first_pass_uses_all_eligible(tmp_pa
     assert summary["cost_usd_total"] is None
     assert summary["cost_usd_per_task"] is None
     artifact["dry_run"] = False
-    payload = artifact_to_payload(
-        artifact,
-        source="mixed-paired.json",
-        provider="offline",
-        allow_infra_errors=True,
-    )
-    assert payload["cost_usd_per_task"] is None
+    with pytest.raises(ImportRefused, match="infrastructure_errors"):
+        artifact_to_payload(
+            artifact,
+            source="mixed-paired.json",
+            provider="offline",
+            allow_infra_errors=True,
+        )
 
 
 def test_artifact_has_compatible_trial_shape_and_paired_metrics(tmp_path):
