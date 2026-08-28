@@ -29,4 +29,14 @@ Backend tests require PostgreSQL; set `MINIBENCH_TEST_PG_HOST` and `MINIBENCH_TE
 - Never commit credentials or represent dry-run or synthetic benchmark data as live results.
 - Paid live model calls, publishing, deployment, and external communication require explicit owner authorization.
 
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `RaapTechllc/minibench` (`gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` plus `docs/adr/`. See `docs/agents/domain.md`.
+
 <!-- unhobbled 2026-07-28; re-ablate after 2027-01-28 -->
