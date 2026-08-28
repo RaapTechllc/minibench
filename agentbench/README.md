@@ -125,6 +125,10 @@ python -m agentbench.run --config agentbench/presets/moa-v1.yaml \
     --tasks agentbench/tasks/coding-v1.json --trials 3 --dry-run
 ```
 
+Operator manual for authoring, fixture pins, gold/bad self-checks, budgets,
+private-split handling, dry runs, comparison, and publication gates:
+[docs/operators/agent-cabinet.md](../docs/operators/agent-cabinet.md).
+
 Real-Work Agent Cabinet lifecycle smoke (fresh fixture per trial, deterministic
 fake agent, hidden verification, and cleanup; no keys or network):
 
@@ -390,3 +394,8 @@ canary-flagged runs are refused, and infra-error runs are refused unless
 fields left null — never guessed. Note the endpoint does not deduplicate:
 importing the same artifact twice creates two runs (the model leaderboard
 still shows only the best run per model).
+
+Real-Work Agent Cabinet artifacts are routed separately: `publication_receipt`
+then `POST /api/v1/agent-cabinet/runs`. `--check` prints
+`destination=/api/v1/agent-cabinet/runs`. `--allow-infra-errors` is ignored on
+that path. See [the operator manual](../docs/operators/agent-cabinet.md).

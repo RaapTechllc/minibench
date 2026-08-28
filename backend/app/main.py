@@ -27,6 +27,7 @@ from app.schemas import (
 )
 from app.seed import run_seed
 from app.agents_router import router as agents_router
+from app.agent_cabinet_router import router as agent_cabinet_router
 from app.openrouter_board import router as openrouter_board_router
 
 
@@ -66,6 +67,8 @@ app.add_middleware(
 
 # Agent-benchmark product (additive; separate router + tables).
 app.include_router(agents_router)
+# Real-Work Agent Cabinet (additive; never mixed into Solo/MoA or hardware).
+app.include_router(agent_cabinet_router)
 # Cached OpenRouter Usage Board (CC BY 4.0 republish). No recommend, no live hop.
 app.include_router(openrouter_board_router)
 

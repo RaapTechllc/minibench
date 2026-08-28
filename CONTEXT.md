@@ -19,6 +19,7 @@ Canonical terms for the benchmark product. Use these words consistently in code,
 | **Cabinet** | A benchmark suite exposed as a leaderboard board. Not the same as a software "component". |
 | **Solo Cabinet** | `/models` — single-model, pinned decoding. Homepage product. |
 | **Multiplayer Cabinet** | `/agents` — MoA / multi-agent configs. Adds **$/quarter** (cost per task). |
+| **Real-Work Agent Cabinet** | Distinct board for published agent-harness runs (`/api/v1/agent-cabinet`). Completion, category completion, cost, and latency — never mixed with Solo or Multiplayer scores and never folded into a composite. |
 | **Arcade manual** | Default drill-down: scenario badges, plain-English task names, pass/fail by category. |
 | **Technician mode** | Optional drill-down: CIs, pass^k, format vs capability split. Backstage stats. |
 
