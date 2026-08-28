@@ -73,6 +73,7 @@ A daily-fresh **republisher** of OpenRouter's public Data API. Not a Mini PC har
 | **as_of** | Timestamp from OpenRouter response `meta.as_of` (or the poll's cited equivalent). Every published number carries it. |
 | **Citation** | Exact string: `Source: OpenRouter (openrouter.ai/rankings), as of {as_of}. CC BY 4.0.` |
 | **Recommend** | Read-only compare over the **cached** Usage Board. Inputs: `task`, `budget`, `max_latency_ms`. Returns one cited pick. Never live-calls OpenRouter. Never accepts a client-supplied key. |
+| **Board path** | Runtime location of a live joined Usage Board snapshot (`OPENROUTER_BOARD_PATH`). Off the git tree. When unset or the file is missing, readers serve the committed fixture and must not label it live. |
 | **Data API paths** | Only `/models`, `/datasets/rankings-daily`, `/benchmarks`, `/classifications/task`. |
 | **Compare routes** | Usage Board views: **best-by-$**, **best-by-task**, **best-by-latency**. Deep-link each row to the OpenRouter model page. |
 | **Blended price** | Prompt + completion token prices from `/models`, expressed per 1M tokens at a 1:3 in:out mix unless a row already publishes a single price. Used only for ranking, still cited as OpenRouter pricing. |

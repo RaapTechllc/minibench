@@ -356,8 +356,13 @@ GET-only poll of `/models`, `/datasets/rankings-daily`, `/benchmarks`, and
 `/classifications/task`. No `/chat/completions`. Missing `OPENROUTER_API_KEY`
 loads `agentbench/data/openrouter_data_fixture.json` (not live).
 
+A live poll writes `OPENROUTER_BOARD_PATH` when set. Recommend and the public
+board read that path if the file exists; otherwise they serve the committed
+fixture and do not label it live. Do not commit a live snapshot.
+
 ```bash
 python -m agentbench.poll_openrouter --fixture --out /tmp/board.json
+OPENROUTER_BOARD_PATH=/var/lib/minibench/openrouter-board.json python -m agentbench.poll_openrouter
 python -m agentbench.recommend --dogfood --task code --budget 5
 ```
 

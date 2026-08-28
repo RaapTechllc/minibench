@@ -1,4 +1,54 @@
 """Public Usage Board reads — fixture snapshot, no recommend, no live key."""
+import json
+
+
+def test_missing_board_path_http_serves_fixture_not_503(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_BOARD_PATH", str(tmp_path / "missing.json"))
+    resp = client.get("/api/v1/openrouter/board")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["live"] is False
+    assert body["meta"]["source"] == "fixture"
+    assert body["meta"]["as_of"] in body["meta"]["citation"]
+    assert "persist-live/path-honor" not in [row["id"] for row in body["rows"]]
+
+
+def test_board_path_http_serves_override_when_file_exists(client, tmp_path, monkeypatch):
+    as_of = "2026-08-28T06:20:00Z"
+    cite = f"Source: OpenRouter (openrouter.ai/rankings), as of {as_of}. CC BY 4.0."
+    dest = tmp_path / "live.json"
+    dest.write_text(
+        json.dumps(
+            {
+                "live": True,
+                "meta": {
+                    "as_of": as_of,
+                    "citation": cite,
+                    "live": True,
+                    "source": "openrouter",
+                    "row_count": 1,
+                },
+                "rows": [
+                    {
+                        "id": "persist-live/path-honor",
+                        "openrouter_url": "https://openrouter.ai/persist-live/path-honor",
+                        "citation": cite,
+                        "as_of": as_of,
+                    }
+                ],
+            }
+        )
+        + "\n"
+    )
+    monkeypatch.setenv("OPENROUTER_BOARD_PATH", str(dest))
+    resp = client.get("/api/v1/openrouter/board")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["meta"]["live"] is True
+    assert body["meta"]["as_of"] == as_of
+    assert body["rows"][0]["id"] == "persist-live/path-honor"
+    assert as_of in body["meta"]["citation"]
+
 
 
 def test_board_serves_cited_fixture_rows(client):

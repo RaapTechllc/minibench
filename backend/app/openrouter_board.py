@@ -15,8 +15,13 @@ CITE_TEMPLATE = "Source: OpenRouter (openrouter.ai/rankings), as of {as_of}. CC 
 
 
 def snapshot_path() -> Path:
+    """Board path when set and present; otherwise the committed fixture."""
     override = (os.environ.get("OPENROUTER_BOARD_PATH") or "").strip()
-    return Path(override) if override else DEFAULT_FIXTURE
+    if override:
+        path = Path(override)
+        if path.exists():
+            return path
+    return DEFAULT_FIXTURE
 
 
 def load_snapshot() -> dict[str, Any]:

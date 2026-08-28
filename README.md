@@ -162,10 +162,14 @@ python -m agentbench.mcp_recommend   # stdio MCP
 python -m agentbench.recommend_http  # GET http://127.0.0.1:3072/recommend?task=code
 ```
 
-Poll (GET-only Data API; fixture if `OPENROUTER_API_KEY` is unset):
+Poll (GET-only Data API; fixture if `OPENROUTER_API_KEY` is unset).
+A live write goes to `OPENROUTER_BOARD_PATH` when that env is set (not a
+durable `/tmp` file). Unset or missing path serves the committed fixture
+and is never labelled live.
 
 ```bash
 python -m agentbench.poll_openrouter --fixture --out /tmp/board.json
+OPENROUTER_BOARD_PATH=/var/lib/minibench/openrouter-board.json python -m agentbench.poll_openrouter
 ```
 
 Every Usage Board number is cited: `Source: OpenRouter (openrouter.ai/rankings), as of {as_of}. CC BY 4.0.`

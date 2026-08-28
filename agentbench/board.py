@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,23 @@ from typing import Any
 from agentbench.openrouter_data import fetch_payloads, load_fixture_payloads
 
 CITE_TEMPLATE = "Source: OpenRouter (openrouter.ai/rankings), as of {as_of}. CC BY 4.0."
+BOARD_PATH_ENV = "OPENROUTER_BOARD_PATH"
 DEFAULT_SNAPSHOT_PATH = Path(__file__).resolve().parent / "data" / "openrouter_board.json"
+
+
+def env_board_path() -> Path | None:
+    raw = (os.environ.get(BOARD_PATH_ENV) or "").strip()
+    return Path(raw) if raw else None
+
+
+def resolve_write_path(out: Path | None = None) -> Path:
+    """Poll destination: explicit --out, else board path, else gitignored default."""
+    if out is not None:
+        return out
+    env = env_board_path()
+    if env is not None:
+        return env
+    return DEFAULT_SNAPSHOT_PATH
 
 
 def citation(as_of: str) -> str:
@@ -226,13 +243,17 @@ def join_board(payloads: dict[str, Any]) -> dict[str, Any]:
 def load_board(*, snapshot_path: Path | None = None, client=None) -> dict[str, Any]:
     """Load a cached snapshot, else the committed fixture.
 
-    Recommend and the public board never live-call OpenRouter. The poller
-    (``python -m agentbench.poll_openrouter``) is the only live GET path.
+    Reader rule (persist-live A2): an explicit ``snapshot_path`` that exists
+    wins; else ``OPENROUTER_BOARD_PATH`` when set and the file exists; else
+    the committed fixture (never labelled live). Recommend and the public
+    board never live-call OpenRouter. The poller is the only live GET path.
     An injected ``client`` is for tests / fake transports only.
     """
-    path = snapshot_path or DEFAULT_SNAPSHOT_PATH
-    if path.exists():
-        return json.loads(path.read_text())
+    if snapshot_path is not None and snapshot_path.exists():
+        return json.loads(snapshot_path.read_text())
+    env = env_board_path()
+    if env is not None and env.exists():
+        return json.loads(env.read_text())
     if client is not None:
         return join_board(fetch_payloads(client))
     return join_board(load_fixture_payloads())
