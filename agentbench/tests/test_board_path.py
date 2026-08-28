@@ -47,6 +47,33 @@ def _live_snapshot() -> dict:
     }
 
 
+def test_poll_explicit_out_wins_over_env_board_path(tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    env_dest = tmp_path / "env.json"
+    out_dest = tmp_path / "out.json"
+    monkeypatch.setenv("OPENROUTER_BOARD_PATH", str(env_dest))
+    board = poll(out=out_dest)
+    assert out_dest.is_file()
+    assert not env_dest.exists()
+    assert board["live"] is False
+    assert board["meta"]["as_of"] in board["meta"]["citation"]
+
+
+def test_load_board_explicit_path_wins_over_env(tmp_path, monkeypatch):
+    env_dest = tmp_path / "env.json"
+    explicit = tmp_path / "explicit.json"
+    env_dest.write_text(json.dumps(_live_snapshot()) + "\n")
+    other = _live_snapshot()
+    other["rows"][0]["id"] = "persist-live/explicit-out"
+    other["live"] = False
+    other["meta"]["live"] = False
+    explicit.write_text(json.dumps(other) + "\n")
+    monkeypatch.setenv("OPENROUTER_BOARD_PATH", str(env_dest))
+    board = load_board(snapshot_path=explicit)
+    assert board["rows"][0]["id"] == "persist-live/explicit-out"
+    assert board["live"] is False
+
+
 def test_poll_writes_openrouter_board_path_when_set(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     dest = tmp_path / "durable-board.json"
