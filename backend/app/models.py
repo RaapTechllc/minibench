@@ -221,3 +221,59 @@ class KnownModel(Base):
     family = Column(String(64))          # Qwen, Kimi, GLM, Claude, ...
     license = Column(String(16))         # open | closed
     snapshot_date = Column(Date)         # provider release date of the pinned id
+
+
+# ─── Real-Work Agent Cabinet (additive; never mixed into agent_runs) ────────────
+
+
+class AgentCabinetRun(Base):
+    """One published Real-Work Agent Cabinet artifact.
+
+    Separate from :class:`AgentRun` so Solo/MoA contracts and leaderboards stay
+    untouched. Only rows that passed ``publication_receipt`` at ingest exist.
+    """
+
+    __tablename__ = "agent_cabinet_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True)
+    submitted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    suite = Column(String(64), nullable=False)
+    model_route = Column(String(256), nullable=False)
+    harness = Column(String(64), nullable=False)
+    harness_version = Column(String(32), nullable=False)
+    tool_contract_sha256 = Column(String(64), nullable=False)
+    fixture_digest = Column(String(80), nullable=False)
+    budgets = Column(JSONB, nullable=False)
+    budgets_canonical = Column(Text, nullable=False)
+    grader_version = Column(String(32), nullable=False)
+    private_split = Column(Boolean, nullable=False, default=False)
+    private_split_id = Column(String(64), nullable=False)
+
+    # Stored/display pass rate is 0–100 (artifact summary.pass_rate * 100).
+    completion = Column(Numeric(5, 2), nullable=False)
+    pass_rate = Column(Numeric(5, 2), nullable=False)
+    cost_usd_per_task = Column(Numeric(10, 6))
+    latency_p50_ms = Column(Integer)
+    category_completion = Column(JSONB, nullable=False)
+
+    provenance = Column(JSONB, nullable=False)
+    summary = Column(JSONB, nullable=False)
+    artifact = Column(JSONB, nullable=False)
+    publication_receipt = Column(JSONB, nullable=False)
+
+
+class AgentCabinetTaskResult(Base):
+    """Per-trial child of an :class:`AgentCabinetRun`."""
+
+    __tablename__ = "agent_cabinet_task_results"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    run_id = Column(UUID(as_uuid=True), ForeignKey("agent_cabinet_runs.run_id"), nullable=False)
+    task_id = Column(String(128), nullable=False)
+    category = Column(String(64))
+    trial = Column(Integer)
+    passed = Column(Boolean, nullable=False)
+    outcome = Column(String(64))
+    trial_payload = Column(JSONB)

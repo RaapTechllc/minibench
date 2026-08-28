@@ -20,6 +20,12 @@ back door around them):
   are not benchmark data; there is deliberately no override flag.
 - Canary-echo trials refuse the import (training contamination — quarantine).
 - Infra-error trials refuse the import unless ``--allow-infra-errors``.
+- Real-Work Agent Cabinet artifacts (``evaluation_type`` in
+  ``agent_harness`` / ``agent_harness_self_review``, or
+  ``policy_version=agent-cabinet-gates-v1``) go through
+  ``publication_receipt`` and POST to ``/api/v1/agent-cabinet/runs``.
+  ``--allow-infra-errors`` is ignored on that path; there is no
+  ``--allow-infra`` override. ``--check`` prints the destination.
 
 Legacy artifacts (pre-grader-v3: no ``provenance``, no per-trial
 ``infra_error``/``canary_flag``/``passed_format``) import with those fields at
@@ -33,6 +39,8 @@ import argparse
 import dataclasses
 import json
 import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +50,9 @@ from agentbench.agent_cabinet import (
     publication_receipt,
 )
 from agentbench.run import TrialResult, publish_run, to_agent_run_submit
+
+CABINET_DESTINATION = "/api/v1/agent-cabinet/runs"
+AGENTS_DESTINATION = "/api/v1/agents/runs"
 
 _TRIAL_FIELDS = {f.name for f in dataclasses.fields(TrialResult)}
 
@@ -138,6 +149,44 @@ def artifact_to_payload(
     )
 
 
+def import_destination(data: dict[str, Any]) -> str:
+    """Where ``--check`` / POST will send this artifact."""
+    if is_agent_cabinet_artifact(data):
+        return CABINET_DESTINATION
+    return AGENTS_DESTINATION
+
+
+def prepare_cabinet_artifact(data: dict[str, Any], *, source: str) -> dict[str, Any]:
+    """Publication-gate a cabinet artifact. ``--allow-infra-errors`` is ignored."""
+    receipt = publication_receipt(data)
+    if not receipt["publishable"]:
+        reasons = ", ".join(receipt["reasons"])
+        raise ImportRefused(
+            f"{source}: agent cabinet publication refused ({reasons}). "
+            f"destination={CABINET_DESTINATION}"
+        )
+    return data
+
+
+def publish_cabinet_run(api_url: str, artifact: dict[str, Any]) -> dict[str, Any]:
+    """POST the raw cabinet artifact (no second submit schema)."""
+    base = api_url.rstrip("/")
+    url = f"{base}{CABINET_DESTINATION}"
+    body = json.dumps(artifact).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"publish failed ({e.code}): {detail}") from e
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         description="Publish committed agentbench result artifacts to the backend."
@@ -161,12 +210,31 @@ def main(argv: list[str] | None = None) -> int:
         path = Path(path_str)
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            payload = artifact_to_payload(
-                data,
-                source=path.name,
-                provider=args.provider,
-                allow_infra_errors=args.allow_infra_errors,
-            )
+            destination = import_destination(data)
+            if is_agent_cabinet_artifact(data):
+                # Cabinet path: publication receipt only. --allow-infra-errors
+                # is ignored; there is no --allow-infra on this cabinet.
+                artifact = prepare_cabinet_artifact(data, source=path.name)
+                payload = None
+                line = (
+                    f"destination={destination}  "
+                    f"suite={(artifact.get('summary') or {}).get('suite', '?')}  "
+                    f"completion={round(float((artifact.get('summary') or {}).get('pass_rate') or 0) * 100, 2)}  "
+                    f"trials={len(artifact.get('trials') or [])}"
+                )
+            else:
+                payload = artifact_to_payload(
+                    data,
+                    source=path.name,
+                    provider=args.provider,
+                    allow_infra_errors=args.allow_infra_errors,
+                )
+                config_name = (payload.get("moa_config") or {}).get("name", "?")
+                line = (
+                    f"destination={destination}  "
+                    f"{payload['benchmark_suite']}  {config_name}  "
+                    f"pass_rate={payload['pass_rate']}%  trials={len(payload['results'])}"
+                )
         except ImportRefused as e:
             print(f"REFUSED  {e}", file=sys.stderr)
             refused += 1
@@ -176,18 +244,16 @@ def main(argv: list[str] | None = None) -> int:
             failed += 1
             continue
 
-        config_name = (payload.get("moa_config") or {}).get("name", "?")
-        line = (
-            f"{payload['benchmark_suite']}  {config_name}  "
-            f"pass_rate={payload['pass_rate']}%  trials={len(payload['results'])}"
-        )
         if args.check:
             print(f"OK       {path.name}: {line}")
             imported += 1
             continue
 
         try:
-            published = publish_run(args.api, payload)
+            if is_agent_cabinet_artifact(data):
+                published = publish_cabinet_run(args.api, data)
+            else:
+                published = publish_run(args.api, payload)
         except (RuntimeError, OSError) as e:
             print(f"ERROR    {path.name}: {e}", file=sys.stderr)
             failed += 1

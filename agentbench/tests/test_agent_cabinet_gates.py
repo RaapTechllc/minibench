@@ -5,6 +5,7 @@ No Docker, no live keys, no scrape. Publication tests use in-memory
 """
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -371,6 +372,32 @@ def test_import_results_refuses_agent_infra_without_allow_infra_override(tmp_pat
         artifact_to_payload(
             art, source="agent.json", provider="offline", allow_infra_errors=True
         )
+
+
+def test_import_results_check_prints_cabinet_destination(tmp_path, capsys):
+    from agentbench.import_results import CABINET_DESTINATION, import_destination, main
+
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    art = _importable(artifact)
+    path = tmp_path / "cabinet.json"
+    path.write_text(json.dumps(art), encoding="utf-8")
+    assert import_destination(art) == CABINET_DESTINATION
+    rc = main([str(path), "--check"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert f"destination={CABINET_DESTINATION}" in out
+
+
+def test_import_results_allow_infra_still_ignored_on_cabinet_prepare(tmp_path):
+    from agentbench.import_results import prepare_cabinet_artifact
+
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    art = _importable(artifact)
+    art["summary"]["n_infra_errors"] = 1
+    art["trials"][0]["outcome"] = "preparation_failed"
+    art["trials"][0]["infra_error"] = True
+    with pytest.raises(ImportRefused, match="infrastructure_errors"):
+        prepare_cabinet_artifact(art, source="agent.json")
 
 
 def test_import_results_accepts_publishable_in_memory_agent_copy(tmp_path):

@@ -190,6 +190,16 @@ def test_main_requires_api_or_check(tmp_path, capsys):
         main([str(art)])
 
 
+def test_main_check_prints_solo_destination(tmp_path, capsys):
+    art = tmp_path / "solo.json"
+    art.write_text(json.dumps(_legacy_artifact()), encoding="utf-8")
+    rc = main([str(art), "--check"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "destination=/api/v1/agents/runs" in out
+    assert "destination=/api/v1/agent-cabinet/runs" not in out
+
+
 def test_main_check_refuses_dry_run_file(tmp_path, capsys):
     art_data = _legacy_artifact()
     art_data["dry_run"] = True

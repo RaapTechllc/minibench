@@ -60,6 +60,19 @@ jobs:
       - name: Unit tests (offline, no keys)
         working-directory: agentbench
         run: pytest -q
+      - name: Agent Cabinet offline smoke
+        run: |
+          python -m agentbench.agent_tasks \
+            --manifest agentbench/tasks/minibench-agent-v1-offline.json \
+            --trials 2 --out /tmp/minibench-agent-smoke.json
+          python -c "
+          import json
+          from agentbench.agent_cabinet import REQUIRED_PROVENANCE_KEYS
+          artifact = json.loads(open('/tmp/minibench-agent-smoke.json', encoding='utf-8').read())
+          assert artifact['dry_run'] is True, artifact.get('dry_run')
+          missing = [key for key in REQUIRED_PROVENANCE_KEYS if key not in (artifact.get('provenance') or {})]
+          assert not missing, missing
+          "
       - name: Terminal-operation isolation smoke
         run: |
           docker pull alpine@sha256:c64c687cbea9300178b30c95835354e34c4e4febc4badfe27102879de0483b5e
