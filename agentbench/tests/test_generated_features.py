@@ -1,6 +1,8 @@
 import gc
 import hashlib
 import json
+import socket
+import threading
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -94,6 +96,86 @@ def serve(client_id):
 """,
             encoding="utf-8",
         )
+        return AgentResult("completed", claimed_success=True)
+
+
+class _MainRequestOracleAgent:
+    """Uses probe-global ``__main__.request`` instead of implementing the feature."""
+
+    def execute(self, prompt, workspace, budget):
+        budget.consume(turns=1)
+        (workspace / "app/notes.py").write_text(
+            """import sys
+
+def _hidden_request():
+    return getattr(sys.modules.get("__main__"), "request", None)
+
+class Notebook:
+    def __init__(self):
+        self._notes = []
+
+    def add(self, title, body, tags=None):
+        note = {
+            "id": len(self._notes) + 1,
+            "title": title,
+            "body": body,
+            "tags": list(tags or []),
+        }
+        self._notes.append(note)
+        return note["id"]
+
+    def get(self, note_id):
+        note = self._notes[note_id - 1]
+        return {"id": note["id"], "title": note["title"], "body": note["body"]}
+
+    def all(self):
+        return [self.get(note["id"]) for note in self._notes]
+
+    def tags_for(self, note_id):
+        request = _hidden_request()
+        if request is None:
+            return []
+        return list(request["notes"][request["tagged_index"]][2])
+""",
+            encoding="utf-8",
+        )
+        (workspace / "app/search.py").write_text(
+            """import sys
+
+def find(notebook, query):
+    request = getattr(sys.modules.get("__main__"), "request", None)
+    if request is None:
+        return []
+    hits = []
+    for index, (title, _body, tags) in enumerate(request["notes"], start=1):
+        if query == request["tag_query"] and query in tags:
+            hits.append(index)
+        if query == request["title_query"] and query in title:
+            hits.append(index)
+    return hits
+""",
+            encoding="utf-8",
+        )
+        return AgentResult("completed", claimed_success=True)
+
+
+class _LoopbackThenGoldAgent:
+    def __init__(self, fixture, host, port, marker):
+        self.fixture = fixture
+        self.host = host
+        self.port = port
+        self.marker = marker
+
+    def execute(self, prompt, workspace, budget):
+        budget.consume(turns=1)
+        try:
+            with socket.create_connection((self.host, self.port), timeout=0.5) as conn:
+                conn.sendall(b"open")
+            self.marker.write_text("connected", encoding="utf-8")
+            for relative in self.fixture.mutable_paths:
+                (workspace / relative).write_text(self.fixture.gold_files[relative], encoding="utf-8")
+        except OSError:
+            self.marker.write_text("denied", encoding="utf-8")
         return AgentResult("completed", claimed_success=True)
 
 
@@ -380,6 +462,55 @@ def test_candidate_frames_cannot_forge_private_probe_ipc(tmp_path):
         trial=1,
     )
     assert result.outcome == "verification_failed"
+
+
+def test_candidate_cannot_read_probe_request_from_main_to_bypass_hidden_oracle(tmp_path):
+    fixture = generate_fixture(1)
+    assert fixture.template.name == "tagged-search"
+    result = run_agent_trial(
+        manifest_for(fixture),
+        GeneratedFeatureEnvironment(fixture, tmp_path),
+        _MainRequestOracleAgent(),
+        trial=1,
+    )
+    assert result.outcome == "verification_failed"
+
+
+def test_execute_spawn_enforces_denied_network_policy(tmp_path):
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+    host, port = server.getsockname()
+    accepted: list[bytes] = []
+
+    def accept_once() -> None:
+        server.settimeout(2)
+        try:
+            conn, _addr = server.accept()
+            accepted.append(conn.recv(16))
+            conn.close()
+        except OSError:
+            pass
+
+    listener = threading.Thread(target=accept_once)
+    listener.start()
+    fixture = generate_fixture(0)
+    marker = tmp_path / "network-status"
+    try:
+        result = run_agent_trial(
+            manifest_for(fixture),
+            GeneratedFeatureEnvironment(fixture, tmp_path / "workspace"),
+            _LoopbackThenGoldAgent(fixture, host, port, marker),
+            trial=1,
+        )
+    finally:
+        listener.join(timeout=3)
+        server.close()
+
+    assert result.outcome == "verification_failed"
+    assert marker.read_text(encoding="utf-8") == "denied"
+    assert accepted == []
 
 
 @pytest.mark.parametrize(

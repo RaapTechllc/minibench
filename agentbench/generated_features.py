@@ -54,55 +54,60 @@ _CANDIDATE_PROBE_PROGRAM = r"""
 import json
 import sys
 
-request = json.loads(sys.stdin.buffer.read())
-sys.stdin.close()
-sys.path.insert(0, request["workspace"])
-outputs = []
-kind = request["kind"]
-if kind == "promo-receipt":
-    from app.catalog import get_price
-    from app.cart import Cart
-    from app.checkout import checkout
-    outputs.append(get_price(request["sku_a"]))
-    outputs.append(get_price(request["sku_b"]))
-    outputs.append(checkout(request["items"]))
-    cart = Cart()
-    for sku, quantity in request["items"]:
-        cart.add(sku, quantity)
-    outputs.append(cart.subtotal())
-    outputs.append(cart.promotion_savings(request["promo"]))
-    outputs.append(checkout(request["items"], request["promo"]))
-    alt = Cart()
-    for sku, quantity in request["alt_items"]:
-        alt.add(sku, quantity)
-    outputs.append(alt.promotion_savings(request["alt_promo"]))
-    outputs.append(checkout(request["alt_items"], request["alt_promo"]))
-elif kind == "tagged-search":
-    from app.notes import Notebook
-    from app.search import find
-    from app.export import dump
-    notebook = Notebook()
-    ids = [notebook.add(title, body, tags) for title, body, tags in request["notes"]]
-    outputs.append(ids)
-    outputs.append(find(notebook, request["tag_query"]))
-    outputs.append(find(notebook, request["title_query"]))
-    outputs.append(notebook.tags_for(ids[request["tagged_index"]]))
-    outputs.append(dump(notebook))
-elif kind == "quota-guard":
-    from app.clients import count, remaining
-    from app.handler import serve
-    from app.status import health
-    outputs.append(health())
-    outputs.append(remaining(request["fresh"]))
-    outputs.append(count(request["fresh"]))
-    sequence = [serve(request["client_a"]) for _ in range(request["calls"])]
-    outputs.append(sequence)
-    outputs.append(remaining(request["client_a"]))
-    outputs.append(serve(request["client_b"]))
-    outputs.append(health())
-else:
-    raise ValueError("unsupported probe")
-sys.stdout.buffer.write(json.dumps({"completed": True, "outputs": outputs}, separators=(",", ":")).encode())
+def _run(payload):
+    workspace = payload["workspace"]
+    kind = payload["kind"]
+    sys.path.insert(0, workspace)
+    outputs = []
+    if kind == "promo-receipt":
+        from app.catalog import get_price
+        from app.cart import Cart
+        from app.checkout import checkout
+        outputs.append(get_price(payload["sku_a"]))
+        outputs.append(get_price(payload["sku_b"]))
+        outputs.append(checkout(payload["items"]))
+        cart = Cart()
+        for sku, quantity in payload["items"]:
+            cart.add(sku, quantity)
+        outputs.append(cart.subtotal())
+        outputs.append(cart.promotion_savings(payload["promo"]))
+        outputs.append(checkout(payload["items"], payload["promo"]))
+        alt = Cart()
+        for sku, quantity in payload["alt_items"]:
+            alt.add(sku, quantity)
+        outputs.append(alt.promotion_savings(payload["alt_promo"]))
+        outputs.append(checkout(payload["alt_items"], payload["alt_promo"]))
+    elif kind == "tagged-search":
+        from app.notes import Notebook
+        from app.search import find
+        from app.export import dump
+        notebook = Notebook()
+        ids = [notebook.add(title, body, tags) for title, body, tags in payload["notes"]]
+        outputs.append(ids)
+        outputs.append(find(notebook, payload["tag_query"]))
+        outputs.append(find(notebook, payload["title_query"]))
+        outputs.append(notebook.tags_for(ids[payload["tagged_index"]]))
+        outputs.append(dump(notebook))
+    elif kind == "quota-guard":
+        from app.clients import count, remaining
+        from app.handler import serve
+        from app.status import health
+        outputs.append(health())
+        outputs.append(remaining(payload["fresh"]))
+        outputs.append(count(payload["fresh"]))
+        sequence = [serve(payload["client_a"]) for _ in range(payload["calls"])]
+        outputs.append(sequence)
+        outputs.append(remaining(payload["client_a"]))
+        outputs.append(serve(payload["client_b"]))
+        outputs.append(health())
+    else:
+        raise ValueError("unsupported probe")
+    sys.stdout.buffer.write(json.dumps({"completed": True, "outputs": outputs}, separators=(",", ":")).encode())
+
+if __name__ == "__main__":
+    payload = json.loads(sys.stdin.buffer.read())
+    sys.stdin.close()
+    _run(payload)
 """
 
 
@@ -701,7 +706,14 @@ class GeneratedFeatureEnvironment(TaskEnvironment):
             raise
 
     def execute(self, agent: AgentAdapter, handle: EnvironmentHandle, prompt: str, budget: AgentBudget) -> AgentResult:
-        return execute_agent_with_budget(agent, prompt, handle.workspace, budget, start_method="spawn")
+        return execute_agent_with_budget(
+            agent,
+            prompt,
+            handle.workspace,
+            budget,
+            start_method="spawn",
+            network_policy=NETWORK_POLICY,
+        )
 
     def verify(self, handle: EnvironmentHandle) -> VerificationResult:
         try:

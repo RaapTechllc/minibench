@@ -345,7 +345,27 @@ def _agent_result_payload(result: Any) -> bytes:
         return b'{"kind":"malformed"}'
 
 
-def _execute_agent_child(connection, agent, prompt, workspace, budget) -> None:
+def _install_denied_network_policy() -> None:
+    """Replace socket constructors in the spawned agent process."""
+    import socket
+
+    def _denied(*_args: Any, **_kwargs: Any) -> Any:
+        raise OSError("network denied")
+
+    class _DeniedSocket:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            raise OSError("network denied")
+
+    socket.socket = _DeniedSocket  # type: ignore[misc, assignment]
+    socket.SocketType = _DeniedSocket  # type: ignore[misc, assignment]
+    socket.create_connection = _denied  # type: ignore[assignment]
+    if hasattr(socket, "create_server"):
+        socket.create_server = _denied  # type: ignore[assignment]
+
+
+def _execute_agent_child(connection, agent, prompt, workspace, budget, network_policy=None) -> None:
+    if network_policy == "denied":
+        _install_denied_network_policy()
     try:
         connection.send_bytes(
             _agent_result_payload(agent.execute(prompt, workspace, AgentBudgetGuard(budget)))
@@ -365,13 +385,14 @@ def execute_agent_with_budget(
     budget: AgentBudget,
     *,
     start_method: str | None = None,
+    network_policy: str | None = None,
 ) -> AgentResult:
     method = start_method or ("fork" if "fork" in multiprocessing.get_all_start_methods() else "spawn")
     context = multiprocessing.get_context(method)
     parent, child = context.Pipe(duplex=False)
     process = context.Process(
         target=_execute_agent_child,
-        args=(child, agent, prompt, workspace, budget),
+        args=(child, agent, prompt, workspace, budget, network_policy),
         daemon=True,
     )
     try:
