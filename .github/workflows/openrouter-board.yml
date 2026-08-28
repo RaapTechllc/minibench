@@ -1,5 +1,6 @@
 # Daily Mode A poll. Live GET only when OPENROUTER_API_KEY is present.
 # Without the secret the job succeeds via the committed fixture (no fail-open numbers).
+# Live durability is OPENROUTER_BOARD_PATH + Actions artifact — not /tmp.
 name: OpenRouter Usage Board
 
 on:
@@ -29,15 +30,24 @@ jobs:
         working-directory: agentbench
         run: pip install -r requirements-dev.txt
       - name: Fixture snapshot (always, no secret required)
-        run: python -m agentbench.poll_openrouter --fixture --out /tmp/board-fixture.json
+        run: python -m agentbench.poll_openrouter --fixture --out "${{ runner.temp }}/board-fixture.json"
       - name: Live poll (skipped without secret)
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_BOARD_PATH: ${{ runner.temp }}/openrouter-board.json
         run: |
           if [ -z "${OPENROUTER_API_KEY}" ]; then
             echo "No OPENROUTER_API_KEY; fixture path only (not live)."
             exit 0
           fi
-          python -m agentbench.poll_openrouter --out /tmp/board-live.json
+          python -m agentbench.poll_openrouter
+      - name: Upload live board artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openrouter-board
+          path: ${{ runner.temp }}/openrouter-board.json
+          if-no-files-found: ignore
       - name: Dog-food recommend against fixture
+        env:
+          OPENROUTER_BOARD_PATH: ""
         run: python -m agentbench.recommend --dogfood --task code --budget 5 --max-latency-ms 5000

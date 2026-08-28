@@ -12,11 +12,11 @@ Work the **frontier**: any ticket whose blockers are all done. This hop fits one
 
 **Blocked by:** None — can start immediately.
 
-- [ ] Poll-with-env writes the env path (no explicit `--out`)
-- [ ] Recommend / `load_board` read the env path when the file exists
-- [ ] Unset env or missing file → committed fixture, `live` is false
-- [ ] Public board loader matches the same rule (no 503 on a missing override)
-- [ ] Citation includes `as_of` from `meta.as_of`
+- [x] Poll-with-env writes the env path (no explicit `--out`)
+- [x] Recommend / `load_board` read the env path when the file exists
+- [x] Unset env or missing file → committed fixture, `live` is false
+- [x] Public board loader matches the same rule (no 503 on a missing override)
+- [x] Citation includes `as_of` from `meta.as_of`
 
 ## T2 — Honor OPENROUTER_BOARD_PATH on write, read, and cron — #56
 
@@ -24,11 +24,11 @@ Work the **frontier**: any ticket whose blockers are all done. This hop fits one
 
 **Blocked by:** T1 (red tests first).
 
-- [ ] With env set, poll writes that path; recommend can read it
-- [ ] With env unset or file missing, serve committed fixture and do not label it live
-- [ ] Workflow does not treat `/tmp` as the durable live board
-- [ ] `.env.example` names `OPENROUTER_BOARD_PATH=` empty; no value and no live file in git
-- [ ] GET-only. No key in repo/MCP. No new package.
+- [x] With env set, poll writes that path; recommend can read it
+- [x] With env unset or file missing, serve committed fixture and do not label it live
+- [x] Workflow does not treat `/tmp` as the durable live board
+- [x] `.env.example` names `OPENROUTER_BOARD_PATH=` empty; no value and no live file in git
+- [x] GET-only. No key in repo/MCP. No new package.
 
 ---
 
