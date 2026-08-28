@@ -376,6 +376,7 @@ def test_artifact_has_compatible_trial_shape_and_paired_metrics(tmp_path):
     assert summary["pass_rate"] == summary["final_completion"]
     assert summary["corrected_failures"] == 1
     assert summary["introduced_regressions"] == 1
+    assert summary["regression_rate"] == 0.25
     assert summary["no_change_outcomes"] == 2
     assert summary["self_correction_lift"] == 0.0
     assert summary["n_paired_trials"] == 4

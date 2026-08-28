@@ -14,6 +14,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from agentbench.agent_cabinet import apply_reliability_fields
 from agentbench.agent_tasks import (
     AgentAdapter,
     AgentBudget,
@@ -368,6 +369,7 @@ def build_self_review_artifact(
         }
     )
     artifact["trials"] = [_artifact_trial(trial) for trial in trials]
+    apply_reliability_fields(artifact)
     return artifact
 
 

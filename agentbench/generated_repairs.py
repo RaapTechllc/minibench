@@ -392,9 +392,11 @@ class GeneratedRepairGoldAgent:
 
 def build_generated_artifact(manifest: AgentTaskManifest, fixture: GeneratedRepairFixture, trials: list[Any]) -> dict[str, Any]:
     artifact = build_agent_artifact(manifest, trials)
+    generator_identity = "|".join(f"{template.name}:repository-repair" for template in TEMPLATES)
     artifact["provenance"].update(
         {
             "fixture_version": FIXTURE_VERSION,
+            "generator_sha256": hashlib.sha256(generator_identity.encode()).hexdigest(),
             "mutation_template_sha256": fixture.template_hash,
             "seed_sha256": fixture.seed_hash,
             "harness": HARNESS,

@@ -448,6 +448,8 @@ def test_artifact_has_sanitized_generated_provenance(tmp_path):
     encoded = json.dumps(artifact)
 
     assert artifact["provenance"]["fixture_version"] == FIXTURE_VERSION
+    assert artifact["provenance"]["generator_sha256"]
+    assert len(artifact["provenance"]["generator_sha256"]) == 64
     assert artifact["provenance"]["mutation_template_sha256"] == hashlib.sha256(fixture.template.name.encode()).hexdigest()
     assert artifact["provenance"]["seed_sha256"] == fixture.seed_hash
     assert artifact["provenance"]["harness"] == "agent-cabinet-generated-repair"

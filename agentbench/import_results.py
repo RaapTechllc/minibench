@@ -36,13 +36,25 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from agentbench.agent_cabinet import (
+    REQUIRED_PROVENANCE_KEYS,
+    is_agent_cabinet_artifact,
+    publication_receipt,
+)
 from agentbench.run import TrialResult, publish_run, to_agent_run_submit
 
 _TRIAL_FIELDS = {f.name for f in dataclasses.fields(TrialResult)}
 
 # Provenance keys forwarded from the artifact to the submit payload when
 # present (current-schema artifacts; legacy files have none of them).
-_PROVENANCE_KEYS = ("seed_sha256", "generator_sha256", "git_commit", "is_private_split")
+# Agent Cabinet keys ride through this same map — to_agent_run_submit field
+# names are unchanged.
+_PROVENANCE_KEYS = tuple(
+    dict.fromkeys(
+        ("seed_sha256", "generator_sha256", "git_commit", "is_private_split")
+        + REQUIRED_PROVENANCE_KEYS
+    )
+)
 
 
 class ImportRefused(Exception):
@@ -92,18 +104,26 @@ def artifact_to_payload(
     # Defense in depth: never trust the summary counters over the trials
     # themselves — an artifact whose summary says 0 while a trial carries the
     # flag is refused, not laundered.
-    n_canary = max(summary.get("n_canary_flags", 0), sum(t.canary_flag for t in trials))
-    if n_canary > 0:
-        raise ImportRefused(
-            f"{source}: {n_canary} canary-echo trial(s) — training contamination; "
-            "quarantine this artifact."
-        )
-    n_infra = max(summary.get("n_infra_errors", 0), sum(t.infra_error for t in trials))
-    if n_infra > 0 and not allow_infra_errors:
-        raise ImportRefused(
-            f"{source}: {n_infra} infra-error trial(s) — partial run; rerun it or "
-            "pass --allow-infra-errors."
-        )
+    if is_agent_cabinet_artifact(data):
+        receipt = publication_receipt(data)
+        if not receipt["publishable"]:
+            reasons = ", ".join(receipt["reasons"])
+            raise ImportRefused(
+                f"{source}: agent cabinet publication refused ({reasons})."
+            )
+    else:
+        n_canary = max(summary.get("n_canary_flags", 0), sum(t.canary_flag for t in trials))
+        if n_canary > 0:
+            raise ImportRefused(
+                f"{source}: {n_canary} canary-echo trial(s) — training contamination; "
+                "quarantine this artifact."
+            )
+        n_infra = max(summary.get("n_infra_errors", 0), sum(t.infra_error for t in trials))
+        if n_infra > 0 and not allow_infra_errors:
+            raise ImportRefused(
+                f"{source}: {n_infra} infra-error trial(s) — partial run; rerun it or "
+                "pass --allow-infra-errors."
+            )
 
     provenance = {
         k: v

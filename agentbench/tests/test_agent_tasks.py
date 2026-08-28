@@ -336,6 +336,11 @@ def test_offline_artifact_keeps_legacy_shape_and_agent_provenance(tmp_path):
     assert loaded["provenance"]["model"] == "deterministic-fake-agent"
     assert loaded["provenance"]["harness"] == "minibench-reference"
     assert loaded["provenance"]["fixture_digest"] == manifest.fixture.digest
+    assert loaded["provenance"]["policy_version"] == "agent-cabinet-gates-v1"
+    assert loaded["provenance"]["generator_sha256"]
+    assert loaded["summary"]["false_verification_rate"] == 0.0
+    assert loaded["summary"]["regression_rate"] is None
+    assert loaded["summary"]["termination_reasons"]["completed"] == 1
     assert str(tmp_path) not in out.read_text(encoding="utf-8")
 
 

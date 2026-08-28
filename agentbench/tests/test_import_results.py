@@ -151,12 +151,16 @@ def test_provenance_forwarded_when_present():
         "generator_sha256": None,  # nulls are dropped, not forwarded
         "git_commit": "deadbeef",
         "is_private_split": True,
+        "tool_contract_sha256": "b" * 64,
+        "private_split_id": "c" * 64,
         "unrelated": "dropped",
     }
     payload = artifact_to_payload(art, source="x.json")
     assert payload["seed_sha256"] == "a" * 64
     assert payload["git_commit"] == "deadbeef"
     assert payload["is_private_split"] is True
+    assert payload["tool_contract_sha256"] == "b" * 64
+    assert payload["private_split_id"] == "c" * 64
     assert "generator_sha256" not in payload
     assert "unrelated" not in payload
 

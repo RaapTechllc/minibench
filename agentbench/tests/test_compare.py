@@ -50,6 +50,12 @@ def test_check_comparable_rejects_different_task_sets():
         check_comparable([a, b])
 
 
+def test_check_comparable_still_accepts_matching_solo_runs():
+    a = _run("a", {"t1": [True, False]})
+    b = _run("b", {"t1": [False, True]})
+    check_comparable([a, b])
+
+
 def test_compare_pair_indistinguishable_on_small_discordance():
     a = _run("a", {f"t{i}": [True] for i in range(10)})
     b = _run("b", {f"t{i}": [i != 0] for i in range(10)})  # b fails one task
