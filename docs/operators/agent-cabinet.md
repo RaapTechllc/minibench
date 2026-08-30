@@ -99,7 +99,10 @@ published scores.
 Pairwise comparison is two steps:
 
 1. `comparability_receipt(a, b)` — same task snapshot, fixture, harness
-   contract, tool-contract hash, budgets, grader version, and private-split id.
+   contract, tool-contract hash, prompt-configuration hash, budgets, grader
+   version, and private-split id, plus identical `(task_id, trial)` sets
+   (McNemar assumes matched samples; runs produced with different `--trials`
+   values refuse with `trial_set_mismatch`).
 2. If `comparable`, `compare_pair` applies the existing McNemar + task-bootstrap
    policy.
 
@@ -107,15 +110,17 @@ Pairwise comparison is two steps:
 pair is incomparable. Solo/MoA/hardware IDs are an `evaluation_type` mismatch
 (409). Do not call `/api/v1/compare` (hardware) with cabinet runs.
 
-Held constant: the shipped `COMPARABILITY_FIELDS`. Changed variables that may
-differ across listed runs are `model_route` and/or `harness`.
+`held_constant` in API payloads lists the shipped `COMPARABILITY_FIELDS` —
+the fields that must **match for a valid pairwise comparison**, not a claim
+that every run on the board held them constant. Variables that may differ
+across listed runs are `model_route` and/or `harness`.
 
 ## Publication gates
 
 `publication_receipt` is the only publish decision. `publishable` → persist on
 `POST /api/v1/agent-cabinet/runs`. Otherwise **422** `{ "detail": <receipt> }`.
 
-The seven refuse reasons (no eighth, no `--allow-infra`):
+The eight refuse reasons (no ninth, no `--allow-infra`):
 
 | Reason | When |
 |--------|------|
@@ -126,6 +131,7 @@ The seven refuse reasons (no eighth, no `--allow-infra`):
 | `missing_provenance` | Any required provenance key absent |
 | `incomplete_disposal` | A trial left `workspace_disposed: false` |
 | `invalid_task_self_check` | Gold/bad self-check failed |
+| `summary_trials_mismatch` | Trials are absent, `n_trials` disagrees with the trial count, or the claimed `pass_rate` cannot be recomputed from the recorded trials |
 
 Comparability mismatch never publish-refuses a run.
 

@@ -139,14 +139,33 @@ def _post(client, artifact):
     return client.post("/api/v1/agent-cabinet/runs", json=artifact)
 
 
+def _set_completion(artifact: dict, n_pass: int, n_total: int) -> dict:
+    """Rebuild trials so the claimed summary is actually derivable from them —
+    the publication gate refuses summaries that do not match their trials."""
+    base = deepcopy(artifact["trials"][0])
+    trials = []
+    for index in range(n_total):
+        trial = deepcopy(base)
+        passed = index < n_pass
+        trial["trial"] = index + 1
+        trial["passed"] = passed
+        trial["outcome"] = "success" if passed else "verification_failed"
+        trial["agent_claimed_success"] = passed
+        trials.append(trial)
+    artifact["trials"] = trials
+    artifact["summary"]["n_trials"] = n_total
+    artifact["summary"]["pass_rate"] = round(n_pass / n_total, 4)
+    artifact["summary"]["termination_reasons"] = {"completed": n_total}
+    assert publication_receipt(artifact)["publishable"] is True
+    return artifact
+
+
 # ─── A1: ingest + list best valid runs ────────────────────────────────────────
 
 
 def test_a1_post_publishable_and_list_best_valid_runs(client):
-    high = _artifact()
-    high["summary"]["pass_rate"] = 0.75
-    low = _artifact()
-    low["summary"]["pass_rate"] = 0.25
+    high = _set_completion(_artifact(), 3, 4)
+    low = _set_completion(_artifact(), 1, 4)
 
     first = _post(client, low)
     second = _post(client, high)
@@ -159,7 +178,7 @@ def test_a1_post_publishable_and_list_best_valid_runs(client):
     item = listed[0]
     assert item["completion"] == 75.0
     assert item["pass_rate"] == 75.0
-    assert item["category_completion"] == {"repository-repair": 100.0}
+    assert item["category_completion"] == {"repository-repair": 75.0}
     assert item["cost_usd_per_task"] == 0.02
     assert item["latency_p50_ms"] == 15
     assert item["run_id"] == second.json()["run_id"]
@@ -352,11 +371,45 @@ def test_a6_unpublishable_is_422_with_receipt(client):
     assert _table_count("agent_cabinet_runs") == 0
 
 
+def test_a6_summary_not_matching_trials_is_422(client):
+    """A claimed 100% summary over failing (or absent) trials must never
+    persist — synthetic submissions cannot corrupt the public cabinet."""
+    inflated = _artifact()
+    for trial in inflated["trials"]:
+        trial["passed"] = False
+        trial["outcome"] = "verification_failed"
+    resp = _post(client, inflated)  # summary still claims pass_rate 1.0
+    assert resp.status_code == 422
+    assert "summary_trials_mismatch" in resp.json()["detail"]["reasons"]
+
+    trialless = _artifact()
+    trialless["trials"] = []
+    resp = _post(client, trialless)
+    assert resp.status_code == 422
+    assert "summary_trials_mismatch" in resp.json()["detail"]["reasons"]
+    assert _table_count("agent_cabinet_runs") == 0
+
+
+def test_a5_compare_refuses_mismatched_trial_sets(client):
+    """Runs produced with different --trials values are 409, not silently
+    intersected inside compare_pair."""
+    left = _artifact()
+    right = _set_completion(_artifact(model_route="offline/other-agent"), 4, 4)
+    a = _post(client, left).json()
+    b = _post(client, right).json()
+    refused = client.get(
+        f"/api/v1/agent-cabinet/compare?a={a['run_id']}&b={b['run_id']}"
+    )
+    assert refused.status_code == 409
+    detail = refused.json()["detail"]
+    assert detail["comparable"] is False
+    assert "trials" in detail["failing_fields"]
+    assert "trial_set_mismatch" in detail["reasons"]
+
+
 def test_a6_private_split_supersedes_higher_public(client):
-    public = _artifact(private_split=False)
-    public["summary"]["pass_rate"] = 0.9
-    private = _artifact(private_split=True)
-    private["summary"]["pass_rate"] = 0.1
+    public = _set_completion(_artifact(private_split=False), 9, 10)
+    private = _set_completion(_artifact(private_split=True), 1, 10)
     _post(client, public)
     private_id = _post(client, private).json()["run_id"]
 

@@ -57,6 +57,7 @@ COMPARABILITY_FIELDS = (
     "harness",
     "harness_version",
     "tool_contract_sha256",
+    "prompt_config_sha256",
     "budgets",
     "grader_version",
     "private_split_id",
@@ -69,10 +70,13 @@ _COMPARABILITY_REASON_BY_FIELD = {
     "harness": "harness_contract_mismatch",
     "harness_version": "harness_contract_mismatch",
     "tool_contract_sha256": "harness_contract_mismatch",
+    "prompt_config_sha256": "prompt_config_mismatch",
     "budgets": "budget_mismatch",
     "grader_version": "grader_version_mismatch",
     "private_split_id": "private_split_mismatch",
 }
+
+COMPARABILITY_TRIAL_SET_REASON = "trial_set_mismatch"
 
 PUBLISH_REFUSE_DRY_RUN = "dry_run"
 PUBLISH_REFUSE_INFRASTRUCTURE_ERRORS = "infrastructure_errors"
@@ -81,6 +85,7 @@ PUBLISH_REFUSE_MUTABLE_FIXTURE = "mutable_fixture_reference"
 PUBLISH_REFUSE_MISSING_PROVENANCE = "missing_provenance"
 PUBLISH_REFUSE_INCOMPLETE_DISPOSAL = "incomplete_disposal"
 PUBLISH_REFUSE_INVALID_SELF_CHECK = "invalid_task_self_check"
+PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH = "summary_trials_mismatch"
 
 PUBLICATION_REFUSE_REASONS = (
     PUBLISH_REFUSE_DRY_RUN,
@@ -90,6 +95,7 @@ PUBLICATION_REFUSE_REASONS = (
     PUBLISH_REFUSE_MISSING_PROVENANCE,
     PUBLISH_REFUSE_INCOMPLETE_DISPOSAL,
     PUBLISH_REFUSE_INVALID_SELF_CHECK,
+    PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH,
 )
 
 AGENT_EVALUATION_TYPES = frozenset({"agent_harness", "agent_harness_self_review"})
@@ -397,6 +403,14 @@ def _comparability_value(artifact: dict[str, Any], field: str) -> Any:
     return provenance.get(field)
 
 
+def _trial_keys(artifact: dict[str, Any]) -> set[tuple[Any, Any]]:
+    keys: set[tuple[Any, Any]] = set()
+    for trial in artifact.get("trials") or []:
+        row = _trial_mapping(trial)
+        keys.add((row.get("task_id"), row.get("trial")))
+    return keys
+
+
 def comparability_receipt(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     """Are these two Agent Cabinet runs equivalent enough to compare?"""
     failing_fields: list[str] = []
@@ -407,6 +421,11 @@ def comparability_receipt(left: dict[str, Any], right: dict[str, Any]) -> dict[s
             reason = _COMPARABILITY_REASON_BY_FIELD[field]
             if reason not in reasons:
                 reasons.append(reason)
+    # McNemar assumes matched samples: both runs must record the exact same
+    # (task_id, trial) keys, or a lower --trials run silently drops outcomes.
+    if _trial_keys(left) != _trial_keys(right):
+        failing_fields.append("trials")
+        reasons.append(COMPARABILITY_TRIAL_SET_REASON)
     return {
         "policy_version": AGENT_CABINET_POLICY,
         "comparable": not failing_fields,
@@ -449,6 +468,32 @@ def _has_incomplete_disposal(artifact: dict[str, Any]) -> bool:
         if row.get("workspace_disposed") is False:
             return True
     return False
+
+
+def _summary_trials_mismatch(artifact: dict[str, Any]) -> bool:
+    """A claimed summary must be derivable from the recorded trials.
+
+    ``build_agent_artifact`` computes ``pass_rate`` as the pass fraction over
+    non-infra trials (rounded to 4 places) and ``n_trials`` as the trial count;
+    every family overlay inherits those semantics. A submission whose summary
+    cannot be reproduced from its own trials is synthetic, not benchmark data.
+    """
+    summary = artifact.get("summary") or {}
+    trials = [_trial_mapping(trial) for trial in artifact.get("trials") or []]
+    if not trials:
+        return True
+    n_trials = summary.get("n_trials")
+    if isinstance(n_trials, int) and n_trials != len(trials):
+        return True
+    claimed = summary.get("pass_rate")
+    if not isinstance(claimed, (int, float)) or isinstance(claimed, bool):
+        return True
+    scored = [trial for trial in trials if not _is_infra(trial)]
+    actual = (
+        sum(1 for trial in scored if trial.get("passed")) / len(scored) if scored else 0.0
+    )
+    # pass_rate ships rounded to 4 places; anything beyond rounding noise is a lie.
+    return abs(float(claimed) - actual) > 0.0001
 
 
 def _self_check_is_invalid(artifact: dict[str, Any]) -> bool:
@@ -494,6 +539,10 @@ def publication_receipt(artifact: dict[str, Any]) -> dict[str, Any]:
     if _self_check_is_invalid(artifact):
         reasons.append(PUBLISH_REFUSE_INVALID_SELF_CHECK)
         failing_fields.append("self_check")
+
+    if _summary_trials_mismatch(artifact):
+        reasons.append(PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH)
+        failing_fields.append("summary")
 
     return {
         "policy_version": AGENT_CABINET_POLICY,

@@ -23,6 +23,7 @@ from agentbench.agent_cabinet import (
     PUBLISH_REFUSE_INVALID_SELF_CHECK,
     PUBLISH_REFUSE_MISSING_PROVENANCE,
     PUBLISH_REFUSE_MUTABLE_FIXTURE,
+    PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH,
     RELIABILITY_SUMMARY_FIELDS,
     REQUIRED_PROVENANCE_KEYS,
     comparability_receipt,
@@ -107,6 +108,7 @@ def test_policy_constant_and_required_key_set():
         PUBLISH_REFUSE_MISSING_PROVENANCE,
         PUBLISH_REFUSE_INCOMPLETE_DISPOSAL,
         PUBLISH_REFUSE_INVALID_SELF_CHECK,
+        PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH,
     }
 
 
@@ -299,6 +301,21 @@ def test_publication_refuses_dry_run_and_accepts_in_memory_copy(tmp_path):
             lambda art: art["provenance"].__setitem__("self_check", "failed"),
             PUBLISH_REFUSE_INVALID_SELF_CHECK,
         ),
+        (
+            # Claimed pass_rate stays 1.0 while the only trial actually failed.
+            lambda art: art["trials"][0].__setitem__("passed", False),
+            PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH,
+        ),
+        (
+            # A summary with no trials behind it cannot support any score.
+            lambda art: art.__setitem__("trials", []),
+            PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH,
+        ),
+        (
+            # n_trials must match the recorded trial count.
+            lambda art: art["summary"].__setitem__("n_trials", 5),
+            PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH,
+        ),
     ],
 )
 def test_publication_refuses_each_named_reason(tmp_path, mutate, reason):
@@ -309,6 +326,21 @@ def test_publication_refuses_each_named_reason(tmp_path, mutate, reason):
     assert receipt["publishable"] is False
     assert reason in receipt["reasons"]
     assert receipt["policy_version"] == AGENT_CABINET_POLICY
+
+
+def test_comparability_rejects_mismatched_trial_sets(tmp_path):
+    """Different --trials values must refuse at the receipt, not silently
+    intersect inside compare_pair (McNemar assumes matched samples)."""
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    left = _publishable(artifact)
+    right = deepcopy(left)
+    extra = deepcopy(right["trials"][0])
+    extra["trial"] = 2
+    right["trials"].append(extra)
+    receipt = comparability_receipt(left, right)
+    assert receipt["comparable"] is False
+    assert "trials" in receipt["failing_fields"]
+    assert "trial_set_mismatch" in receipt["reasons"]
 
 
 def test_publication_does_not_refuse_for_comparability_mismatch_alone(tmp_path):
