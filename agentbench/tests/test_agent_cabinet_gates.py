@@ -237,6 +237,32 @@ def test_comparability_accepts_matching_agent_runs(tmp_path):
     check_comparable([left, right])
 
 
+def test_comparability_rejects_generator_or_oracle_source_change(tmp_path):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    left = _publishable(artifact)
+    right = deepcopy(left)
+    right["provenance"]["generator_sha256"] = "0" * 64
+
+    receipt = comparability_receipt(left, right)
+
+    assert receipt["comparable"] is False
+    assert "generator_sha256" in receipt["failing_fields"]
+    assert "generator_mismatch" in receipt["reasons"]
+
+
+def test_comparability_rejects_suite_change_even_with_forged_task_set_hash(tmp_path):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    left = _publishable(artifact)
+    right = deepcopy(left)
+    right["provenance"]["suite"] = "different-suite"
+
+    receipt = comparability_receipt(left, right)
+
+    assert receipt["comparable"] is False
+    assert "suite" in receipt["failing_fields"]
+    assert "suite_mismatch" in receipt["reasons"]
+
+
 @pytest.mark.parametrize("field", COMPARABILITY_FIELDS)
 def test_comparability_rejects_each_incompatibility(tmp_path, field):
     _manifest, _trial, artifact = _offline_artifact(tmp_path)
@@ -328,6 +354,109 @@ def test_publication_refuses_each_named_reason(tmp_path, mutate, reason):
     assert receipt["policy_version"] == AGENT_CABINET_POLICY
 
 
+@pytest.mark.parametrize("bad_key", [(None, 1), ("task", None)])
+def test_duplicate_or_null_trial_keys_fail_publication_and_comparison(tmp_path, bad_key):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    valid = _publishable(artifact)
+    invalid = deepcopy(valid)
+    invalid["trials"][0]["task_id"], invalid["trials"][0]["trial"] = bad_key
+
+    publication = publication_receipt(invalid)
+    comparison = comparability_receipt(invalid, deepcopy(invalid))
+
+    assert publication["publishable"] is False
+    assert PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH in publication["reasons"]
+    assert comparison["comparable"] is False
+    assert "invalid_trial_keys" in comparison["reasons"]
+
+
+def test_duplicate_trial_keys_fail_publication_and_comparison(tmp_path):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    valid = _publishable(artifact)
+    invalid = deepcopy(valid)
+    invalid["trials"].append(deepcopy(invalid["trials"][0]))
+    invalid["summary"]["n_trials"] = 2
+
+    publication = publication_receipt(invalid)
+    comparison = comparability_receipt(invalid, deepcopy(invalid))
+
+    assert publication["publishable"] is False
+    assert PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH in publication["reasons"]
+    assert comparison["comparable"] is False
+    assert "invalid_trial_keys" in comparison["reasons"]
+
+
+def test_valid_unique_trial_keys_remain_publishable_and_comparable(tmp_path):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    valid = _publishable(artifact)
+
+    assert publication_receipt(valid)["publishable"] is True
+    assert comparability_receipt(valid, deepcopy(valid))["comparable"] is True
+
+
+def test_multi_task_artifact_uses_trials_per_task_and_remains_publishable(tmp_path):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    valid = _publishable(artifact)
+    second = deepcopy(valid["trials"][0])
+    second["task_id"] = "second-task"
+    valid["trials"].append(second)
+    valid["summary"].update(
+        {
+            "n_tasks": 2,
+            "n_trials": 1,
+            "pass_hat_k_effective_k": 1,
+            "pass_rate_ci95": [0.3424, 1.0],
+            "termination_reasons": {"completed": 2},
+        }
+    )
+
+    assert publication_receipt(valid)["publishable"] is True
+
+
+def test_publication_refuses_missing_n_trials(tmp_path):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    invalid = _publishable(artifact)
+    invalid["summary"].pop("n_trials")
+
+    receipt = publication_receipt(invalid)
+
+    assert receipt["publishable"] is False
+    assert PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH in receipt["reasons"]
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("n_tasks", 2),
+        ("n_tasks", True),
+        ("pass_rate", 0.0),
+        ("pass_hat_k_effective_k", 2),
+        ("pass_hat_k_effective_k", True),
+        ("pass_hat_k", 0.0),
+        ("pass_rate_ci95", [0.0, 0.0]),
+        ("pass_rate_ci95_boot", [0.0, 0.0]),
+        ("false_verification_rate", 1.0),
+        ("regression_rate", 1.0),
+        ("termination_reasons", {"fabricated": 1}),
+        ("cost_usd_total", 999.0),
+        ("cost_usd_per_task", 999.0),
+        ("latency_p50_ms", 999.0),
+        ("latency_p95_ms", 999.0),
+    ],
+)
+def test_publication_refuses_each_inconsistent_trial_derived_summary(
+    tmp_path, field, replacement
+):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    invalid = _publishable(artifact)
+    invalid["summary"][field] = replacement
+
+    receipt = publication_receipt(invalid)
+
+    assert receipt["publishable"] is False
+    assert PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH in receipt["reasons"]
+
+
 def test_comparability_rejects_mismatched_trial_sets(tmp_path):
     """Different --trials values must refuse at the receipt, not silently
     intersect inside compare_pair (McNemar assumes matched samples)."""
@@ -341,6 +470,35 @@ def test_comparability_rejects_mismatched_trial_sets(tmp_path):
     assert receipt["comparable"] is False
     assert "trials" in receipt["failing_fields"]
     assert "trial_set_mismatch" in receipt["reasons"]
+
+
+def test_comparability_rejects_mismatched_mcnemar_eligible_trial_sets(tmp_path):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    left = _publishable(artifact)
+    right = deepcopy(left)
+    right["trials"][0]["category"] = "calibration"
+
+    assert publication_receipt(left)["publishable"] is True
+    assert publication_receipt(right)["publishable"] is True
+    receipt = comparability_receipt(left, right)
+
+    assert receipt["comparable"] is False
+    assert "trials" in receipt["failing_fields"]
+    assert "trial_set_mismatch" in receipt["reasons"]
+
+
+def test_comparability_rejects_vacuous_axis_only_pair(tmp_path):
+    _manifest, _trial, artifact = _offline_artifact(tmp_path)
+    left = _publishable(artifact)
+    left["trials"][0]["category"] = "robustness"
+    right = deepcopy(left)
+
+    assert publication_receipt(left)["publishable"] is True
+    receipt = comparability_receipt(left, right)
+
+    assert receipt["comparable"] is False
+    assert "trials" in receipt["failing_fields"]
+    assert "no_matched_trials" in receipt["reasons"]
 
 
 def test_publication_does_not_refuse_for_comparability_mismatch_alone(tmp_path):

@@ -13,11 +13,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import subprocess
 from collections import Counter
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+
+from agentbench.stats import bootstrap_ci_by_task, pass_hat_k, percentile, wilson_ci
 
 
 AGENT_CABINET_POLICY = "agent-cabinet-gates-v1"
@@ -51,6 +54,7 @@ RELIABILITY_SUMMARY_FIELDS = (
 )
 
 COMPARABILITY_FIELDS = (
+    "suite",
     "task_set_sha256",
     "fixture_reference",
     "fixture_digest",
@@ -58,12 +62,14 @@ COMPARABILITY_FIELDS = (
     "harness_version",
     "tool_contract_sha256",
     "prompt_config_sha256",
+    "generator_sha256",
     "budgets",
     "grader_version",
     "private_split_id",
 )
 
 _COMPARABILITY_REASON_BY_FIELD = {
+    "suite": "suite_mismatch",
     "task_set_sha256": "task_set_mismatch",
     "fixture_reference": "fixture_version_mismatch",
     "fixture_digest": "fixture_version_mismatch",
@@ -71,6 +77,7 @@ _COMPARABILITY_REASON_BY_FIELD = {
     "harness_version": "harness_contract_mismatch",
     "tool_contract_sha256": "harness_contract_mismatch",
     "prompt_config_sha256": "prompt_config_mismatch",
+    "generator_sha256": "generator_mismatch",
     "budgets": "budget_mismatch",
     "grader_version": "grader_version_mismatch",
     "private_split_id": "private_split_mismatch",
@@ -100,6 +107,7 @@ PUBLICATION_REFUSE_REASONS = (
 
 AGENT_EVALUATION_TYPES = frozenset({"agent_harness", "agent_harness_self_review"})
 INFRA_OUTCOMES = frozenset({"preparation_failed", "execution_failed"})
+MCNEMAR_AXIS_ONLY_CATEGORIES = frozenset({"calibration", "robustness"})
 _STRUCTURED_REGRESSION_KEYS = ("introduced_regression", "regression", "regression_failed")
 _FORBIDDEN_PROVENANCE_KEYS = frozenset(
     {
@@ -403,12 +411,36 @@ def _comparability_value(artifact: dict[str, Any], field: str) -> Any:
     return provenance.get(field)
 
 
-def _trial_keys(artifact: dict[str, Any]) -> set[tuple[Any, Any]]:
-    keys: set[tuple[Any, Any]] = set()
-    for trial in artifact.get("trials") or []:
+def _valid_trial_keys(artifact: dict[str, Any]) -> set[tuple[str, int]] | None:
+    trials = artifact.get("trials")
+    if not isinstance(trials, list) or not trials:
+        return None
+    keys: set[tuple[str, int]] = set()
+    for trial in trials:
         row = _trial_mapping(trial)
-        keys.add((row.get("task_id"), row.get("trial")))
+        task_id = row.get("task_id")
+        trial_id = row.get("trial")
+        if (
+            not isinstance(task_id, str)
+            or not task_id.strip()
+            or not isinstance(trial_id, int)
+            or isinstance(trial_id, bool)
+        ):
+            return None
+        key = (task_id, trial_id)
+        if key in keys:
+            return None
+        keys.add(key)
     return keys
+
+
+def _mcnemar_trial_keys(artifact: dict[str, Any]) -> set[tuple[str, int]]:
+    return {
+        (row["task_id"], row["trial"])
+        for row in (_trial_mapping(trial) for trial in artifact.get("trials") or [])
+        if not _is_infra(row)
+        and row.get("category") not in MCNEMAR_AXIS_ONLY_CATEGORIES
+    }
 
 
 def comparability_receipt(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
@@ -421,11 +453,25 @@ def comparability_receipt(left: dict[str, Any], right: dict[str, Any]) -> dict[s
             reason = _COMPARABILITY_REASON_BY_FIELD[field]
             if reason not in reasons:
                 reasons.append(reason)
-    # McNemar assumes matched samples: both runs must record the exact same
-    # (task_id, trial) keys, or a lower --trials run silently drops outcomes.
-    if _trial_keys(left) != _trial_keys(right):
+    # McNemar assumes unique, non-null matched samples. Sets alone would hide
+    # duplicate keys, and two equally malformed runs must not compare.
+    left_keys = _valid_trial_keys(left)
+    right_keys = _valid_trial_keys(right)
+    if left_keys is None or right_keys is None:
+        failing_fields.append("trials")
+        reasons.append("invalid_trial_keys")
+    elif left_keys != right_keys:
         failing_fields.append("trials")
         reasons.append(COMPARABILITY_TRIAL_SET_REASON)
+    else:
+        left_mcnemar_keys = _mcnemar_trial_keys(left)
+        right_mcnemar_keys = _mcnemar_trial_keys(right)
+        if left_mcnemar_keys != right_mcnemar_keys:
+            failing_fields.append("trials")
+            reasons.append(COMPARABILITY_TRIAL_SET_REASON)
+        elif not left_mcnemar_keys:
+            failing_fields.append("trials")
+            reasons.append("no_matched_trials")
     return {
         "policy_version": AGENT_CABINET_POLICY,
         "comparable": not failing_fields,
@@ -470,30 +516,151 @@ def _has_incomplete_disposal(artifact: dict[str, Any]) -> bool:
     return False
 
 
+def _same_number(claimed: Any, expected: float | int) -> bool:
+    return (
+        isinstance(claimed, (int, float))
+        and not isinstance(claimed, bool)
+        and math.isfinite(float(claimed))
+        and math.isclose(float(claimed), float(expected), rel_tol=0.0, abs_tol=1e-9)
+    )
+
+
+def _same_count(claimed: Any, expected: int) -> bool:
+    return isinstance(claimed, int) and not isinstance(claimed, bool) and claimed == expected
+
+
+def _same_interval(claimed: Any, expected: tuple[float, float]) -> bool:
+    return (
+        isinstance(claimed, list)
+        and len(claimed) == 2
+        and all(_same_number(value, target) for value, target in zip(claimed, expected))
+    )
+
+
 def _summary_trials_mismatch(artifact: dict[str, Any]) -> bool:
     """A claimed summary must be derivable from the recorded trials.
 
-    ``build_agent_artifact`` computes ``pass_rate`` as the pass fraction over
-    non-infra trials (rounded to 4 places) and ``n_trials`` as the trial count;
-    every family overlay inherits those semantics. A submission whose summary
-    cannot be reproduced from its own trials is synthetic, not benchmark data.
+    Every displayed trial-derived statistic must reproduce from unique,
+    non-null ``(task_id, trial)`` rows. A submission whose summary cannot be
+    reproduced from its own trials is synthetic, not benchmark data.
     """
     summary = artifact.get("summary") or {}
     trials = [_trial_mapping(trial) for trial in artifact.get("trials") or []]
-    if not trials:
+    keys = _valid_trial_keys(artifact)
+    if keys is None:
         return True
-    n_trials = summary.get("n_trials")
-    if isinstance(n_trials, int) and n_trials != len(trials):
+
+    by_task: dict[str, list[dict[str, Any]]] = {}
+    trial_ids_by_task: dict[str, set[int]] = {}
+    for trial in trials:
+        task_id = trial["task_id"]
+        by_task.setdefault(task_id, []).append(trial)
+        trial_ids_by_task.setdefault(task_id, set()).add(trial["trial"])
+    trial_sets = list(trial_ids_by_task.values())
+    if not trial_sets or any(ids != trial_sets[0] for ids in trial_sets[1:]):
         return True
-    claimed = summary.get("pass_rate")
-    if not isinstance(claimed, (int, float)) or isinstance(claimed, bool):
+
+    n_tasks = len(by_task)
+    n_trials = len(trial_sets[0])
+    if not _same_count(summary.get("n_tasks"), n_tasks):
         return True
+    if not _same_count(summary.get("n_trials"), n_trials):
+        return True
+    if not _same_count(summary.get("pass_hat_k_effective_k"), n_trials):
+        return True
+
     scored = [trial for trial in trials if not _is_infra(trial)]
-    actual = (
-        sum(1 for trial in scored if trial.get("passed")) / len(scored) if scored else 0.0
+    if not scored:
+        return True
+    passes = sum(1 for trial in scored if trial.get("passed"))
+    rate = round(passes / len(scored), 4)
+    if not _same_number(summary.get("pass_rate"), rate):
+        return True
+
+    per_task_passes = [
+        sum(1 for trial in task_trials if trial.get("passed"))
+        for task_trials in by_task.values()
+    ]
+    per_task_trials = [len(task_trials) for task_trials in by_task.values()]
+    expected_pass_hat_k = round(
+        pass_hat_k(per_task_passes, per_task_trials, k=n_trials), 4
     )
-    # pass_rate ships rounded to 4 places; anything beyond rounding noise is a lie.
-    return abs(float(claimed) - actual) > 0.0001
+    if not _same_number(summary.get("pass_hat_k"), expected_pass_hat_k):
+        return True
+
+    ci = tuple(round(value, 4) for value in wilson_ci(passes, len(scored)))
+    per_task_rates = [
+        passed / count
+        for passed, count in zip(per_task_passes, per_task_trials)
+        if count
+    ]
+    boot = tuple(
+        round(value, 4) for value in bootstrap_ci_by_task(per_task_rates)
+    )
+    if not _same_interval(summary.get("pass_rate_ci95"), ci):
+        return True
+    if not _same_interval(summary.get("pass_rate_ci95_boot"), boot):
+        return True
+
+    reliability = reliability_summary_fields(trials)
+    if not _same_number(
+        summary.get("false_verification_rate"),
+        reliability["false_verification_rate"],
+    ):
+        return True
+    expected_regression = reliability["regression_rate"]
+    claimed_regression = summary.get("regression_rate")
+    if expected_regression is None:
+        if claimed_regression is not None:
+            return True
+    elif not _same_number(claimed_regression, expected_regression):
+        return True
+    if summary.get("termination_reasons") != reliability["termination_reasons"]:
+        return True
+
+    costs = [trial.get("cost_usd") for trial in scored if trial.get("cost_usd") is not None]
+    if any(
+        not isinstance(cost, (int, float))
+        or isinstance(cost, bool)
+        or not math.isfinite(float(cost))
+        for cost in costs
+    ):
+        return True
+    total_cost = round(sum(float(cost) for cost in costs), 6) if costs else None
+    cost_per_task = (
+        round(float(total_cost) / n_tasks, 6) if total_cost is not None else None
+    )
+    for field, expected in (
+        ("cost_usd_total", total_cost),
+        ("cost_usd_per_task", cost_per_task),
+    ):
+        if field in summary:
+            claimed = summary.get(field)
+            if expected is None:
+                if claimed is not None:
+                    return True
+            elif not _same_number(claimed, expected):
+                return True
+
+    latencies = [
+        trial.get("wall_time_ms", trial.get("latency_ms"))
+        for trial in scored
+    ]
+    for field, quantile in (("latency_p50_ms", 50), ("latency_p95_ms", 95)):
+        if field not in summary:
+            continue
+        if any(
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(float(value))
+            for value in latencies
+        ):
+            return True
+        expected = round(percentile([float(value) for value in latencies], quantile), 1)
+        if not _same_number(summary.get(field), expected):
+            return True
+
+    return False
 
 
 def _self_check_is_invalid(artifact: dict[str, Any]) -> bool:
