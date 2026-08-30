@@ -125,14 +125,26 @@ test('controlledVariableSentence prefers payload held_constant + changed_variabl
   };
   assert.equal(
     controlledVariableSentence(detail),
-    'Held constant: task_set_sha256, fixture_digest, budgets. ' +
+    'Must match for a valid pairwise comparison: task_set_sha256, fixture_digest, budgets. ' +
       'Independent variables that may differ across listed runs are model_route and harness.',
   );
   assert.equal(
     controlledVariableSentence({ changed_variables: 'Changed variable: model_route.' }),
     'Changed variable: model_route.',
   );
-  assert.equal(controlledVariableSentence({ held_constant: ['budgets'] }), 'Held constant: budgets.');
+  assert.equal(
+    controlledVariableSentence({ held_constant: ['budgets'] }),
+    'Must match for a valid pairwise comparison: budgets.',
+  );
+  // The sentence never asserts a variable was held constant on the board while
+  // the changed-variables note says it may differ (harness contradiction).
+  assert.equal(
+    controlledVariableSentence({
+      held_constant: ['harness'],
+      changed_variables: 'Independent variables that may differ across listed runs are model_route and harness.',
+    }).startsWith('Held constant:'),
+    false,
+  );
   assert.equal(controlledVariableSentence(null), '');
   assert.equal(controlledVariableSentence({}), '');
 });
