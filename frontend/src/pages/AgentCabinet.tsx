@@ -71,14 +71,13 @@ export default function AgentCabinet() {
         <Card className="animate-rise rise-1 overflow-hidden">
           <CardHeader
             title="Published runs"
-            sub="Best valid run per identity key; private split supersedes public. Rank is board order, not a composite score."
+            sub={`Latest valid run per exact identity; private split supersedes matching public. ${AGENT_CABINET_COPY.presentationOrder}`}
           />
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px]">
               <thead>
                 <tr className="border-y border-line text-[11px] uppercase tracking-wider">
-                  <th className="py-3 pl-5 pr-2 font-semibold whitespace-nowrap text-ink-3">#</th>
-                  <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Model route</th>
+                  <th className="py-3 pl-5 pr-2 font-semibold whitespace-nowrap text-ink-3">Model route</th>
                   <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Suite</th>
                   <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Harness</th>
                   <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Completion</th>
@@ -89,10 +88,9 @@ export default function AgentCabinet() {
                 </tr>
               </thead>
               <tbody>
-                {runs.map((run, index) => (
+                {runs.map((run) => (
                   <tr key={run.run_id} className="border-t border-line hover:bg-surface-2">
-                    <td className="tnum py-3 pl-5 pr-2 text-ink-3">#{index + 1}</td>
-                    <td className="px-2 py-3">
+                    <td className="py-3 pl-5 pr-2">
                       <Link
                         to={`/agent-cabinet/runs/${run.run_id}`}
                         className="font-medium text-ink whitespace-nowrap hover:text-accent"

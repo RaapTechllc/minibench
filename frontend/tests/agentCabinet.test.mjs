@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   AGENT_CABINET_COPY,
   AGENT_CABINET_DEFAULT_FIELDS,
@@ -97,6 +98,19 @@ test('copy constants: controlled-variable contract names what is held', () => {
     assert.match(AGENT_CABINET_COPY.controlledVariables, new RegExp(term));
   }
   assert.match(AGENT_CABINET_COPY.controlledVariables, /changed variables are explicit/);
+});
+
+test('published-run presentation is explicitly unranked with no ordinal column', () => {
+  assert.match(AGENT_CABINET_COPY.presentationOrder, /unranked/i);
+  assert.match(AGENT_CABINET_COPY.presentationOrder, /comparability receipt/i);
+
+  const page = readFileSync(
+    new URL('../src/pages/AgentCabinet.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.doesNotMatch(page, /Rank is board order/i);
+  assert.doesNotMatch(page, /index \+ 1/);
+  assert.doesNotMatch(page, />#<\/th>/);
 });
 
 test('categoryTitle title-cases raw keys without Arcade display names', () => {

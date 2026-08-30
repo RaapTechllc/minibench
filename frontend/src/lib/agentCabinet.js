@@ -62,6 +62,9 @@ export const AGENT_CABINET_COPY = {
   controlledVariables:
     'Within any valid pairwise comparison, the task snapshot, tools, limits, ' +
     'verification, and trials are held constant; changed variables are explicit.',
+  presentationOrder:
+    'Unranked published runs, newest first. Use the pairwise comparability receipt ' +
+    'before interpreting completion differences.',
   emptyTitle: 'No published Real-Work Agent Cabinet runs yet.',
   emptyBody: 'Offline dry-run artifacts do not appear.',
 };
