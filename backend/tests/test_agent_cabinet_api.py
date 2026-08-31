@@ -6,6 +6,7 @@ from copy import deepcopy
 from uuid import UUID
 
 import psycopg2
+import pytest
 
 from agentbench.agent_cabinet import (
     AGENT_CABINET_POLICY,
@@ -15,7 +16,9 @@ from agentbench.agent_cabinet import (
     REQUIRED_PROVENANCE_KEYS,
     private_split_id,
     publication_receipt,
+    reliability_summary_fields,
 )
+from agentbench.stats import bootstrap_ci_by_task, pass_hat_k, percentile, wilson_ci
 from agentbench.tests.test_import_results import _legacy_artifact
 from tests.conftest import PG_HOST, PG_PASS, PG_PORT, PG_USER, TEST_DB
 
@@ -68,14 +71,17 @@ def _base_artifact() -> dict:
             "grader_version": "agent-1",
             "n_tasks": 1,
             "n_trials": 2,
+            "pass_hat_k_effective_k": 2,
             "pass_rate": 1.0,
             "pass_hat_k": 1.0,
-            "pass_rate_ci95": [0.34, 1.0],
+            "pass_rate_ci95": [0.3424, 1.0],
             "pass_rate_ci95_boot": [1.0, 1.0],
             "n_infra_errors": 0,
             "n_canary_flags": 0,
+            "cost_usd_total": 0.02,
             "cost_usd_per_task": 0.02,
             "latency_p50_ms": 15,
+            "latency_p95_ms": 19.5,
             "evaluation_type": "agent_harness",
             "false_verification_rate": 0.0,
             "regression_rate": None,
@@ -91,6 +97,8 @@ def _base_artifact() -> dict:
                 "workspace_disposed": True,
                 "agent_claimed_success": True,
                 "termination_reason": "completed",
+                "cost_usd": 0.01,
+                "wall_time_ms": 10,
             },
             {
                 "task_id": "mba-offline-text-repair-001",
@@ -101,6 +109,8 @@ def _base_artifact() -> dict:
                 "workspace_disposed": True,
                 "agent_claimed_success": True,
                 "termination_reason": "completed",
+                "cost_usd": 0.01,
+                "wall_time_ms": 20,
             },
         ],
     }
@@ -139,17 +149,54 @@ def _post(client, artifact):
     return client.post("/api/v1/agent-cabinet/runs", json=artifact)
 
 
+def _set_completion(artifact: dict, n_pass: int, n_total: int) -> dict:
+    """Rebuild trials so the claimed summary is actually derivable from them —
+    the publication gate refuses summaries that do not match their trials."""
+    base = deepcopy(artifact["trials"][0])
+    trials = []
+    for index in range(n_total):
+        trial = deepcopy(base)
+        passed = index < n_pass
+        trial["trial"] = index + 1
+        trial["passed"] = passed
+        trial["outcome"] = "success" if passed else "verification_failed"
+        trial["agent_claimed_success"] = passed
+        trial["wall_time_ms"] = 15
+        trials.append(trial)
+    artifact["trials"] = trials
+    passes = sum(1 for trial in trials if trial["passed"])
+    ci = wilson_ci(passes, n_total)
+    boot = bootstrap_ci_by_task([passes / n_total])
+    costs = [float(trial["cost_usd"]) for trial in trials]
+    latencies = [float(trial["wall_time_ms"]) for trial in trials]
+    artifact["summary"]["n_trials"] = n_total
+    artifact["summary"]["pass_hat_k_effective_k"] = n_total
+    artifact["summary"]["pass_rate"] = round(n_pass / n_total, 4)
+    artifact["summary"]["pass_hat_k"] = round(
+        pass_hat_k([passes], [n_total], k=n_total), 4
+    )
+    artifact["summary"]["pass_rate_ci95"] = [round(value, 4) for value in ci]
+    artifact["summary"]["pass_rate_ci95_boot"] = [
+        round(value, 4) for value in boot
+    ]
+    artifact["summary"].update(reliability_summary_fields(trials))
+    artifact["summary"]["cost_usd_total"] = round(sum(costs), 6)
+    artifact["summary"]["cost_usd_per_task"] = round(sum(costs), 6)
+    artifact["summary"]["latency_p50_ms"] = round(percentile(latencies, 50), 1)
+    artifact["summary"]["latency_p95_ms"] = round(percentile(latencies, 95), 1)
+    assert publication_receipt(artifact)["publishable"] is True
+    return artifact
+
+
 # ─── A1: ingest + list best valid runs ────────────────────────────────────────
 
 
-def test_a1_post_publishable_and_list_best_valid_runs(client):
-    high = _artifact()
-    high["summary"]["pass_rate"] = 0.75
-    low = _artifact()
-    low["summary"]["pass_rate"] = 0.25
+def test_a1_list_uses_latest_valid_run_per_exact_identity_not_best_completion(client):
+    high = _set_completion(_artifact(), 3, 4)
+    low = _set_completion(_artifact(), 1, 4)
 
-    first = _post(client, low)
-    second = _post(client, high)
+    first = _post(client, high)
+    second = _post(client, low)
     assert first.status_code == 200
     assert second.status_code == 200
     assert publication_receipt(high)["publishable"] is True
@@ -157,10 +204,10 @@ def test_a1_post_publishable_and_list_best_valid_runs(client):
     listed = client.get("/api/v1/agent-cabinet/runs").json()
     assert len(listed) == 1
     item = listed[0]
-    assert item["completion"] == 75.0
-    assert item["pass_rate"] == 75.0
-    assert item["category_completion"] == {"repository-repair": 100.0}
-    assert item["cost_usd_per_task"] == 0.02
+    assert item["completion"] == 25.0
+    assert item["pass_rate"] == 25.0
+    assert item["category_completion"] == {"repository-repair": 25.0}
+    assert item["cost_usd_per_task"] == 0.04
     assert item["latency_p50_ms"] == 15
     assert item["run_id"] == second.json()["run_id"]
 
@@ -201,10 +248,8 @@ def test_a2_cabinet_does_not_touch_other_leaderboards_or_add_composite(client):
 
 
 def test_a3_default_view_is_completion_category_cost_latency(client):
-    artifact = _artifact()
+    artifact = _set_completion(_artifact(), 1, 2)
     artifact["trials"][1]["category"] = "feature-implementation"
-    artifact["trials"][1]["passed"] = False
-    artifact["summary"]["pass_rate"] = 0.5
     posted = _post(client, artifact)
     assert posted.status_code == 200
 
@@ -257,7 +302,7 @@ def test_a4_technician_is_nested_and_lists_required_fields(client):
     assert tech["regression_rate"] is None
     assert tech["termination_reasons"] == {"completed": 2}
     assert tech["pass_hat_k"] == 100.0
-    assert tech["ci95_low"] == 34.0
+    assert tech["ci95_low"] == 34.24
     assert tech["ci95_high"] == 100.0
     assert tech["budgets"]["max_turns"] == 1
     assert len(tech["trials"]) == 2
@@ -273,17 +318,13 @@ def test_a4_technician_is_nested_and_lists_required_fields(client):
 
 def test_a5_compare_and_held_constant_contract(client):
     left = _artifact()
-    right = _artifact(model_route="offline/other-agent")
+    right = _set_completion(_artifact(model_route="offline/other-agent"), 1, 2)
     right["provenance"]["model"] = "other-agent"
     right["summary"]["moa_config"] = {
         "name": "other",
         "self_moa": False,
         "models": ["other-agent"],
     }
-    right["trials"][1]["passed"] = False
-    right["trials"][1]["outcome"] = "verification_failed"
-    right["summary"]["pass_rate"] = 0.5
-
     a = _post(client, left).json()
     b = _post(client, right).json()
     assert a["held_constant"] == list(COMPARABILITY_FIELDS)
@@ -352,11 +393,64 @@ def test_a6_unpublishable_is_422_with_receipt(client):
     assert _table_count("agent_cabinet_runs") == 0
 
 
+def test_a6_summary_not_matching_trials_is_422(client):
+    """A claimed 100% summary over failing (or absent) trials must never
+    persist — synthetic submissions cannot corrupt the public cabinet."""
+    inflated = _artifact()
+    for trial in inflated["trials"]:
+        trial["passed"] = False
+        trial["outcome"] = "verification_failed"
+    resp = _post(client, inflated)  # summary still claims pass_rate 1.0
+    assert resp.status_code == 422
+    assert "summary_trials_mismatch" in resp.json()["detail"]["reasons"]
+
+    trialless = _artifact()
+    trialless["trials"] = []
+    resp = _post(client, trialless)
+    assert resp.status_code == 422
+    assert "summary_trials_mismatch" in resp.json()["detail"]["reasons"]
+    assert _table_count("agent_cabinet_runs") == 0
+
+
+def test_a5_compare_refuses_mismatched_trial_sets(client):
+    """Runs produced with different --trials values are 409, not silently
+    intersected inside compare_pair."""
+    left = _artifact()
+    right = _set_completion(_artifact(model_route="offline/other-agent"), 4, 4)
+    a = _post(client, left).json()
+    b = _post(client, right).json()
+    refused = client.get(
+        f"/api/v1/agent-cabinet/compare?a={a['run_id']}&b={b['run_id']}"
+    )
+    assert refused.status_code == 409
+    detail = refused.json()["detail"]
+    assert detail["comparable"] is False
+    assert "trials" in detail["failing_fields"]
+    assert "trial_set_mismatch" in detail["reasons"]
+
+
+def test_a5_compare_refuses_mismatched_mcnemar_eligible_trials(client):
+    left = _artifact()
+    right = _artifact(model_route="offline/other-agent")
+    for trial in right["trials"]:
+        trial["category"] = "calibration"
+
+    a = _post(client, left).json()
+    b = _post(client, right).json()
+    refused = client.get(
+        f"/api/v1/agent-cabinet/compare?a={a['run_id']}&b={b['run_id']}"
+    )
+
+    assert refused.status_code == 409
+    detail = refused.json()["detail"]
+    assert detail["comparable"] is False
+    assert "trials" in detail["failing_fields"]
+    assert "trial_set_mismatch" in detail["reasons"]
+
+
 def test_a6_private_split_supersedes_higher_public(client):
-    public = _artifact(private_split=False)
-    public["summary"]["pass_rate"] = 0.9
-    private = _artifact(private_split=True)
-    private["summary"]["pass_rate"] = 0.1
+    public = _set_completion(_artifact(private_split=False), 9, 10)
+    private = _set_completion(_artifact(private_split=True), 1, 10)
     _post(client, public)
     private_id = _post(client, private).json()["run_id"]
 
@@ -391,6 +485,42 @@ def test_a6_different_model_route_lists_both(client):
         "offline/deterministic-fake-agent",
         "offline/other",
     }
+
+
+def test_a6_list_is_latest_first_not_completion_order(client):
+    high = _set_completion(_artifact(model_route="offline/high"), 4, 4)
+    low = _set_completion(_artifact(model_route="offline/low"), 1, 4)
+    _post(client, high)
+    _post(client, low)
+
+    listed = client.get("/api/v1/agent-cabinet/runs").json()
+
+    assert [item["model_route"] for item in listed] == ["offline/low", "offline/high"]
+    assert [item["completion"] for item in listed] == [25.0, 100.0]
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "generator_sha256",
+        "prompt_config_sha256",
+        "task_set_sha256",
+        "fixture_reference",
+    ],
+)
+def test_a6_incomparable_sources_remain_separate_unranked_rows(client, field):
+    original = _artifact()
+    changed = _artifact()
+    changed["provenance"][field] = (
+        "different-fixture@2" if field == "fixture_reference" else f"changed-{field}"
+    )
+    assert publication_receipt(changed)["publishable"] is True
+
+    _post(client, original)
+    _post(client, changed)
+
+    listed = client.get("/api/v1/agent-cabinet/runs").json()
+    assert len(listed) == 2
 
 
 def test_present_helpers_do_not_flatten_technician():

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   AGENT_CABINET_COPY,
   AGENT_CABINET_DEFAULT_FIELDS,
@@ -99,6 +100,19 @@ test('copy constants: controlled-variable contract names what is held', () => {
   assert.match(AGENT_CABINET_COPY.controlledVariables, /changed variables are explicit/);
 });
 
+test('published-run presentation is explicitly unranked with no ordinal column', () => {
+  assert.match(AGENT_CABINET_COPY.presentationOrder, /unranked/i);
+  assert.match(AGENT_CABINET_COPY.presentationOrder, /comparability receipt/i);
+
+  const page = readFileSync(
+    new URL('../src/pages/AgentCabinet.tsx', import.meta.url),
+    'utf8',
+  );
+  assert.doesNotMatch(page, /Rank is board order/i);
+  assert.doesNotMatch(page, /index \+ 1/);
+  assert.doesNotMatch(page, />#<\/th>/);
+});
+
 test('categoryTitle title-cases raw keys without Arcade display names', () => {
   assert.equal(categoryTitle('repository-repair'), 'Repository Repair');
   assert.equal(categoryTitle('feature-implementation'), 'Feature Implementation');
@@ -125,14 +139,26 @@ test('controlledVariableSentence prefers payload held_constant + changed_variabl
   };
   assert.equal(
     controlledVariableSentence(detail),
-    'Held constant: task_set_sha256, fixture_digest, budgets. ' +
+    'Must match for a valid pairwise comparison: task_set_sha256, fixture_digest, budgets. ' +
       'Independent variables that may differ across listed runs are model_route and harness.',
   );
   assert.equal(
     controlledVariableSentence({ changed_variables: 'Changed variable: model_route.' }),
     'Changed variable: model_route.',
   );
-  assert.equal(controlledVariableSentence({ held_constant: ['budgets'] }), 'Held constant: budgets.');
+  assert.equal(
+    controlledVariableSentence({ held_constant: ['budgets'] }),
+    'Must match for a valid pairwise comparison: budgets.',
+  );
+  // The sentence never asserts a variable was held constant on the board while
+  // the changed-variables note says it may differ (harness contradiction).
+  assert.equal(
+    controlledVariableSentence({
+      held_constant: ['harness'],
+      changed_variables: 'Independent variables that may differ across listed runs are model_route and harness.',
+    }).startsWith('Held constant:'),
+    false,
+  );
   assert.equal(controlledVariableSentence(null), '');
   assert.equal(controlledVariableSentence({}), '');
 });

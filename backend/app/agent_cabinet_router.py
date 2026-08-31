@@ -63,35 +63,38 @@ def _row_dict(run: AgentCabinetRun) -> dict[str, Any]:
     }
 
 
-def _full_key(run: AgentCabinetRun) -> tuple:
+def _identity_value(run: AgentCabinetRun, field: str) -> Any:
+    provenance = run.provenance or {}
+    if field == "budgets":
+        return canonical_budgets(provenance.get("budgets"))
+    if field == "grader_version":
+        return provenance.get("grader_version", run.grader_version)
+    return provenance.get(field)
+
+
+def _full_key(run: AgentCabinetRun) -> tuple[Any, ...]:
+    """One model/harness result under the exact pairwise-comparison identity."""
     return (
-        run.suite,
         run.model_route,
-        run.harness,
-        run.harness_version,
-        run.tool_contract_sha256,
-        run.fixture_digest,
-        run.budgets_canonical,
-        run.grader_version,
-        run.private_split_id,
+        *(_identity_value(run, field) for field in COMPARABILITY_FIELDS),
     )
 
 
-def _supersession_key(run: AgentCabinetRun) -> tuple:
+def _supersession_key(run: AgentCabinetRun) -> tuple[Any, ...]:
     return _full_key(run)[:-1]
 
 
-def _rank_tuple(run: AgentCabinetRun) -> tuple:
-    return (float(run.completion), run.submitted_at)
+def _latest_tuple(run: AgentCabinetRun) -> tuple[Any, str]:
+    return (run.submitted_at, str(run.run_id))
 
 
-def select_best_runs(runs: list[AgentCabinetRun]) -> list[AgentCabinetRun]:
-    """Best valid run per identity key, with private split superseding public."""
+def select_representative_runs(runs: list[AgentCabinetRun]) -> list[AgentCabinetRun]:
+    """Latest valid run per exact identity; private supersedes matching public."""
     by_full: dict[tuple, AgentCabinetRun] = {}
     for run in runs:
         key = _full_key(run)
         current = by_full.get(key)
-        if current is None or _rank_tuple(run) > _rank_tuple(current):
+        if current is None or _latest_tuple(run) > _latest_tuple(current):
             by_full[key] = run
 
     grouped: dict[tuple, list[AgentCabinetRun]] = {}
@@ -102,7 +105,7 @@ def select_best_runs(runs: list[AgentCabinetRun]) -> list[AgentCabinetRun]:
     for group in grouped.values():
         privates = [run for run in group if run.private_split]
         best.extend(privates if privates else group)
-    return sorted(best, key=_rank_tuple, reverse=True)
+    return sorted(best, key=_latest_tuple, reverse=True)
 
 
 def _latency_p50_ms(summary: dict[str, Any]) -> int | None:
@@ -187,7 +190,7 @@ async def list_agent_cabinet_runs(
     if view not in (None, "technician"):
         raise HTTPException(status_code=400, detail="view must be technician when set")
     result = await db.execute(select(AgentCabinetRun))
-    best = select_best_runs(list(result.scalars().all()))
+    best = select_representative_runs(list(result.scalars().all()))
     include_technician = view == "technician"
     return [list_item_view(_row_dict(run), technician=include_technician) for run in best]
 

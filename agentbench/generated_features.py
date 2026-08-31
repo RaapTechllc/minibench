@@ -782,11 +782,13 @@ def build_generated_feature_artifact(
     trials: list[Any],
 ) -> dict[str, Any]:
     artifact = build_agent_artifact(manifest, trials)
-    generator_identity = "|".join(f"{template.name}:{template.family}" for template in TEMPLATES)
+    # Fingerprint the generator implementation itself (mutation, gold, and
+    # oracle logic live in this module), not just template labels — a
+    # grading-logic change must change the advertised reproducibility hash.
     artifact["provenance"].update(
         {
             "fixture_version": FIXTURE_VERSION,
-            "generator_sha256": hashlib.sha256(generator_identity.encode()).hexdigest(),
+            "generator_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             "mutation_template_sha256": fixture.template_hash,
             "seed_sha256": fixture.seed_hash,
             "harness": HARNESS,

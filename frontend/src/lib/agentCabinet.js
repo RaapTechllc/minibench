@@ -60,8 +60,11 @@ export const AGENT_CABINET_COPY = {
     'This is not Solo Cabinet (single-model capability) and not Multiplayer ' +
     'Cabinet (MoA configs) — scores are never combined into a composite.',
   controlledVariables:
-    'Same task snapshot, tools, limits, verification, and trials across ' +
-    'listed runs; changed variables are explicit.',
+    'Within any valid pairwise comparison, the task snapshot, tools, limits, ' +
+    'verification, and trials are held constant; changed variables are explicit.',
+  presentationOrder:
+    'Unranked published runs, newest first. Use the pairwise comparability receipt ' +
+    'before interpreting completion differences.',
   emptyTitle: 'No published Real-Work Agent Cabinet runs yet.',
   emptyBody: 'Offline dry-run artifacts do not appear.',
 };
@@ -83,7 +86,12 @@ export function sortedCategoryEntries(categoryCompletion) {
 }
 
 /** Controlled-variable sentence assembled from the detail payload's
- *  held_constant list and changed_variables note. */
+ *  held_constant list and changed_variables note.
+ *
+ *  held_constant lists the fields that must MATCH for a valid pairwise
+ *  comparison — it is a comparison requirement, not a claim that every run on
+ *  the board actually held them constant (harness, for example, may differ
+ *  across listed runs while still being a comparability requirement). */
 export function controlledVariableSentence(detail) {
   const held = Array.isArray(detail?.held_constant)
     ? detail.held_constant.filter(Boolean)
@@ -91,6 +99,8 @@ export function controlledVariableSentence(detail) {
   const changed = typeof detail?.changed_variables === 'string'
     ? detail.changed_variables.trim()
     : '';
-  const heldPart = held.length ? `Held constant: ${held.join(', ')}.` : '';
+  const heldPart = held.length
+    ? `Must match for a valid pairwise comparison: ${held.join(', ')}.`
+    : '';
   return [heldPart, changed].filter(Boolean).join(' ');
 }

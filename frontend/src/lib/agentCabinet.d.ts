@@ -2,6 +2,7 @@ export interface AgentCabinetCopy {
   tagline: string;
   notSoloNotMultiplayer: string;
   controlledVariables: string;
+  presentationOrder: string;
   emptyTitle: string;
   emptyBody: string;
 }

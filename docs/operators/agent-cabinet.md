@@ -98,8 +98,13 @@ published scores.
 
 Pairwise comparison is two steps:
 
-1. `comparability_receipt(a, b)` — same task snapshot, fixture, harness
-   contract, tool-contract hash, budgets, grader version, and private-split id.
+1. `comparability_receipt(a, b)` — same suite, task snapshot, fixture, harness
+   contract, tool-contract hash, prompt-configuration hash, generator/oracle
+   source hash, budgets, grader version, and private-split id, plus unique,
+   non-null, identical `(task_id, trial)` sets (McNemar assumes matched samples;
+   runs produced with different `--trials` values refuse with
+   `trial_set_mismatch`). The McNemar-eligible keys must also match and be
+   non-empty after calibration and robustness axis-only rows are excluded.
 2. If `comparable`, `compare_pair` applies the existing McNemar + task-bootstrap
    policy.
 
@@ -107,15 +112,21 @@ Pairwise comparison is two steps:
 pair is incomparable. Solo/MoA/hardware IDs are an `evaluation_type` mismatch
 (409). Do not call `/api/v1/compare` (hardware) with cabinet runs.
 
-Held constant: the shipped `COMPARABILITY_FIELDS`. Changed variables that may
-differ across listed runs are `model_route` and/or `harness`.
+`held_constant` in API payloads lists the shipped `COMPARABILITY_FIELDS` —
+the fields that must **match for a valid pairwise comparison**, not a claim
+that every run on the board held them constant. Variables that may differ
+across listed runs are `model_route` and/or `harness`.
+
+The published-runs list is unranked and newest-first. It keeps incomparable
+identities as separate rows; completion is never used for global ordering or
+for choosing which repeated run represents an exact identity.
 
 ## Publication gates
 
 `publication_receipt` is the only publish decision. `publishable` → persist on
 `POST /api/v1/agent-cabinet/runs`. Otherwise **422** `{ "detail": <receipt> }`.
 
-The seven refuse reasons (no eighth, no `--allow-infra`):
+The eight refuse reasons (no ninth, no `--allow-infra`):
 
 | Reason | When |
 |--------|------|
@@ -126,6 +137,7 @@ The seven refuse reasons (no eighth, no `--allow-infra`):
 | `missing_provenance` | Any required provenance key absent |
 | `incomplete_disposal` | A trial left `workspace_disposed: false` |
 | `invalid_task_self_check` | Gold/bad self-check failed |
+| `summary_trials_mismatch` | Trial keys are duplicate/null, `n_trials`/`n_tasks` or effective k are missing/inconsistent, or a published trial-derived rate, interval, reliability, cost, or latency summary cannot be recomputed |
 
 Comparability mismatch never publish-refuses a run.
 
@@ -185,14 +197,17 @@ the shape `build_agent_artifact` emits. It is **not** a live host result.
     "grader_version": "agent-1",
     "n_tasks": 1,
     "n_trials": 2,
+    "pass_hat_k_effective_k": 2,
     "pass_rate": 0.5,
     "pass_hat_k": 0.0,
     "pass_rate_ci95": [0.0945, 0.9055],
-    "pass_rate_ci95_boot": [0.0, 1.0],
+    "pass_rate_ci95_boot": [0.5, 0.5],
     "n_infra_errors": 0,
     "n_canary_flags": 0,
+    "cost_usd_total": 0.01,
     "cost_usd_per_task": 0.01,
     "latency_p50_ms": 12,
+    "latency_p95_ms": 13.8,
     "evaluation_type": "agent_harness",
     "false_verification_rate": 0.0,
     "regression_rate": null,
@@ -207,7 +222,9 @@ the shape `build_agent_artifact` emits. It is **not** a live host result.
       "passed": true,
       "workspace_disposed": true,
       "agent_claimed_success": true,
-      "termination_reason": "completed"
+      "termination_reason": "completed",
+      "cost_usd": 0.005,
+      "wall_time_ms": 10
     },
     {
       "task_id": "mba-offline-text-repair-001",
@@ -217,7 +234,9 @@ the shape `build_agent_artifact` emits. It is **not** a live host result.
       "passed": false,
       "workspace_disposed": true,
       "agent_claimed_success": false,
-      "termination_reason": "completed"
+      "termination_reason": "completed",
+      "cost_usd": 0.005,
+      "wall_time_ms": 14
     }
   ]
 }

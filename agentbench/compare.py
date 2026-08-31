@@ -18,7 +18,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from agentbench.agent_cabinet import comparability_receipt, is_agent_cabinet_artifact
+from agentbench.agent_cabinet import (
+    MCNEMAR_AXIS_ONLY_CATEGORIES,
+    comparability_receipt,
+    is_agent_cabinet_artifact,
+)
 from agentbench.stats import bootstrap_ci_by_task, mcnemar_exact
 
 ALPHA = 0.05
@@ -87,7 +91,7 @@ def check_comparable(runs: list[dict[str, Any]]) -> None:
 # continuous (Brier), and robustness base/pert are correlated near-duplicates
 # that would double-weight one capability and violate McNemar's independent-pair
 # assumption. Both are scored on their own axes instead.
-_AXIS_ONLY = {"calibration", "robustness"}
+_AXIS_ONLY = MCNEMAR_AXIS_ONLY_CATEGORIES
 
 
 def _outcomes(run: dict[str, Any]) -> dict[tuple[str, int], bool]:
