@@ -1,5 +1,8 @@
 # MiniBench — Continuation Plan (for Claude Code Fable 5)
 
+> Historical July 6 handoff. Its open work and verification counts describe that
+> date. Use [project status](PROJECT-STATUS.md) and current GitHub issues now.
+
 **Last reviewed:** 2026-07-06  
 **Repo:** `RaapTechllc/minibench`  
 **Baseline:** `main` @ `20e78f5`

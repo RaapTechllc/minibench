@@ -190,6 +190,37 @@ def test_publish_refused_on_canary_flags(monkeypatch, tmp_path):
     assert not published
 
 
+def test_dry_run_cannot_publish_even_with_infra_override(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr("agentbench.run._load_env_files", lambda: None)
+    published = []
+    monkeypatch.setattr("agentbench.run.publish_run", lambda url, p: published.append(p) or {})
+    out = tmp_path / "dryrun.json"
+    rc = main(["--model", "openrouter/x/y", "--tasks", CODING_V1, "--dry-run",
+               "--out", str(out), "--publish", "http://api", "--allow-infra-errors"])
+    assert rc == 3
+    assert not published
+    assert json.loads(out.read_text())["dry_run"] is True
+    assert "dry-run" in capsys.readouterr().err
+
+
+def test_publish_failure_preserves_live_artifact(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr("agentbench.run._load_env_files", lambda: None)
+    monkeypatch.setattr("agentbench.run.run_suite", lambda *a, **k: [
+        TrialResult("t1", "reasoning", 1, True, 1.0, 0.0, 0, 0, 0, "match"),
+    ])
+
+    def fail_publish(url, payload):
+        raise RuntimeError("publish failed (500): test failure")
+
+    monkeypatch.setattr("agentbench.run.publish_run", fail_publish)
+    out = tmp_path / "live.json"
+    rc = main(["--model", "ollama/test", "--provider", "ollama", "--tasks", CODING_V1,
+               "--out", str(out), "--publish", "http://api"])
+    assert rc == 1
+    assert json.loads(out.read_text())["dry_run"] is False
+    assert "publish failed (500)" in capsys.readouterr().err
+
+
 # ── private-seed --generate protocol ──────────────────────────────────────────
 
 

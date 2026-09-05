@@ -1,5 +1,9 @@
 # MiniBench — Build Brief for Damien
 
+> Historical hardware build brief. Completed or superseded; do not execute its
+> deployment or main-branch instructions as current work. Start with
+> [project status](docs/PROJECT-STATUS.md).
+
 ## What You're Building
 "MiniBench" — a platform that crowdsources benchmarks for Mini PCs running local LLMs. CLI collects data, API stores it, dashboard visualizes it.
 

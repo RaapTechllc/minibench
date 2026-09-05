@@ -1,5 +1,8 @@
 # MiniBench Sprint 1 — UI/UX Overhaul
 
+> Historical hardware UI sprint. This is not the current backlog. Start with
+> [project status](docs/PROJECT-STATUS.md).
+
 ## Problem
 Current MiniBench frontend is functional but looks like AI-generated slop. Generic dark theme, no personality, no visual hierarchy, standard Recharts defaults. It needs to feel like a product people bookmark, not a school project.
 

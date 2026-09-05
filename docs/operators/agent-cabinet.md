@@ -90,9 +90,11 @@ run for the same identity key even when its completion is lower.
 `python -m agentbench.agent_tasks` always writes `dry_run: true`. Offline CLI
 artifacts are not leaderboard data.
 
-Publication tests (and a live publish) use an **in-memory** copy with
-`dry_run: false` only. Gold CLI files stay dry-run. Do not treat them as
-published scores.
+Publication tests use an **in-memory synthetic fixture** with `dry_run: false`
+to exercise the API contract. That exception is for tests only. A live publish
+requires evidence from an actual model-plus-agent run; changing the flag on a
+gold or offline artifact does not create that evidence. The shipped cabinet
+CLIs are offline reference runners, not live-agent adapters.
 
 ## Comparison
 

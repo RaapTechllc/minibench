@@ -586,9 +586,17 @@ def main(argv: list[str] | None = None) -> int:
                   "publish a partial run — rerun, or pass --allow-infra-errors.",
                   file=sys.stderr)
             return 3
+        if args.dry_run:
+            print("ERROR: dry-run output is not benchmark data. Refusing to publish.",
+                  file=sys.stderr)
+            return 3
         submit = to_agent_run_submit(summary, results, provider=args.provider,
                                      provenance=provenance)
-        published = publish_run(args.publish, submit)
+        try:
+            published = publish_run(args.publish, submit)
+        except RuntimeError as exc:
+            print(f"Error publishing run: {exc}", file=sys.stderr)
+            return 1
         print(f"Published run_id={published.get('run_id')} to {args.publish}")
 
     return 0

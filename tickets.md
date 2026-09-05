@@ -1,5 +1,8 @@
 # Tickets: Arcade Scorecard
 
+> Historical completed Arcade tranche, issues #20-#26. Current work is tracked
+> in GitHub issues and [project status](docs/PROJECT-STATUS.md).
+
 Tracer bullets for the Arcade Scorecard vision. Parent spec: #19 · `docs/PRD-arcade-scorecard.md`.
 
 Work the **frontier**: any ticket whose blockers are all done.

@@ -1,8 +1,17 @@
 # MiniBench
 
-Crowdsourced LLM benchmarks for Mini PCs. Answers: **"What's the best hardware per dollar for running LLMs locally?"**
+MiniBench measures whether AI models and agent configurations finish useful work,
+with completion, cost, latency, and reproducibility receipts kept together.
 
-**Memory bandwidth is the critical metric** — for memory-bound local inference, throughput tracks bandwidth almost linearly. MiniBench makes that visible.
+The active engineering goal is the **Real-Work Agent Cabinet**. Its task fixtures,
+validation gates, API, and UI are implemented. The shipped cabinet runners are
+offline reference agents; a real-agent benchmark campaign is still outstanding.
+
+Start with [project status and direction](docs/PROJECT-STATUS.md), then
+[domain terms](CONTEXT.md) and the [operator manual](docs/operators/agent-cabinet.md).
+Solo model tests and Multiplayer MoA tests remain separate supporting screens.
+The OpenRouter Usage Board is a separate source of hosted-model context. Hardware
+benchmarks remain available as legacy reference data.
 
 ## Architecture
 
@@ -81,13 +90,17 @@ npm run dev                                  # http://localhost:5173 (proxies to
 ```
 
 `create_all` creates new schemas but does not alter existing tables. Upgrade an
-existing database for Arcade manual task metadata and its canonical format rate
-before starting the updated backend. For the documented Docker database on host
-port 5438:
+existing database using the committed migrations before starting the updated
+backend. Back up the target database first. For the documented Docker database
+on host port 5438, apply them in filename order:
 
 ```bash
 PGPASSWORD=minibench psql -h localhost -p 5438 -U minibench -d minibench \
   -f backend/migrations/20260720_01_agent_task_arcade_fields.sql
+PGPASSWORD=minibench psql -h localhost -p 5438 -U minibench -d minibench \
+  -f backend/migrations/20260828_01_agent_cabinet.sql
+PGPASSWORD=minibench psql -h localhost -p 5438 -U minibench -d minibench \
+  -f backend/migrations/20260904_01_legacy_provenance.sql
 ```
 
 ## CLI
@@ -113,7 +126,7 @@ minibench run --no-lookup        # disable the lookup entirely
 
 Set the API target with `MINIBENCH_API_URL` (default `http://localhost:3070`).
 
-## Key metrics
+## Legacy hardware metrics
 
 - **Hardware Efficiency Index (HEI)** = `(tokens/sec × model_quality) / price` — value per dollar.
 - **Memory Bandwidth** — color-coded everywhere: `<50` red, `50–100` amber, `100–200` green, `200+` gold.
@@ -127,6 +140,8 @@ Set the API target with `MINIBENCH_API_URL` (default `http://localhost:3070`).
 | `/models` | Model capability leaderboard — heatmap category cells, equal-weight composite, CI bars, capability-vs-cost frontier |
 | `/agents` | Agent/MoA config leaderboard (published `agentbench` runs) |
 | `/agents/runs/:runId` | Single published run detail (per-task results) |
+| `/agent-cabinet` | Real-Work Agent Cabinet: valid published runs, unranked and newest-first |
+| `/agent-cabinet/runs/:runId` | Agent completion, category breakdown, cost, latency, and Technician receipts |
 | `/methodology` | How the numbers are made — graders, dual scoring, CIs, contamination defenses |
 | `/benchmarks/:id` | Single-benchmark detail (full hardware/software/performance breakdown) |
 | `/compare` | Side-by-side comparison of two benchmarks |
@@ -148,6 +163,10 @@ Set the API target with `MINIBENCH_API_URL` (default `http://localhost:3070`).
 | GET | `/api/v1/compare?a={id}&b={id}` | Side-by-side comparison |
 | GET | `/api/v1/stats` | Aggregate stats |
 | GET | `/api/v1/models` | Model quality table |
+| POST | `/api/v1/agent-cabinet/runs` | Ingest a genuine agent-run artifact after publication gates pass |
+| GET | `/api/v1/agent-cabinet/runs` | Valid agent runs, deduplicated only within exact comparison identities |
+| GET | `/api/v1/agent-cabinet/runs/{run_id}` | Agent run details and provenance |
+| GET | `/api/v1/agent-cabinet/compare?a={id}&b={id}` | Pairwise comparison; incompatible runs return 409 |
 | GET | `/api/v1/openrouter/board` | Cached OpenRouter Usage Board snapshot (no live hop, no recommend) |
 | GET | `/api/v1/openrouter/compare/best-by-cost` | Snapshot rows cheapest-first |
 | GET | `/api/v1/openrouter/compare/best-by-task?task=` | Snapshot rows by task share |
@@ -194,9 +213,24 @@ cd backend && pip install -r requirements-dev.txt && pytest
 # CLI
 cd cli && pip install -e . && pip install pytest && pytest
 
+# Agent/model evaluation (offline)
+cd agentbench && pip install -r requirements-dev.txt && pytest -q
+
 # Frontend
-cd frontend && npm run lint && npm run build
+cd frontend && npm run lint && npm test && npm run build
 ```
+
+Run each component command from the repository root in its own shell. For the
+Agent Cabinet lifecycle smoke, also run from the root:
+
+```bash
+python -m agentbench.agent_tasks --manifest agentbench/tasks/minibench-agent-v1-offline.json \
+  --trials 2 --out /tmp/minibench-agent-smoke.json
+```
+
+Dry runs are test evidence only. Both the runner's `--publish` path and the
+artifact importer refuse dry-run model/MoA results. Agent Cabinet publication
+has its own stricter validation gates.
 
 The backend suite spins up an isolated `minibench_test` database and resets its
 schema per test. Override connection details with `MINIBENCH_TEST_PG_HOST` /
@@ -204,9 +238,11 @@ schema per test. Override connection details with `MINIBENCH_TEST_PG_HOST` /
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs three jobs on every push and
-pull request: backend tests (against a Postgres service), CLI tests, and the
-frontend lint + production build.
+GitHub Actions (`.github/workflows/ci.yml`) runs four jobs on pushes to `main`
+and pull requests: backend tests against Postgres, agentbench tests and offline
+smokes, CLI tests, and frontend lint, tests, and production build.
+The separate Usage Board workflow can succeed on fixtures with no API key;
+green status alone does not prove a live poll or a deployed snapshot.
 
 ## License
 

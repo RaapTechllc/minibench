@@ -50,7 +50,7 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title="MiniBench API",
     version="1.0.0",
-    description="Crowdsourced LLM benchmarks for Mini PCs",
+    description="AI model and agent benchmark evidence, with legacy hardware reference data",
     lifespan=lifespan,
 )
 app.state.limiter = limiter
