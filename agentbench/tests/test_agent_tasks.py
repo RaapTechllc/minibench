@@ -18,6 +18,7 @@ from agentbench.agent_tasks import (
     run_agent_trial,
     write_agent_artifact,
     build_agent_artifact,
+    _valid_agent_result,
 )
 from agentbench.run import TrialResult, summarize
 
@@ -280,6 +281,37 @@ def test_adapter_budget_guard_rejects_usage_before_it_is_consumed(usage):
     assert guard.turns == 0
     assert guard.tokens == 0
     assert guard.cost_usd == 0.0
+
+
+@pytest.mark.parametrize("cost", [float("nan"), float("inf"), float("-inf"), 10**400])
+def test_budget_and_result_reject_nonfinite_or_unrepresentable_costs(cost):
+    raw = {"max_turns": 1, "wall_time_seconds": 5, "max_tokens": 100, "max_cost_usd": cost}
+    with pytest.raises(ValueError, match="max_cost_usd"):
+        AgentBudget.from_dict(raw)
+    assert not _valid_agent_result(AgentResult("completed", cost_usd=cost))
+    guard = AgentBudgetGuard(AgentBudget(1, 5, 100, 1.0))
+    with pytest.raises(ValueError):
+        guard.consume(cost_usd=cost)
+    assert guard.cost_usd == 0.0
+
+
+@pytest.mark.parametrize("field", ["turns", "tokens", "cost_usd"])
+@pytest.mark.parametrize("value", [True, -1, "1", None, float("nan"), float("inf"), float("-inf")])
+def test_budget_guard_rejects_invalid_usage_atomically(field, value):
+    guard = AgentBudgetGuard(AgentBudget(10, 5, 100, 1.0))
+    guard.consume(turns=1, tokens=2, cost_usd=0.25)
+    usage = {"turns": 1, "tokens": 2, "cost_usd": 0.25, field: value}
+    with pytest.raises(ValueError):
+        guard.consume(**usage)
+    assert (guard.turns, guard.tokens, guard.cost_usd) == (1, 2, 0.25)
+
+
+@pytest.mark.parametrize("field", ["turns", "tokens"])
+def test_budget_guard_rejects_fractional_counts(field):
+    guard = AgentBudgetGuard(AgentBudget(10, 5, 100, 1.0))
+    with pytest.raises(ValueError):
+        guard.consume(**{field: 0.5})
+    assert (guard.turns, guard.tokens, guard.cost_usd) == (0, 0, 0.0)
 
 
 def test_preparation_failure_is_explicit_and_leaves_no_workspace(tmp_path):

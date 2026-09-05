@@ -11,6 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError, DataError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent_cabinet_present import (
@@ -159,22 +160,29 @@ async def submit_agent_cabinet_run(
         publication_receipt=receipt,
     )
     db.add(run)
-    await db.flush()
+    try:
+        await db.flush()
 
-    for trial in trials:
-        db.add(
-            AgentCabinetTaskResult(
-                run_id=run.run_id,
-                task_id=trial.get("task_id") or "",
-                category=trial.get("category"),
-                trial=trial.get("trial"),
-                passed=bool(trial.get("passed")),
-                outcome=trial.get("outcome"),
-                trial_payload=trial,
+        for trial in trials:
+            db.add(
+                AgentCabinetTaskResult(
+                    run_id=run.run_id,
+                    task_id=trial.get("task_id") or "",
+                    category=trial.get("category"),
+                    trial=trial.get("trial"),
+                    passed=bool(trial.get("passed")),
+                    outcome=trial.get("outcome"),
+                    trial_payload=trial,
+                )
             )
-        )
 
-    await db.commit()
+        await db.commit()
+    except DBAPIError as exc:
+        # asyncpg wraps PostgreSQL truncation/range errors as DBAPIError.
+        if not isinstance(exc, DataError) and getattr(exc.orig, "sqlstate", None) not in ("22001", "22003"):
+            raise
+        await db.rollback()
+        raise HTTPException(status_code=422, detail="Artifact values exceed storage limits") from exc
     await db.refresh(run)
     return detail_view(_row_dict(run))
 

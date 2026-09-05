@@ -11,6 +11,7 @@ import hashlib
 import json
 import multiprocessing
 import shutil
+import sys
 import tempfile
 import time
 from dataclasses import asdict, dataclass
@@ -62,9 +63,9 @@ class AgentBudget:
         if (
             not isinstance(max_cost_usd, (int, float))
             or isinstance(max_cost_usd, bool)
-            or max_cost_usd < 0
+            or not 0 <= max_cost_usd <= sys.float_info.max
         ):
-            raise ValueError("budget.max_cost_usd must be a non-negative number")
+            raise ValueError("budget.max_cost_usd must be a finite non-negative number")
         return cls(max_turns, wall_time_seconds, max_tokens, float(max_cost_usd))
 
 
@@ -212,8 +213,14 @@ class AgentBudgetGuard:
         return self._budget.max_cost_usd
 
     def consume(self, *, turns: int = 0, tokens: int = 0, cost_usd: float = 0.0) -> None:
-        if turns < 0 or tokens < 0 or cost_usd < 0:
-            raise ValueError("resource usage increments must be non-negative")
+        if any(not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in (turns, tokens)):
+            raise ValueError("turn and token increments must be non-negative integers")
+        if (
+            not isinstance(cost_usd, (int, float))
+            or isinstance(cost_usd, bool)
+            or not 0 <= cost_usd <= sys.float_info.max
+        ):
+            raise ValueError("cost increment must be a finite non-negative number")
         if self.turns + turns > self.max_turns:
             raise TimeoutError("turn budget exceeded")
         if self.tokens + tokens > self.max_tokens:
@@ -452,7 +459,7 @@ def _valid_agent_result(result: Any) -> bool:
     return result.cost_usd is None or (
         isinstance(result.cost_usd, (int, float))
         and not isinstance(result.cost_usd, bool)
-        and result.cost_usd >= 0
+        and 0 <= result.cost_usd <= sys.float_info.max
     )
 
 

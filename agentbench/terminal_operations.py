@@ -526,13 +526,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run offline terminal-operation smoke tasks")
     parser.add_argument("--manifest", action="append", required=True)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--require-runtime", action="store_true", help="Fail instead of skipping when Docker or the fixture image is unavailable")
     args = parser.parse_args(argv)
     manifests = [load_terminal_manifest(path) for path in args.manifest]
     for manifest in manifests:
         reason = runtime_skip_reason(image=manifest.container.image)
         if reason:
-            print(f"SKIP: {reason}")
-            return 0
+            print(f"{'ERROR' if args.require_runtime else 'SKIP'}: {reason}")
+            return 1 if args.require_runtime else 0
     trials = []
     for number, manifest in enumerate(manifests, 1):
         trials.append(
