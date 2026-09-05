@@ -2,6 +2,11 @@
 
 Canonical terms for the benchmark product. Use these words consistently in code, UI copy, specs, and ADRs.
 
+Current engineering priority and delivery status live in
+[docs/PROJECT-STATUS.md](docs/PROJECT-STATUS.md). The Real-Work Agent Cabinet is
+the active workstream. Older Solo-homepage and Usage-Board-headline language
+describes those individual product surfaces, not a replacement project mission.
+
 ## Audience
 
 | Term | Meaning |
@@ -17,7 +22,7 @@ Canonical terms for the benchmark product. Use these words consistently in code,
 | **Score** | Raw pass rate (0–100) on the active cabinet. Shown **beside** the tier, e.g. `High Score · 68`. |
 | **Category** | One of four frontend columns. Maps from backend grader categories (see table below). |
 | **Cabinet** | A benchmark suite exposed as a leaderboard board. Not the same as a software "component". |
-| **Solo Cabinet** | `/models` — single-model, pinned decoding. Homepage product. |
+| **Solo Cabinet** | `/models` — single-model, pinned decoding. Fast capability screening. |
 | **Multiplayer Cabinet** | `/agents` — MoA / multi-agent configs. Adds **$/quarter** (cost per task). |
 | **Real-Work Agent Cabinet** | Distinct board for published agent-harness runs (`/api/v1/agent-cabinet`). Completion, category completion, cost, and latency — never mixed with Solo or Multiplayer scores and never folded into a composite. |
 | **Arcade manual** | Default drill-down: scenario badges, plain-English task names, pass/fail by category. |
@@ -46,7 +51,7 @@ Canonical terms for the benchmark product. Use these words consistently in code,
 
 | Term | Meaning |
 |------|---------|
-| **Hard Cabinet (Season 1)** | Default homepage board today. Suite: `minibench-hard-v1`. |
+| **Hard Cabinet (Season 1)** | Default Solo board. Suite: `minibench-hard-v1`. |
 | **Season 2** | Auto-promoted board when Season 1 saturates. Suite: `minibench-v2`. |
 | **Classic Cabinet** | Regression view. Suite: `minibench-core-v1`. Not the vibe-coder front door. |
 | **Season rotation** | New cabinet + holdout refresh when models clear the old board. |
@@ -64,11 +69,14 @@ Canonical terms for the benchmark product. Use these words consistently in code,
 
 ## OpenRouter Usage Board (Mode A)
 
-A daily-fresh **republisher** of OpenRouter's public Data API. Not a Mini PC hardware board, not an Arena clone, not a live inference proxy.
+A cached republisher of OpenRouter's Data API with a daily polling workflow.
+Freshness depends on a successful live poll and installing its snapshot where
+the API reads it. Missing credentials or a missing snapshot produce an explicitly
+labelled fixture. This is separate from MiniBench's measured cabinet results.
 
 | Term | Meaning |
 |------|---------|
-| **Usage Board** | Joined view of usage, price, official eval, and task share for OpenRouter models. Headline product for "what should I call today?" |
+| **Usage Board** | Separate hosted-model context: usage, price, official eval, and task share, with citations and fixture/live status. |
 | **Mode A** | GET-only poll of documented Data API paths. No `/chat/completions`, no `/analytics`, no live agentbench runs. |
 | **Mode B** | Hermes / paid live bench. **Parked.** Do not start. |
 | **as_of** | Timestamp from OpenRouter response `meta.as_of` (or the poll's cited equivalent). Every published number carries it. |

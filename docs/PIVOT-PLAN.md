@@ -1,5 +1,8 @@
 # MiniBench Pivot — Capability-First "Minibenchmarks" + Master Model Catalog
 
+> Historical plan implemented through PR #17. The original sign-off language
+> below is retained as history. See [current project status](PROJECT-STATUS.md).
+
 **Date:** 2026-07-06 · **Status:** proposed (this doc is deliverable 1, for sign-off)
 **Source brief:** the `/goal` pivot directive; guardrails inherited verbatim from
 `benchmarks/AGENT-BENCH-BRIEF.md` §"Rigor guardrails".

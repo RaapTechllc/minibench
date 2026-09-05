@@ -1,4 +1,8 @@
 # MiniBench — Technical Specification Document
+
+> Historical March 2026 hardware specification. Current product scope and
+> evidence are in [project status](docs/PROJECT-STATUS.md).
+
 **Version:** 1.0
 **Date:** 2026-03-29
 **Author:** Maxx (for Kyle Raap / RaapTech LLC)

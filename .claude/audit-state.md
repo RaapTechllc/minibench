@@ -1,5 +1,8 @@
 # MiniBench audit state
 
+This is a historical environment snapshot. Current direction and dated CI
+evidence are in [project status](../docs/PROJECT-STATUS.md).
+
 Baseline captured 2026-07-28:
 
 | Gate | Exact command | Result |

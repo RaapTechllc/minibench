@@ -1,5 +1,9 @@
 # ADR 0001: Arcade Scorecard Vision
 
+Scope clarification, September 4: these presentation rules apply to Solo and
+Multiplayer. The original homepage priority below is historical. See
+[project status](../PROJECT-STATUS.md) for the active Agent Cabinet workstream.
+
 **Status:** accepted  
 **Date:** 2026-07-09  
 **Context:** Grilling session (grill-with-docs) — benchmark product direction
