@@ -12,6 +12,7 @@ from agentbench.terminal_operations import (
     GoldTerminalAgent,
     DockerTerminalEnvironment,
     load_terminal_manifest,
+    main,
     runtime_skip_reason,
     TerminalTaskManifest,
     TerminalProcedureAgent,
@@ -340,6 +341,20 @@ def test_runtime_skip_reason_is_explicit_when_docker_daemon_is_unavailable():
     reason = runtime_skip_reason(unavailable)
 
     assert reason == "Docker runtime unavailable: daemon unavailable"
+
+
+@pytest.mark.parametrize("required", [False, True])
+@pytest.mark.parametrize("reason", ["Docker runtime unavailable: daemon unavailable", "Fixture image unavailable"])
+def test_cli_runtime_requirement(monkeypatch, tmp_path, capsys, required, reason):
+    monkeypatch.setattr("agentbench.terminal_operations.runtime_skip_reason", lambda **kwargs: reason)
+    destination = tmp_path / "smoke.json"
+    args = ["--manifest", str(HTTP_MANIFEST), "--out", str(destination)]
+    if required:
+        args.append("--require-runtime")
+
+    assert main(args) == (1 if required else 0)
+    assert capsys.readouterr().out == f"{'ERROR' if required else 'SKIP'}: {reason}\n"
+    assert not destination.exists()
 
 
 @pytest.mark.parametrize("path", MANIFESTS, ids=lambda path: path.stem)

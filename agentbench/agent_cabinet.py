@@ -396,10 +396,12 @@ def apply_agent_cabinet_to_artifact(
 def is_agent_cabinet_artifact(data: Any) -> bool:
     if not isinstance(data, dict):
         return False
-    evaluation = (data.get("summary") or {}).get("evaluation_type")
-    if evaluation in AGENT_EVALUATION_TYPES:
+    summary = data.get("summary")
+    provenance = data.get("provenance")
+    evaluation = summary.get("evaluation_type") if isinstance(summary, dict) else None
+    if isinstance(evaluation, str) and evaluation in AGENT_EVALUATION_TYPES:
         return True
-    return (data.get("provenance") or {}).get("policy_version") == AGENT_CABINET_POLICY
+    return isinstance(provenance, dict) and provenance.get("policy_version") == AGENT_CABINET_POLICY
 
 
 def _comparability_value(artifact: dict[str, Any], field: str) -> Any:
@@ -511,16 +513,31 @@ def _has_canary_flags(artifact: dict[str, Any]) -> bool:
 def _has_incomplete_disposal(artifact: dict[str, Any]) -> bool:
     for trial in artifact.get("trials") or []:
         row = _trial_mapping(trial)
-        if row.get("workspace_disposed") is False:
+        if row.get("workspace_disposed") is not True:
             return True
     return False
 
 
+def _nonnegative_number(value: Any, maximum: float = math.inf) -> bool:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        return math.isfinite(float(value)) and 0 <= value <= maximum
+    except OverflowError:
+        return False
+
+
+def _valid_budget_numbers(value: Any) -> bool:
+    # Self-review records separate first_attempt and correction budgets.
+    if isinstance(value, dict):
+        return all(_valid_budget_numbers(item) for item in value.values())
+    return _nonnegative_number(value)
+
+
 def _same_number(claimed: Any, expected: float | int) -> bool:
     return (
-        isinstance(claimed, (int, float))
-        and not isinstance(claimed, bool)
-        and math.isfinite(float(claimed))
+        _nonnegative_number(claimed)
+        and _nonnegative_number(expected)
         and math.isclose(float(claimed), float(expected), rel_tol=0.0, abs_tol=1e-9)
     )
 
@@ -620,9 +637,7 @@ def _summary_trials_mismatch(artifact: dict[str, Any]) -> bool:
 
     costs = [trial.get("cost_usd") for trial in scored if trial.get("cost_usd") is not None]
     if any(
-        not isinstance(cost, (int, float))
-        or isinstance(cost, bool)
-        or not math.isfinite(float(cost))
+        not _nonnegative_number(cost)
         for cost in costs
     ):
         return True
@@ -650,9 +665,7 @@ def _summary_trials_mismatch(artifact: dict[str, Any]) -> bool:
         if field not in summary:
             continue
         if any(
-            not isinstance(value, (int, float))
-            or isinstance(value, bool)
-            or not math.isfinite(float(value))
+            not _nonnegative_number(value, 2147483647)
             for value in latencies
         ):
             return True
@@ -674,6 +687,16 @@ def _self_check_is_invalid(artifact: dict[str, Any]) -> bool:
 
 def publication_receipt(artifact: dict[str, Any]) -> dict[str, Any]:
     """Is this individual Agent Cabinet result trustworthy enough to publish?"""
+    # Validate JSON at the shared boundary before helpers or database adapters
+    # interpret its values. Keep the existing refusal vocabulary for callers.
+    malformed = _malformed_publication_fields(artifact)
+    if malformed:
+        return {
+            "policy_version": AGENT_CABINET_POLICY,
+            "publishable": False,
+            "failing_fields": malformed,
+            "reasons": [PUBLISH_REFUSE_SUMMARY_TRIALS_MISMATCH],
+        }
     provenance = artifact.get("provenance") or {}
     failing_fields: list[str] = []
     reasons: list[str] = []
@@ -717,3 +740,59 @@ def publication_receipt(artifact: dict[str, Any]) -> dict[str, Any]:
         "failing_fields": failing_fields,
         "reasons": reasons,
     }
+
+
+def _malformed_publication_fields(artifact: Any) -> list[str]:
+    if not isinstance(artifact, dict):
+        return ["artifact"]
+    invalid = []
+    for key in ("provenance", "summary"):
+        if not isinstance(artifact.get(key), dict):
+            invalid.append(key)
+    trials = artifact.get("trials")
+    if not isinstance(trials, list) or any(not isinstance(row, dict) for row in trials):
+        invalid.append("trials")
+    if invalid:
+        return invalid
+    provenance = artifact["provenance"]
+    for key in REQUIRED_PROVENANCE_KEYS:
+        value = provenance.get(key)
+        if value is None:  # The missing-provenance gate names absent keys.
+            continue
+        if key == "private_split":
+            valid = isinstance(value, bool)
+        elif key == "tool_contract":
+            valid = isinstance(value, list) and all(isinstance(item, str) for item in value)
+        elif key == "budgets":
+            valid = isinstance(value, dict) and _valid_budget_numbers(value)
+        else:
+            valid = isinstance(value, str)
+        if not valid:
+            invalid.append(key)
+    for key in ("n_infra_errors", "n_canary_flags"):
+        value = artifact["summary"].get(key, 0)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            invalid.append(key)
+    for source in (provenance, artifact["summary"]):
+        value = source.get("self_check")
+        if value is not None and not isinstance(value, (str, bool)):
+            invalid.append("self_check")
+    # These values are persisted as Numeric(10, 6) and a PostgreSQL Integer.
+    for key, maximum in (("cost_usd_per_task", 9999.999999), ("latency_p50_ms", 2147483647)):
+        value = artifact["summary"].get(key)
+        if value is not None and not _nonnegative_number(value, maximum):
+            invalid.append(key)
+    for row in trials:
+        trial_id = row.get("trial")
+        if not isinstance(trial_id, int) or isinstance(trial_id, bool) or not 1 <= trial_id <= 2147483647:
+            invalid.append("trial")
+        for key, maximum in (("cost_usd", math.inf), ("wall_time_ms", 2147483647), ("latency_ms", 2147483647)):
+            value = row.get(key)
+            if value is not None and not _nonnegative_number(value, maximum):
+                invalid.append(key)
+        for key in ("category", "outcome", "termination_reason"):
+            if row.get(key) is not None and not isinstance(row[key], str):
+                invalid.append(key)
+        if not isinstance(row.get("passed"), bool):
+            invalid.append("passed")
+    return list(dict.fromkeys(invalid))

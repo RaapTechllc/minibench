@@ -77,6 +77,45 @@ def _importable(artifact: dict) -> dict:
     return copy
 
 
+@pytest.mark.parametrize("field,value", [
+    ("summary", ["bad"]), ("provenance", ["bad"]),
+    ("trials", "bad"), ("trials", [None]),
+    ("summary.n_infra_errors", "0"), ("summary.n_canary_flags", []),
+    ("provenance.model_route", ["bad"]), ("provenance.private_split", "false"),
+    ("provenance.self_check", []),
+    ("provenance.budgets.max_cost_usd", 10**400),
+    ("summary.pass_rate", 10**400),
+    ("summary.cost_usd_per_task", 10000),
+    ("summary.latency_p50_ms", 2147483648),
+    ("trials.0.trial", 10**100), ("trials.0.trial", -1),
+    ("trials.0.cost_usd", -1), ("trials.0.cost_usd", float("inf")),
+    ("trials.0.wall_time_ms", -1), ("trials.0.wall_time_ms", 10**400),
+])
+def test_publication_refuses_malformed_json_without_raising(tmp_path, field, value):
+    _, _, artifact = _offline_artifact(tmp_path)
+    artifact = _publishable(artifact)
+    keys = field.split(".")
+    target = artifact
+    for key in keys[:-1]:
+        target = target[int(key)] if isinstance(target, list) else target[key]
+    target[keys[-1]] = value
+    if field == "trials.0.cost_usd" and value == -1:
+        artifact["summary"].update(cost_usd_total=-1, cost_usd_per_task=-1)
+    is_agent_cabinet_artifact(artifact)
+    assert publication_receipt(artifact)["publishable"] is False
+
+
+@pytest.mark.parametrize("value", [None, "false", 1])
+def test_publication_requires_explicit_disposal_evidence(tmp_path, value):
+    _, _, artifact = _offline_artifact(tmp_path)
+    artifact = _publishable(artifact)
+    if value is None:
+        artifact["trials"][0].pop("workspace_disposed")
+    else:
+        artifact["trials"][0]["workspace_disposed"] = value
+    assert PUBLISH_REFUSE_INCOMPLETE_DISPOSAL in publication_receipt(artifact)["reasons"]
+
+
 def test_policy_constant_and_required_key_set():
     assert AGENT_CABINET_POLICY == "agent-cabinet-gates-v1"
     assert REQUIRED_PROVENANCE_KEYS == (

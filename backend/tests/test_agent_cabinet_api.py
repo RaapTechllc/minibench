@@ -149,6 +149,60 @@ def _post(client, artifact):
     return client.post("/api/v1/agent-cabinet/runs", json=artifact)
 
 
+@pytest.mark.parametrize("field,value", [
+    ("summary", ["bad"]), ("provenance", ["bad"]),
+    ("trials", "bad"), ("trials", [None]),
+    ("summary.n_infra_errors", "0"), ("summary.n_canary_flags", []),
+    ("provenance.model_route", ["bad"]), ("provenance.private_split", "false"),
+    ("provenance.self_check", []), ("disposal", None), ("disposal", "false"),
+    ("provenance.budgets.max_cost_usd", 10**400),
+    ("summary.pass_rate", 10**400),
+    ("summary.cost_usd_per_task", 10000),
+    ("summary.latency_p50_ms", 2147483648),
+    ("trials.0.trial", 10**100), ("trials.0.trial", -1),
+    ("trials.0.cost_usd", -1),
+    ("trials.0.wall_time_ms", -1), ("trials.0.wall_time_ms", 10**400),
+])
+def test_malformed_publication_is_422_and_leaves_board_usable(client, field, value):
+    artifact = _artifact()
+    if field == "disposal":
+        for row in artifact["trials"]:
+            row.pop("workspace_disposed")
+            if value is not None:
+                row["workspace_disposed"] = value
+    else:
+        keys = field.split(".")
+        target = artifact
+        for key in keys[:-1]:
+            target = target[int(key)] if isinstance(target, list) else target[key]
+        target[keys[-1]] = value
+        if field == "trials.0.cost_usd" and value == -1:
+            artifact["trials"][1]["cost_usd"] = -1
+            artifact["summary"].update(cost_usd_total=-2, cost_usd_per_task=-2)
+    response = _post(client, artifact)
+    assert response.status_code == 422
+    assert response.json()["detail"]["publishable"] is False
+    assert _table_count("agent_cabinet_runs") == 0
+    board = client.get("/api/v1/agent-cabinet/runs")
+    assert board.status_code == 200
+    assert board.json() == []
+
+
+@pytest.mark.parametrize("field", ["model_route", "category"])
+def test_storage_limit_failure_rolls_back_entire_artifact(client, field):
+    artifact = _artifact()
+    target = artifact["provenance"] if field == "model_route" else artifact["trials"][0]
+    target[field] = "x" * 257
+    response = _post(client, artifact)
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Artifact values exceed storage limits"
+    assert _table_count("agent_cabinet_runs") == 0
+    assert _table_count("agent_cabinet_task_results") == 0
+    board = client.get("/api/v1/agent-cabinet/runs")
+    assert board.status_code == 200
+    assert board.json() == []
+
+
 def _set_completion(artifact: dict, n_pass: int, n_total: int) -> dict:
     """Rebuild trials so the claimed summary is actually derivable from them —
     the publication gate refuses summaries that do not match their trials."""
