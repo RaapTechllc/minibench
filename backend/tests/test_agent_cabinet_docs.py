@@ -8,6 +8,7 @@ from pathlib import Path
 from agentbench.agent_cabinet import (
     PUBLICATION_REFUSE_REASONS,
     REQUIRED_PROVENANCE_KEYS,
+    product_receipt,
     publication_receipt,
 )
 from app.agent_cabinet_present import default_view, detail_view, technician_view
@@ -32,6 +33,7 @@ def test_a8_operator_manual_covers_required_topics():
         "## Budget checks",
         "## Private-split handling",
         "## Dry runs",
+        "## Genuine dogfood",
         "## Comparison",
         "## Publication gates",
     ):
@@ -48,6 +50,8 @@ def test_a8_operator_manual_covers_required_topics():
         assert reason in text
     assert "--allow-infra" in text
     assert "no `--allow-infra`" in text or "There is **no**" in text
+    assert "python -m agentbench.agent_eval" in text
+    assert "injected-transport" in text
     readme = (REPO / "agentbench" / "README.md").read_text(encoding="utf-8")
     assert "docs/operators/agent-cabinet.md" in readme
     glossary = (REPO / "CONTEXT.md").read_text(encoding="utf-8")
@@ -87,3 +91,7 @@ def test_a8_docs_example_is_publishable_and_presents():
     assert detail["technician"] is tech or detail["technician"] == tech
     assert "held_constant" in detail
     assert "changed_variables" in detail
+    receipt = product_receipt(artifact)
+    assert receipt["scorecard"]["completion"] == default["completion"]
+    assert receipt["scorecard"]["category_completion"] == default["category_completion"]
+    assert receipt["published"] is False

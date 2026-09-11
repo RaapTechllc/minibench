@@ -73,6 +73,26 @@ jobs:
           missing = [key for key in REQUIRED_PROVENANCE_KEYS if key not in (artifact.get('provenance') or {})]
           assert not missing, missing
           "
+      - name: Agent Cabinet genuine-path dogfood (injected transport)
+        run: |
+          python -m agentbench.agent_eval \
+            --manifest agentbench/tasks/minibench-agent-v1-dogfood.json \
+            --agent model \
+            --scripted-reply-file agentbench/tasks/dogfood-scripted-reply.json \
+            --trials 2 \
+            --out /tmp/minibench-agent-eval.json \
+            --receipt-out /tmp/minibench-agent-eval-receipt.json
+          python -c "
+          import json
+          artifact = json.load(open('/tmp/minibench-agent-eval.json', encoding='utf-8'))
+          receipt = json.load(open('/tmp/minibench-agent-eval-receipt.json', encoding='utf-8'))
+          assert artifact['dry_run'] is True, artifact.get('dry_run')
+          assert artifact['provenance']['evaluation_class'] == 'injected-transport'
+          assert receipt['published'] is False
+          assert receipt['publication']['publishable'] is False
+          assert 'dry_run' in receipt['publication']['reasons']
+          assert receipt['scorecard']['completion'] == 100.0
+          "
       - name: Terminal-operation isolation smoke
         run: |
           docker pull busybox@sha256:3c6ae8008e2c2eedd141725c30b20d9c36b026eb796688f88205845ef17aa213

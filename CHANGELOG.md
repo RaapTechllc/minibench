@@ -6,6 +6,12 @@ All notable changes to MiniBench are documented here. Format based on
 ## [Unreleased]
 
 ### Added
+- **Agent Cabinet genuine-path dogfood** — `python -m agentbench.agent_eval`
+  reuses `AgentAdapter`, `run_agent_trial`, and `OpenAICompatClient` to write a
+  local product receipt (`scorecard` + `publication_receipt`). Scripted
+  transports are labeled `injected-transport` and stay `dry_run: true`. Paid
+  OpenRouter / Ollama Cloud calls are refused. See
+  `docs/validation/agent-eval-reuse-preflight.md`.
 - **Offline results importer** — `python -m agentbench.import_results` replays
   committed `agentbench/results/*.json` artifacts to `POST /api/v1/agents/runs`
   with no provider key, applying the same honesty gates as the live publish

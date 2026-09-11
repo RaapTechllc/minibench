@@ -38,7 +38,8 @@ not imply that a full product redesign has shipped.
 | Area | Repository evidence | Remaining limit |
 |---|---|---|
 | Agent task lifecycle | Offline prepare/execute/verify/dispose contract and CI smoke | A lifecycle smoke is not a model evaluation. |
-| Task families | Generated repository repair, feature implementation, SQL repair, terminal operations, and self-review | Shipped CLIs use deterministic fake/gold reference agents. |
+| Genuine-path dogfood | `python -m agentbench.agent_eval` reuses `AgentAdapter` + `OpenAICompatClient` and writes a local product receipt | Scripted transport is `injected-transport` / `dry_run: true`. Live-local needs Ollama. Paid providers are refused. |
+| Task families | Generated repository repair, feature implementation, SQL repair, terminal operations, and self-review | Family CLIs still use deterministic fake/gold reference agents. |
 | Trust gates | Provenance, budget/disposal checks, recomputed statistics, publication and exact comparability receipts | These validate artifact structure and consistency, not the authenticity of an arbitrary submitter. |
 | Product/API | Agent Cabinet list/detail/compare endpoints, frontend and Technician mode, operator manual | No verified deployed real-agent campaign was established by this audit. |
 | Solo/MoA | Runners, executable graders, committed result artifacts and importer | Historical runs must retain their suite, dates and provider provenance. |
@@ -49,13 +50,12 @@ passed all four jobs. The [September 4 Usage Board run](https://github.com/RaapT
 explicitly logged `No OPENROUTER_API_KEY; fixture path only (not live).`
 Neither run is evidence of production deployment or real Agent Cabinet results.
 
-The next product milestone is **one genuine, reproducible agent evaluation from
-execution through the product receipt**. Before specifying a new adapter or
-runner, run the RaapTech technical reuse preflight against the current adapter
-contract and available upstream implementations. Then choose a bounded task,
-frozen configuration and budget. Paid calls, benchmark publication and deployment
-need their own explicit authorization. Do not flip `dry_run` to manufacture a
-live result. OpenRouter Mode B remains parked.
+The local genuine-path receipt is documented in
+[docs/validation/agent-eval-reuse-preflight.md](validation/agent-eval-reuse-preflight.md).
+It reuses the shipped adapter contract; it does not publish and does not flip
+`dry_run` on reference artifacts. A **paid campaign, live cabinet publication,
+or production deploy** still needs its own explicit authorization. Do not
+relabel `injected-transport` as live. OpenRouter Mode B remains parked.
 
 ## Why the repository had conflicting visions
 
@@ -103,6 +103,8 @@ untracked files and Git history are backed up in the cleanup task's work folder.
 
 GitHub issues are the current backlog. [#37](https://github.com/RaapTechllc/minibench/issues/37)
 tracks the delivered Agent Cabinet API/UI/operator documentation slice.
-[#30](https://github.com/RaapTechllc/minibench/issues/30) remains the parent for
-real-agent evidence and release readiness. Old sprint files and Era 1 receipts
-describe their own dates and must not be treated as today's verification status.
+[#30](https://github.com/RaapTechllc/minibench/issues/30) is the parent PRD.
+Local genuine-path dogfood writes an inspectable receipt; a paid campaign or
+production publication is still a separate authorized task. Old sprint files
+and Era 1 receipts describe their own dates and must not be treated as today's
+verification status.

@@ -106,6 +106,19 @@ PUBLICATION_REFUSE_REASONS = (
 )
 
 AGENT_EVALUATION_TYPES = frozenset({"agent_harness", "agent_harness_self_review"})
+
+EVALUATION_CLASS_OFFLINE_REFERENCE = "offline-reference"
+EVALUATION_CLASS_INJECTED_TRANSPORT = "injected-transport"
+EVALUATION_CLASS_LIVE_LOCAL = "live-local"
+EVALUATION_CLASSES = frozenset(
+    {
+        EVALUATION_CLASS_OFFLINE_REFERENCE,
+        EVALUATION_CLASS_INJECTED_TRANSPORT,
+        EVALUATION_CLASS_LIVE_LOCAL,
+    }
+)
+PRODUCT_RECEIPT_KIND = "agent-cabinet-product-v1"
+PAID_LIVE_PROVIDERS = frozenset({"openrouter", "ollama-cloud"})
 INFRA_OUTCOMES = frozenset({"preparation_failed", "execution_failed"})
 MCNEMAR_AXIS_ONLY_CATEGORIES = frozenset({"calibration", "robustness"})
 _STRUCTURED_REGRESSION_KEYS = ("introduced_regression", "regression", "regression_failed")
@@ -346,6 +359,64 @@ def apply_reliability_fields(artifact: dict[str, Any]) -> dict[str, Any]:
     summary = artifact.setdefault("summary", {})
     summary.update(reliability_summary_fields(artifact.get("trials") or []))
     return artifact
+
+
+def honest_dry_run(evaluation_class: str) -> bool:
+    """Reference and injected transports are never live evidence."""
+    if evaluation_class not in EVALUATION_CLASSES:
+        raise ValueError(f"unknown evaluation_class: {evaluation_class}")
+    return evaluation_class != EVALUATION_CLASS_LIVE_LOCAL
+
+
+def scorecard_from_artifact(artifact: dict[str, Any]) -> dict[str, Any]:
+    """Default product scorecard (0–100 completion), matching cabinet presentation."""
+    summary = artifact.get("summary") or {}
+    trials = artifact.get("trials") or []
+    rate = summary.get("pass_rate") or 0.0
+    grouped: dict[str, list[bool]] = {}
+    for trial in trials:
+        if not isinstance(trial, dict):
+            continue
+        category = trial.get("category") or "unknown"
+        grouped.setdefault(str(category), []).append(bool(trial.get("passed")))
+    return {
+        "completion": round(float(rate) * 100.0, 2),
+        "category_completion": {
+            category: round(100.0 * sum(flags) / len(flags), 2)
+            for category, flags in grouped.items()
+        },
+        "cost_usd_per_task": summary.get("cost_usd_per_task"),
+        "latency_p50_ms": summary.get("latency_p50_ms"),
+    }
+
+
+def product_receipt(
+    artifact: dict[str, Any],
+    *,
+    artifact_path: str | None = None,
+    published: bool = False,
+) -> dict[str, Any]:
+    """Inspectable local product receipt. Does not POST or flip ``dry_run``."""
+    provenance = artifact.get("provenance") or {}
+    technician = {key: provenance.get(key) for key in REQUIRED_PROVENANCE_KEYS}
+    technician["evaluation_class"] = provenance.get("evaluation_class")
+    technician["agent_kind"] = provenance.get("agent_kind")
+    publication = publication_receipt(artifact)
+    return {
+        "receipt_kind": PRODUCT_RECEIPT_KIND,
+        "evaluation_class": provenance.get("evaluation_class"),
+        "dry_run": bool(artifact.get("dry_run")),
+        "published": published,
+        "scorecard": scorecard_from_artifact(artifact),
+        "publication": publication,
+        "technician": technician,
+        "artifact_path": artifact_path,
+        "operator_note": (
+            "Local Agent Cabinet dogfood receipt. Not production publication. "
+            "offline-reference and injected-transport stays dry_run; do not flip "
+            "the flag. Paid providers stay refused without owner authorization."
+        ),
+    }
 
 
 def apply_agent_cabinet_to_artifact(

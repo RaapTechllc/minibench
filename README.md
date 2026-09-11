@@ -4,8 +4,11 @@ MiniBench measures whether AI models and agent configurations finish useful work
 with completion, cost, latency, and reproducibility receipts kept together.
 
 The active engineering goal is the **Real-Work Agent Cabinet**. Its task fixtures,
-validation gates, API, and UI are implemented. The shipped cabinet runners are
-offline reference agents; a real-agent benchmark campaign is still outstanding.
+validation gates, API, and UI are implemented. Family CLIs remain offline
+reference agents. `python -m agentbench.agent_eval` reuses that contract to write
+a local product receipt (scripted transport is labeled `injected-transport` and
+stays `dry_run: true`). A paid or production-published campaign still needs
+explicit owner authorization.
 
 Start with [project status and direction](docs/PROJECT-STATUS.md), then
 [domain terms](CONTEXT.md) and the [operator manual](docs/operators/agent-cabinet.md).
