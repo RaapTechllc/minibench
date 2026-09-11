@@ -553,7 +553,16 @@ def run_agent_trial(
 
 
 def build_agent_artifact(
-    manifest: AgentTaskManifest, trials: list[AgentTrialResult]
+    manifest: AgentTaskManifest,
+    trials: list[AgentTrialResult],
+    *,
+    model: str = "deterministic-fake-agent",
+    provider: str = "offline",
+    harness: str = "minibench-reference",
+    harness_version: str = "1",
+    dry_run: bool = True,
+    evaluation_class: str | None = None,
+    agent_kind: str | None = None,
 ) -> dict[str, Any]:
     infra_outcomes = {"preparation_failed", "execution_failed"}
     scored = [trial for trial in trials if trial.outcome not in infra_outcomes]
@@ -568,11 +577,11 @@ def build_agent_artifact(
     effective_k = count
     artifact = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "dry_run": True,
+        "dry_run": dry_run,
         "provenance": {
-            "model": "deterministic-fake-agent",
-            "harness": "minibench-reference",
-            "harness_version": "1",
+            "model": model,
+            "harness": harness,
+            "harness_version": harness_version,
             "tool_contract": list(manifest.required_capabilities),
             "fixture_reference": manifest.fixture.reference,
             "fixture_digest": manifest.fixture.digest,
@@ -582,9 +591,9 @@ def build_agent_artifact(
         "summary": {
             "suite": manifest.suite,
             "moa_config": {
-                "name": "minibench-reference",
+                "name": harness,
                 "self_moa": False,
-                "models": ["deterministic-fake-agent"],
+                "models": [model],
             },
             "grader_version": AGENT_GRADER_VERSION,
             "decoding": {
@@ -618,10 +627,10 @@ def build_agent_artifact(
     }
     apply_agent_cabinet_to_artifact(
         artifact,
-        model="deterministic-fake-agent",
-        provider="offline",
-        harness="minibench-reference",
-        harness_version="1",
+        model=model,
+        provider=provider,
+        harness=harness,
+        harness_version=harness_version,
         tool_contract=list(manifest.required_capabilities),
         fixture_reference=manifest.fixture.reference,
         fixture_digest=manifest.fixture.digest,
@@ -637,6 +646,10 @@ def build_agent_artifact(
         private_split=manifest.private,
         public_prompt=manifest.public_prompt,
     )
+    if evaluation_class is not None:
+        artifact["provenance"]["evaluation_class"] = evaluation_class
+    if agent_kind is not None:
+        artifact["provenance"]["agent_kind"] = agent_kind
     return artifact
 
 
@@ -644,8 +657,9 @@ def write_agent_artifact(
     path: str | Path,
     manifest: AgentTaskManifest,
     trials: list[AgentTrialResult],
+    **kwargs: Any,
 ) -> dict[str, Any]:
-    artifact = build_agent_artifact(manifest, trials)
+    artifact = build_agent_artifact(manifest, trials, **kwargs)
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
@@ -666,7 +680,13 @@ def main(argv: list[str] | None = None) -> int:
         run_agent_trial(manifest, OfflineTextEnvironment(), DeterministicFakeAgent(), trial=i)
         for i in range(1, args.trials + 1)
     ]
-    artifact = write_agent_artifact(args.out, manifest, results)
+    artifact = write_agent_artifact(
+        args.out,
+        manifest,
+        results,
+        evaluation_class="offline-reference",
+        agent_kind="deterministic-fake",
+    )
     print(json.dumps(artifact["summary"], indent=2))
     return 0 if all(result.passed and result.workspace_disposed for result in results) else 1
 

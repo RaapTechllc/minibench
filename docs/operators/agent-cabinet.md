@@ -93,8 +93,60 @@ artifacts are not leaderboard data.
 Publication tests use an **in-memory synthetic fixture** with `dry_run: false`
 to exercise the API contract. That exception is for tests only. A live publish
 requires evidence from an actual model-plus-agent run; changing the flag on a
-gold or offline artifact does not create that evidence. The shipped cabinet
-CLIs are offline reference runners, not live-agent adapters.
+gold or offline artifact does not create that evidence.
+
+The family CLIs (`agent_tasks`, `generated_repairs`, `generated_features`,
+`generated_sql_repairs`, `terminal_operations`, `self_review`) remain offline
+reference runners. The dogfood CLI below reuses the same contract with a model
+adapter; scripted transports stay `dry_run: true`.
+
+## Genuine dogfood
+
+Reuse preflight: [docs/validation/agent-eval-reuse-preflight.md](../validation/agent-eval-reuse-preflight.md).
+This path implements `AgentAdapter` with `OpenAICompatClient`. It does not add
+a second lifecycle or publication policy. It never POSTs to the cabinet API.
+
+Evaluation classes:
+
+| Class | Meaning | `dry_run` |
+|--------|---------|-----------|
+| `offline-reference` | Deterministic fake/gold adapter | always true |
+| `injected-transport` | Model adapter + scripted transport | always true |
+| `live-local` | Model adapter + local Ollama | false; still unpublished by this CLI |
+| paid OpenRouter / Ollama Cloud | **Refused** without owner authorization | n/a |
+
+**Injected-transport dogfood** (no secrets, proves inspect → model → edit →
+hidden verify → product receipt):
+
+```bash
+python -m agentbench.agent_eval \
+    --manifest agentbench/tasks/minibench-agent-v1-dogfood.json \
+    --agent model \
+    --scripted-reply-file agentbench/tasks/dogfood-scripted-reply.json \
+    --trials 2 \
+    --out /tmp/minibench-agent-eval.json \
+    --receipt-out /tmp/minibench-agent-eval-receipt.json
+```
+
+Inspect `/tmp/minibench-agent-eval-receipt.json`: `scorecard` (completion,
+category completion, cost, latency), `publication` (`publishable` is false
+because `dry_run` is true), and nested technician provenance. Do not flip
+`dry_run`. `python -m agentbench.import_results --check` refuses this file.
+
+**Local Ollama** (genuine live-local, still not published):
+
+```bash
+python -m agentbench.agent_eval \
+    --manifest agentbench/tasks/minibench-agent-v1-dogfood.json \
+    --agent model --provider ollama --model llama3.2:1b \
+    --trials 1 \
+    --out /tmp/minibench-agent-eval-ollama.json \
+    --receipt-out /tmp/minibench-agent-eval-ollama-receipt.json
+```
+
+Requires a running Ollama daemon. If it is missing, the CLI exits `2` with
+`BLOCKED` and writes nothing claimed live. Paid providers are refused even
+when a key is present in the environment.
 
 ## Comparison
 

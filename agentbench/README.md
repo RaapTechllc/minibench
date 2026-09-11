@@ -138,6 +138,23 @@ python -m agentbench.agent_tasks \
     --trials 2 --out /tmp/minibench-agent-smoke.json
 ```
 
+Genuine-path dogfood (same `AgentAdapter` contract + local product receipt).
+`--scripted-reply-file` is **injected-transport** and stays `dry_run: true`.
+It is not a live provider result. Paid OpenRouter / Ollama Cloud calls are
+refused. Local Ollama is optional and unpublished:
+
+```bash
+python -m agentbench.agent_eval \
+    --manifest agentbench/tasks/minibench-agent-v1-dogfood.json \
+    --agent model \
+    --scripted-reply-file agentbench/tasks/dogfood-scripted-reply.json \
+    --trials 2 \
+    --out /tmp/minibench-agent-eval.json \
+    --receipt-out /tmp/minibench-agent-eval-receipt.json
+```
+
+Reuse notes and labels: [docs/validation/agent-eval-reuse-preflight.md](../docs/validation/agent-eval-reuse-preflight.md).
+
 Terminal-operation smoke uses Docker for real CPU, memory, PID, filesystem, and
 network isolation. Pull the immutable fixture image once, then both task
 containers run with `--network none`; when Docker or the image is unavailable,
