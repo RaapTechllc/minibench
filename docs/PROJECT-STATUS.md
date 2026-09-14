@@ -108,3 +108,9 @@ Local genuine-path dogfood writes an inspectable receipt; a paid campaign or
 production publication is still a separate authorized task. Old sprint files
 and Era 1 receipts describe their own dates and must not be treated as today's
 verification status.
+
+Proposed next additive surface: the Benchmark Lens
+([research](research-agentic-benchmark-lens.md), [plan](PLAN-benchmark-lens.md),
+[ADR 0004, proposed](adr/0004-benchmark-lens.md)). It republishes cited external
+agentic benchmark claims with provenance tiers and signal flags; it is not a
+MiniBench measurement and adds no composite. Nothing from it is implemented yet.
