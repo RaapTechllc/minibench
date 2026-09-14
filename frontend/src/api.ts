@@ -1,93 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-export interface Benchmark {
-  id: number;
-  submission_id: string;
-  submitted_at: string;
-  cpu_model: string;
-  cpu_cores: number | null;
-  cpu_threads: number | null;
-  gpu_model: string | null;
-  igpu_model: string | null;
-  total_ram_gb: number;
-  vram_gb: number | null;
-  memory_type: string | null;
-  memory_bandwidth_gbs: number | null;
-  system_type: string | null;
-  hardware_price_usd: number | null;
-  os: string;
-  inference_engine: string;
-  engine_version: string | null;
-  model_name: string;
-  model_params_b: number | null;
-  quantization: string;
-  tokens_per_second: number;
-  time_to_first_token: number | null;
-  total_power_watts: number | null;
-  watts_per_token: number | null;
-  thermal_setting: string | null;
-  ambient_temp_c: number | null;
-  model_quality_score: number | null;
-  quality_source: string | null;
-  hei: number | null;
-  fingerprint: string | null;
-  test_duration_secs: number;
-  prompt_tokens: number;
-  completion_tokens: number;
-}
-
-export interface HardwareSpec {
-  id: number;
-  system_name: string;
-  cpu_model: string | null;
-  gpu_model: string | null;
-  igpu_model: string | null;
-  system_ram_gb: number | null;
-  vram_gb: number | null;
-  memory_type: string | null;
-  max_memory_gb: number | null;
-  memory_bandwidth_gbs: number | null;
-  tdp_watts: number | null;
-  msrp_usd: number | null;
-  release_year: number | null;
-  form_factor: string | null;
-}
-
-export interface ModelQuality {
-  id: number;
-  model_family: string;
-  model_variant: string;
-  params_b: number | null;
-  mmlu_score: number | null;
-  lmsys_elo: number | null;
-}
-
-export interface LeaderboardEntry {
-  rank: number;
-  id: number;
-  system_type: string | null;
-  cpu_model: string;
-  total_ram_gb: number;
-  vram_gb: number | null;
-  memory_bandwidth_gbs: number | null;
-  model_name: string;
-  quantization: string;
-  tokens_per_second: number;
-  time_to_first_token: number | null;
-  model_quality_score: number | null;
-  hardware_price_usd: number | null;
-  hei: number | null;
-}
-
-export interface Stats {
-  total_submissions: number;
-  unique_systems: number;
-  unique_models: number;
-  avg_tokens_per_second: number | null;
-  max_tokens_per_second: number | null;
-  total_hardware_specs: number;
-}
-
 export interface AgentLeaderboardEntry {
   rank: number;
   run_id: string;
@@ -226,21 +138,6 @@ export interface UsageBoardPayload {
   rows: UsageBoardRow[];
 }
 
-export interface ReferenceProfile {
-  id: number;
-  profile_key: string;
-  display_name: string;
-  description: string | null;
-  engine: string | null;
-  engine_version_min: string | null;
-  quantization: string | null;
-  context_length: number | null;
-  temperature: number | null;
-  top_p: number | null;
-  max_tokens: number | null;
-  representative_system: string | null;
-}
-
 /* ── Real-Work Agent Cabinet (/api/v1/agent-cabinet) ───────────────────────
    Distinct board for published agent-harness runs. Read-only product surface;
    these types mirror backend/app/agent_cabinet_present.py and never mix with
@@ -309,49 +206,7 @@ async function fetchJSON<T>(path: string): Promise<T> {
   return res.json();
 }
 
-async function postJSON<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    // FastAPI errors carry a `detail` — a string for HTTPException,
-    // a list of {loc, msg} for 422 validation errors.
-    let message = `API error: ${res.status}`;
-    try {
-      const data = await res.json();
-      if (typeof data.detail === 'string') {
-        message = data.detail;
-      } else if (Array.isArray(data.detail)) {
-        message = data.detail
-          .map((d: { loc?: (string | number)[]; msg: string }) =>
-            `${(d.loc ?? []).slice(1).join('.')}: ${d.msg}`)
-          .join('; ');
-      }
-    } catch { /* keep generic message */ }
-    throw new Error(message);
-  }
-  return res.json();
-}
-
 export const api = {
-  getBenchmarks: (params?: Record<string, string>) => {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-    return fetchJSON<Benchmark[]>(`/api/v1/benchmarks${qs}`);
-  },
-  getBenchmark: (id: number) => fetchJSON<Benchmark>(`/api/v1/benchmarks/${id}`),
-  submitBenchmark: (payload: unknown) => postJSON<Benchmark>('/api/v1/submit', payload),
-  getLeaderboard: (params?: Record<string, string>) => {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-    return fetchJSON<LeaderboardEntry[]>(`/api/v1/leaderboard${qs}`);
-  },
-  getHardware: () => fetchJSON<HardwareSpec[]>('/api/v1/hardware'),
-  getReferenceProfiles: () => fetchJSON<ReferenceProfile[]>('/api/v1/profiles'),
-  getCompare: (a: number, b: number) =>
-    fetchJSON<{ a: Benchmark; b: Benchmark }>(`/api/v1/compare?a=${a}&b=${b}`),
-  getStats: () => fetchJSON<Stats>('/api/v1/stats'),
-  getModels: () => fetchJSON<ModelQuality[]>('/api/v1/models'),
   getAgentLeaderboard: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return fetchJSON<AgentLeaderboardEntry[]>(`/api/v1/agents/leaderboard${qs}`);
@@ -363,11 +218,6 @@ export const api = {
   },
   getAgentRun: (runId: string) => fetchJSON<AgentRunDetail>(`/api/v1/agents/runs/${runId}`),
   getOpenRouterBoard: () => fetchJSON<UsageBoardPayload>('/api/v1/openrouter/board'),
-  getOpenRouterCompare: (by: 'cost' | 'task' | 'latency', task?: string) => {
-    const path = `/api/v1/openrouter/compare/best-by-${by}`;
-    const qs = by === 'task' && task ? `?task=${encodeURIComponent(task)}` : '';
-    return fetchJSON<UsageBoardPayload>(`${path}${qs}`);
-  },
   getAgentCabinetRuns: () => fetchJSON<AgentCabinetListItem[]>('/api/v1/agent-cabinet/runs'),
   getAgentCabinetRun: (runId: string) =>
     fetchJSON<AgentCabinetDetail>(`/api/v1/agent-cabinet/runs/${runId}`),

@@ -1,29 +1,21 @@
 import { useState } from 'react';
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Gauge, BarChart3, Database, Bot, Briefcase, Calculator, Trophy, BookOpen, Activity, Menu, X } from 'lucide-react';
-import Dashboard from './pages/Dashboard';
-import Compare from './pages/Compare';
-import Submit from './pages/Submit';
-import Hardware from './pages/Hardware';
-import LegacyLeaderboardRedirect from './pages/LegacyLeaderboardRedirect';
-import BenchmarkDetail from './pages/BenchmarkDetail';
+import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { Gauge, Bot, Briefcase, Trophy, BookOpen, Activity, Menu, X, Home as HomeIcon } from 'lucide-react';
+import Home from './pages/Home';
 import Agents from './pages/Agents';
 import AgentCabinet from './pages/AgentCabinet';
 import AgentCabinetRun from './pages/AgentCabinetRun';
 import RunDetail from './pages/RunDetail';
-import MoaCalculator from './pages/MoaCalculator';
 import Models from './pages/Models';
 import Methodology from './pages/Methodology';
 import UsageBoard from './pages/UsageBoard';
 
 const NAV = [
-  { path: '/', label: 'Overview', icon: BarChart3 },
-  { path: '/models', label: 'Models', icon: Trophy },
-  { path: '/usage/cost', label: 'Usage', icon: Activity },
-  { path: '/agents', label: 'Agents', icon: Bot },
+  { path: '/', label: 'Home', icon: HomeIcon },
   { path: '/agent-cabinet', label: 'Agent Cabinet', icon: Briefcase },
-  { path: '/moa-calculator', label: 'MoA Calculator', icon: Calculator },
-  { path: '/hardware', label: 'Test Rigs', icon: Database },
+  { path: '/models', label: 'Models', icon: Trophy },
+  { path: '/agents', label: 'Agents', icon: Bot },
+  { path: '/usage/cost', label: 'Usage', icon: Activity },
   { path: '/methodology', label: 'Methodology', icon: BookOpen },
 ];
 
@@ -33,7 +25,8 @@ function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () 
       {NAV.map(({ path, label, icon: Icon }) => {
         const active = pathname === path
           || (path === '/usage/cost' && pathname.startsWith('/usage'))
-          || (path === '/agent-cabinet' && pathname.startsWith('/agent-cabinet'));
+          || (path === '/agent-cabinet' && pathname.startsWith('/agent-cabinet'))
+          || (path === '/agents' && pathname.startsWith('/agents/'));
         return (
           <Link
             key={path}
@@ -90,29 +83,26 @@ export default function App() {
 
       <main className="mx-auto max-w-7xl px-4 py-8 lg:px-6 lg:py-10">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Home />} />
           <Route path="/models" element={<Models />} />
           <Route path="/usage" element={<UsageBoard />} />
           <Route path="/usage/cost" element={<UsageBoard />} />
           <Route path="/usage/task" element={<UsageBoard />} />
           <Route path="/usage/latency" element={<UsageBoard />} />
-          <Route path="/leaderboard" element={<LegacyLeaderboardRedirect />} />
+          {/* Inbound links from the retired Era 1 leaderboard land on the Solo Cabinet. */}
+          <Route path="/leaderboard" element={<Navigate to="/models" replace />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/agents/runs/:runId" element={<RunDetail />} />
           <Route path="/agent-cabinet" element={<AgentCabinet />} />
           <Route path="/agent-cabinet/runs/:runId" element={<AgentCabinetRun />} />
-          <Route path="/benchmarks/:id" element={<BenchmarkDetail />} />
-          <Route path="/compare" element={<Compare />} />
-          <Route path="/moa-calculator" element={<MoaCalculator />} />
-          <Route path="/hardware" element={<Hardware />} />
-          <Route path="/submit" element={<Submit />} />
           <Route path="/methodology" element={<Methodology />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
       <footer className="mx-auto max-w-7xl px-4 py-8 lg:px-6">
         <div className="border-t border-line pt-6 text-[13px] text-ink-3">
-          MiniBench by RaapTech LLC — deterministic, contamination-resistant model evaluation.
+          MiniBench by RaapTech LLC — cited, contamination-resistant model evaluation. No composite scores.
         </div>
       </footer>
     </div>
