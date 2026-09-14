@@ -22,7 +22,7 @@ cd frontend && npm run lint && npm test && npm run build
 python -m agentbench.run --config agentbench/presets/moa-v1.yaml --tasks agentbench/tasks/coding-v1.json --trials 2 --dry-run --out /tmp/dryrun.json
 ```
 
-Backend tests require PostgreSQL; set `MINIBENCH_TEST_PG_HOST` and `MINIBENCH_TEST_PG_PORT` when the listener is not the documented Docker default.
+Backend tests use PostgreSQL when reachable (set `MINIBENCH_TEST_PG_HOST` and `MINIBENCH_TEST_PG_PORT` when the listener is not the documented Docker default) and fall back to a temp SQLite file otherwise; force either with `MINIBENCH_TEST_DB=postgres|sqlite`. CI runs Postgres.
 
 ## Hard invariants
 
