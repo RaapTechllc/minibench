@@ -114,3 +114,6 @@ Proposed next additive surface: the Benchmark Lens
 [ADR 0004, proposed](adr/0004-benchmark-lens.md)). It republishes cited external
 agentic benchmark claims with provenance tiers and signal flags; it is not a
 MiniBench measurement and adds no composite. Nothing from it is implemented yet.
+The surface reset that precedes it is sequenced in [PLAN-era-2-cut.md](PLAN-era-2-cut.md):
+delete the retired hardware, CLI, and dashboard surfaces, keep `agentbench/` and
+the Cabinet code intact, and adopt the "not slop" acceptance rules.
