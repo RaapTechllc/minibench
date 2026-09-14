@@ -5,7 +5,6 @@ import {
 } from 'recharts';
 import { api } from '../api';
 import type { ModelLeaderboardEntry, KnownModel } from '../api';
-import { consumeLegacyLeaderboardNotice } from '../lib/legacyNotice';
 import { heatBand, compositeScore } from '../lib/scoreScale';
 import {
   Card, CardHeader, PageHeader, Badge, ValidityBadge, Skeleton, EmptyState, ErrorState,
@@ -131,8 +130,6 @@ export default function Models() {
   const [chartMetric, setChartMetric] = useState<string>('pass_rate');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Lazy initializer: consume the one-shot flag during first render, no effect.
-  const [legacyNotice, setLegacyNotice] = useState(() => consumeLegacyLeaderboardNotice());
 
   const load = useCallback(() => {
     setLoading(true);
@@ -239,24 +236,6 @@ export default function Models() {
         Rolling, we&apos;re on the wrong board. Tier · score rides on the active cabinet, with 95% CI
         bars underneath. When two bars overlap, it&apos;s a tie, not a winner.
       </PageHeader>
-
-      {legacyNotice && (
-        <Card className="border-accent/30 bg-accent-soft/40 px-5 py-4">
-          <p className="text-[13px] text-ink">
-            The hardware throughput leaderboard has been retired — too many uncontrolled variables
-            (machine × engine × quantization × model) made rows incomparable. Model capability
-            scores on pinned reference profiles are now the primary ranking. Reference rig docs
-            live on <Link to="/hardware" className="text-accent hover:text-accent-strong font-medium">Test Rigs</Link>.
-          </p>
-          <button
-            type="button"
-            onClick={() => setLegacyNotice(false)}
-            className="mt-2 text-xs text-ink-3 hover:text-ink transition-colors"
-          >
-            Dismiss
-          </button>
-        </Card>
-      )}
 
       <div className="flex flex-wrap items-end gap-4">
         <Select label="Cabinet" value={suite} onChange={(e) => handleCabinetChange(e.target.value)}>
