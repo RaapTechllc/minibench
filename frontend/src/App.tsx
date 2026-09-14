@@ -89,7 +89,7 @@ export default function App() {
           <Route path="/usage/cost" element={<UsageBoard />} />
           <Route path="/usage/task" element={<UsageBoard />} />
           <Route path="/usage/latency" element={<UsageBoard />} />
-          {/* Inbound links from the retired hardware leaderboard land on the Solo Cabinet. */}
+          {/* Inbound links from the retired Era 1 leaderboard land on the Solo Cabinet. */}
           <Route path="/leaderboard" element={<Navigate to="/models" replace />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/agents/runs/:runId" element={<RunDetail />} />
