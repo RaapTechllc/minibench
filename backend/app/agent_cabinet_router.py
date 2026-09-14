@@ -10,7 +10,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import String, inspect, select
 from sqlalchemy.exc import DBAPIError, DataError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -119,6 +119,26 @@ def _latency_p50_ms(summary: dict[str, Any]) -> int | None:
 # ─── POST /api/v1/agent-cabinet/runs ──────────────────────────────────────────
 
 
+_STORAGE_LIMIT_DETAIL = "Artifact values exceed storage limits"
+
+
+def _exceeds_string_limits(row: Any) -> bool:
+    """True when any mapped String(n) column holds a value longer than n.
+
+    PostgreSQL enforces VARCHAR lengths itself; SQLite does not. Checking in
+    Python keeps the 422 contract identical on both backends.
+    """
+    for column in inspect(type(row)).columns:
+        limit = getattr(column.type, "length", None)
+        if not isinstance(column.type, String) or not limit:
+            continue
+        value = getattr(row, column.key, None)
+        if isinstance(value, str) and len(value) > limit:
+            return True
+    return False
+
+
+
 @router.post("/runs")
 async def submit_agent_cabinet_run(
     artifact: dict[str, Any],
@@ -159,30 +179,33 @@ async def submit_agent_cabinet_run(
         artifact=artifact,
         publication_receipt=receipt,
     )
+    task_rows = [
+        AgentCabinetTaskResult(
+            task_id=trial.get("task_id") or "",
+            category=trial.get("category"),
+            trial=trial.get("trial"),
+            passed=bool(trial.get("passed")),
+            outcome=trial.get("outcome"),
+            trial_payload=trial,
+        )
+        for trial in trials
+    ]
+    if _exceeds_string_limits(run) or any(_exceeds_string_limits(t) for t in task_rows):
+        raise HTTPException(status_code=422, detail=_STORAGE_LIMIT_DETAIL)
+
     db.add(run)
     try:
         await db.flush()
-
-        for trial in trials:
-            db.add(
-                AgentCabinetTaskResult(
-                    run_id=run.run_id,
-                    task_id=trial.get("task_id") or "",
-                    category=trial.get("category"),
-                    trial=trial.get("trial"),
-                    passed=bool(trial.get("passed")),
-                    outcome=trial.get("outcome"),
-                    trial_payload=trial,
-                )
-            )
-
+        for task_row in task_rows:
+            task_row.run_id = run.run_id
+            db.add(task_row)
         await db.commit()
     except DBAPIError as exc:
         # asyncpg wraps PostgreSQL truncation/range errors as DBAPIError.
         if not isinstance(exc, DataError) and getattr(exc.orig, "sqlstate", None) not in ("22001", "22003"):
             raise
         await db.rollback()
-        raise HTTPException(status_code=422, detail="Artifact values exceed storage limits") from exc
+        raise HTTPException(status_code=422, detail=_STORAGE_LIMIT_DETAIL) from exc
     await db.refresh(run)
     return detail_view(_row_dict(run))
 

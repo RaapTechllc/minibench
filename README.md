@@ -84,6 +84,9 @@ python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 export DATABASE_URL=postgresql+asyncpg://minibench:minibench@localhost:5432/minibench
 export DATABASE_URL_SYNC=postgresql+psycopg2://minibench:minibench@localhost:5432/minibench
+# No Postgres? SQLite works for local development:
+#   export DATABASE_URL=sqlite+aiosqlite:///./minibench.db
+#   export DATABASE_URL_SYNC=sqlite:///./minibench.db
 uvicorn app.main:app --reload --port 3070   # creates tables + seeds on startup
 
 # 3. Frontend (separate terminal)
@@ -205,8 +208,9 @@ Every Usage Board number is cited: `Source: OpenRouter (openrouter.ai/rankings),
 ## Testing
 
 ```bash
-# Backend (needs a reachable Postgres; defaults to localhost:5438)
+# Backend (uses Postgres on localhost:5438 when reachable, else a temp SQLite file)
 cd backend && pip install -r requirements-dev.txt && pytest
+# Force one backend: MINIBENCH_TEST_DB=sqlite pytest  /  MINIBENCH_TEST_DB=postgres pytest
 
 # Homebrew Postgres on :5432:
 # MINIBENCH_TEST_PG_HOST=127.0.0.1 MINIBENCH_TEST_PG_PORT=5432 pytest
@@ -237,7 +241,10 @@ has its own stricter validation gates.
 
 The backend suite spins up an isolated `minibench_test` database and resets its
 schema per test. Override connection details with `MINIBENCH_TEST_PG_HOST` /
-`_PORT` / `_USER` / `_PASSWORD` / `_DB`.
+`_PORT` / `_USER` / `_PASSWORD` / `_DB`. With `MINIBENCH_TEST_DB=auto` (the
+default) it falls back to a throwaway SQLite file when no Postgres answers; CI
+always runs Postgres, and the one Postgres-only test (the SQL migration replay)
+is skipped on SQLite.
 
 ## CI
 

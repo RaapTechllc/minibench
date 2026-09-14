@@ -1,9 +1,10 @@
 """The legacy upgrade must preserve rows and be safe to run twice."""
 from pathlib import Path
 
-from conftest import TEST_DB, _connect
+from conftest import TEST_DB, _connect, requires_postgres
 
 
+@requires_postgres("migration SQL uses Postgres ALTER TABLE syntax")
 def test_legacy_provenance_upgrade_preserves_rows(client):
     migration = Path(__file__).resolve().parents[1] / "migrations" / "20260904_01_legacy_provenance.sql"
     conn = _connect(TEST_DB)
