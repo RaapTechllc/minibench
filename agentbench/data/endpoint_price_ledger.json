@@ -1,0 +1,107 @@
+{
+  "ledger_version": "1",
+  "live": false,
+  "as_of": "2026-10-15",
+  "rows": [
+    {
+      "model_id": "deepseek-ai/DeepSeek-V3",
+      "provider": "deepinfra",
+      "price_in_per_m": 0.32,
+      "price_out_per_m": 0.89,
+      "tier": "standard",
+      "quantization": "fp4",
+      "price_source_url": "https://deepinfra.com/deepseek-ai/DeepSeek-V3",
+      "fetched_at": "2026-10-15"
+    },
+    {
+      "model_id": "deepseek-ai/DeepSeek-V3",
+      "provider": "deepinfra",
+      "price_in_per_m": 0.256,
+      "price_out_per_m": 0.712,
+      "tier": "flex",
+      "quantization": "fp4",
+      "price_source_url": "https://deepinfra.com/deepseek-ai/DeepSeek-V3",
+      "fetched_at": "2026-10-15"
+    },
+    {
+      "model_id": "Qwen/Qwen3-30B-A3B",
+      "provider": "deepinfra",
+      "price_in_per_m": 0.12,
+      "price_out_per_m": 0.5,
+      "tier": "standard",
+      "quantization": "fp8",
+      "price_source_url": "https://deepinfra.com/Qwen/Qwen3-30B-A3B",
+      "fetched_at": "2026-10-15"
+    },
+    {
+      "model_id": "Qwen/Qwen3-30B-A3B",
+      "provider": "deepinfra",
+      "price_in_per_m": 0.18,
+      "price_out_per_m": 0.75,
+      "tier": "priority",
+      "quantization": "fp8",
+      "price_source_url": "https://deepinfra.com/Qwen/Qwen3-30B-A3B",
+      "fetched_at": "2026-10-15"
+    },
+    {
+      "model_id": "Qwen/Qwen3-30B-A3B",
+      "provider": "deepinfra",
+      "price_in_per_m": 0.096,
+      "price_out_per_m": 0.4,
+      "tier": "flex",
+      "quantization": "fp8",
+      "price_source_url": "https://deepinfra.com/Qwen/Qwen3-30B-A3B",
+      "fetched_at": "2026-10-15"
+    },
+    {
+      "model_id": "openai/gpt-oss-120b",
+      "provider": "deepinfra",
+      "price_in_per_m": 0.037,
+      "price_out_per_m": 0.17,
+      "tier": "standard",
+      "quantization": "bfloat16",
+      "price_source_url": "https://deepinfra.com/openai/gpt-oss-120b",
+      "fetched_at": "2026-10-15"
+    },
+    {
+      "model_id": "openai/gpt-oss-120b",
+      "provider": "groq",
+      "price_in_per_m": 0.15,
+      "price_out_per_m": 0.6,
+      "tier": "standard",
+      "quantization": "truepoint",
+      "price_source_url": "https://console.groq.com/docs/model/openai/gpt-oss-120b",
+      "fetched_at": "2026-10-15"
+    },
+    {
+      "model_id": "openai/gpt-oss-120b",
+      "provider": "together",
+      "price_in_per_m": 0.15,
+      "price_out_per_m": 0.6,
+      "tier": "standard",
+      "quantization": "unknown",
+      "price_source_url": "https://docs.together.ai/docs/gpt-oss",
+      "fetched_at": "2026-10-15"
+    },
+    {
+      "model_id": "openai/gpt-oss-120b",
+      "provider": "fireworks",
+      "price_in_per_m": 0.15,
+      "price_out_per_m": 0.6,
+      "tier": "standard",
+      "quantization": "unknown",
+      "price_source_url": "https://docs.fireworks.ai/serverless/pricing",
+      "fetched_at": "2026-10-15"
+    },
+    {
+      "model_id": "openai/gpt-oss-120b",
+      "provider": "fireworks",
+      "price_in_per_m": 0.18,
+      "price_out_per_m": 0.72,
+      "tier": "priority",
+      "quantization": "unknown",
+      "price_source_url": "https://docs.fireworks.ai/serverless/pricing",
+      "fetched_at": "2026-10-15"
+    }
+  ]
+}

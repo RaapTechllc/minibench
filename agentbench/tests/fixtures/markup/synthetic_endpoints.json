@@ -1,0 +1,19 @@
+{
+  "ledger_version": "1",
+  "live": false,
+  "synthetic": true,
+  "label": "SYNTHETIC fixture for unit tests. Not listed prices. Do not copy into the real ledger.",
+  "as_of": "2026-10-15",
+  "rows": [
+    {
+      "model_id": "synthetic/open-moe",
+      "provider": "host-a",
+      "price_in_per_m": 0.4,
+      "price_out_per_m": 2.0,
+      "tier": "standard",
+      "quantization": "bf16",
+      "price_source_url": "https://example.com/synthetic/host-a",
+      "fetched_at": "2026-10-15"
+    }
+  ]
+}

@@ -86,6 +86,8 @@ labelled fixture. This is separate from MiniBench's measured cabinet results.
 | **Data API paths** | Only `/models`, `/datasets/rankings-daily`, `/benchmarks`, `/classifications/task`. |
 | **Compare routes** | Usage Board views: **best-by-$**, **best-by-task**, **best-by-latency**. Deep-link each row to the OpenRouter model page. |
 | **Blended price** | Prompt + completion token prices from `/models`, expressed per 1M tokens at a 1:3 in:out mix unless a row already publishes a single price. Used only for ranking, still cited as OpenRouter pricing. |
+| **Provider markup index** | Listed-price comparison for the same open weights across hosts: `$ / 1M tokens / active_params` and markup vs the lowest listed standard-tier price. Always a `[min, max]` range. See [docs/provider-markup-index.md](docs/provider-markup-index.md). |
+| **Workload profile** | Token mix used to blend listed input and output prices. D1 default is `minibench-1:3` (same mix as Usage Board blended price). |
 | **Official eval** | A score from OpenRouter `/benchmarks` (Artificial Analysis, Design Arena, or OpenRouter's own evals). Not MiniBench cabinet pass rate. |
 | **Task share** | Market-share fraction from `/classifications/task` for a classification tag (e.g. `code:general_impl`). Sampled; not an absolute volume. |
 

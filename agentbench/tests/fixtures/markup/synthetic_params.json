@@ -1,0 +1,18 @@
+{
+  "ledger_version": "1",
+  "live": false,
+  "synthetic": true,
+  "label": "SYNTHETIC fixture for unit tests. Not listed prices. Do not copy into the real ledger.",
+  "as_of": "2026-10-15",
+  "rows": [
+    {
+      "model_id": "synthetic/open-moe",
+      "total_params_b": 100,
+      "active_params_b": 37,
+      "count_convention": "SYNTHETIC: 100B total / 37B active",
+      "params_source_url": "https://example.com/synthetic/params",
+      "params_tier": "disclosed",
+      "as_of": "2026-10-15"
+    }
+  ]
+}

@@ -115,8 +115,16 @@ Real spend on a normal run is a few dollars at most.
 | `check_ceiling_items.py` | Season-publish gate that fails a comparable sweep when any item is at or above the ceiling threshold (90% pass by default). |
 | `catalog.py` | Master model catalog: joins the strategic-family list against the live OpenRouter feed → `backend/app/data/known_models_seed.json`. |
 | `cost_check.py` | Budget guard: tasks x trials x tokens x price against the priciest catalog model. Worst-case (full completion cap). Core/hard ≤ $15; pro ≤ $40 (broader suite). CI-enforced, all three suites. |
+| `markup_index.py` | Curated listed-price comparison of open-weight hosts (provider markup / serving efficiency). See [docs/provider-markup-index.md](../docs/provider-markup-index.md). |
 
 ## Running
+
+Listed-price comparison for open-weight hosts (offline, curated ledgers, no keys):
+
+```bash
+python -m agentbench.markup_index --check
+python -m agentbench.markup_index --out /tmp/markup.json
+```
 
 Offline smoke test (no keys, no network — also what CI runs, catches config drift):
 

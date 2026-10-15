@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Listed-price comparison output",
+  "type": "object",
+  "required": [
+    "kind",
+    "label",
+    "as_of",
+    "profile_id",
+    "cache_assumption",
+    "live",
+    "models",
+    "refusals"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "kind": { "type": "string", "const": "listed-price comparison" },
+    "label": { "type": "string", "maxLength": 128 },
+    "as_of": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "profile_id": { "type": "string", "maxLength": 64 },
+    "cache_assumption": { "type": "string", "maxLength": 64 },
+    "live": { "type": "boolean", "const": false },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "model_id",
+          "active_params_b",
+          "params_tier",
+          "baseline_provider",
+          "baseline_tier",
+          "baseline_blended_per_m",
+          "markup_range",
+          "providers"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "model_id": { "type": "string", "maxLength": 256 },
+          "total_params_b": { "type": ["number", "null"] },
+          "active_params_b": { "type": "number", "exclusiveMinimum": 0 },
+          "params_tier": { "type": "string", "const": "disclosed" },
+          "baseline_provider": { "type": "string", "maxLength": 128 },
+          "baseline_tier": { "type": "string", "maxLength": 64 },
+          "baseline_blended_per_m": { "type": "number", "minimum": 0 },
+          "markup_range": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "number", "minimum": 0 }
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "provider",
+                "tier",
+                "quantization",
+                "price_in_per_m",
+                "price_out_per_m",
+                "blended_per_m",
+                "dollars_per_1m_per_active_b",
+                "markup",
+                "price_source",
+                "as_of",
+                "profile_id",
+                "cache_assumption",
+                "flags",
+                "in_default_ranking"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "provider": { "type": "string", "maxLength": 128 },
+                "tier": { "type": "string", "maxLength": 64 },
+                "quantization": { "type": "string", "maxLength": 64 },
+                "price_in_per_m": { "type": "number", "minimum": 0 },
+                "price_out_per_m": { "type": "number", "minimum": 0 },
+                "blended_per_m": { "type": "number", "minimum": 0 },
+                "dollars_per_1m_per_active_b": { "type": "number", "minimum": 0 },
+                "markup": { "type": "number", "minimum": 0 },
+                "price_source": { "type": "string", "maxLength": 2048, "pattern": "^https://" },
+                "as_of": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+                "profile_id": { "type": "string", "maxLength": 64 },
+                "cache_assumption": { "type": "string", "maxLength": 64 },
+                "flags": { "type": "array", "items": { "type": "string", "maxLength": 64 } },
+                "in_default_ranking": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "refusals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["model_id", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "model_id": { "type": "string", "maxLength": 256 },
+          "reason": { "type": "string", "maxLength": 64 },
+          "detail": { "type": "string", "maxLength": 256 }
+        }
+      }
+    }
+  }
+}
