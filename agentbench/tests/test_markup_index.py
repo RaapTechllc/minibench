@@ -595,3 +595,387 @@ def test_synthetic_fixtures_are_labeled_and_not_the_real_ledger() -> None:
     real = json.loads(PARAM_LEDGER_PATH.read_text(encoding="utf-8"))
     assert real.get("synthetic") is not True
     assert "SYNTHETIC" not in json.dumps(real)
+
+
+# --- Review #72: B1 dates, B2 cache, C-2 nits, ranking gaps ---
+
+
+def test_b1_impossible_fetched_at_is_named_refusal(tmp_path: Path) -> None:
+    row = _endpoint_row(fetched_at="2026-13-45")
+    path = _write_json(tmp_path / "endpoints.json", _endpoint_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(path)
+    _expect_reason(exc.value, "invalid_fetched_at")
+
+
+def test_b1_impossible_as_of_is_named_refusal(tmp_path: Path) -> None:
+    row = _params_row(as_of="2026-02-30")
+    path = _write_json(tmp_path / "params.json", _params_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_param_ledger(path)
+    _expect_reason(exc.value, "invalid_as_of")
+
+
+def test_b1_cli_impossible_dates_exit_nonzero(tmp_path: Path) -> None:
+    params = _write_json(tmp_path / "params.json", _params_ledger([_params_row(as_of="2026-02-30")]))
+    endpoints = _write_json(tmp_path / "endpoints.json", _endpoint_ledger([_endpoint_row()]))
+    assert main(["--check", "--params", str(params), "--endpoints", str(endpoints)]) != 0
+    params_ok = _write_json(tmp_path / "params-ok.json", _params_ledger([_params_row()]))
+    endpoints_bad = _write_json(
+        tmp_path / "endpoints-bad.json",
+        _endpoint_ledger([_endpoint_row(fetched_at="2026-13-45")]),
+    )
+    assert main(["--check", "--params", str(params_ok), "--endpoints", str(endpoints_bad)]) != 0
+
+
+def test_b2_cache_string_refused_under_aa_profile(tmp_path: Path) -> None:
+    params = _write_json(tmp_path / "params.json", _params_ledger([_params_row()]))
+    endpoints = _write_json(
+        tmp_path / "endpoints.json",
+        _endpoint_ledger([_endpoint_row(price_cache_per_m="abc")]),
+    )
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(endpoints)
+    _expect_reason(exc.value, "non_finite_price")
+    assert (
+        main(
+            [
+                "--profile",
+                "aa-7:2:1",
+                "--params",
+                str(params),
+                "--endpoints",
+                str(endpoints),
+                "--as-of",
+                "2026-10-15",
+            ]
+        )
+        != 0
+    )
+
+
+def test_b2_cache_boolean_refused_under_aa_profile(tmp_path: Path) -> None:
+    params = _write_json(tmp_path / "params.json", _params_ledger([_params_row()]))
+    endpoints = _write_json(
+        tmp_path / "endpoints.json",
+        _endpoint_ledger([_endpoint_row(price_cache_per_m=True)]),
+    )
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(endpoints)
+    _expect_reason(exc.value, "non_finite_price")
+    assert (
+        main(
+            [
+                "--profile",
+                "aa-7:2:1",
+                "--params",
+                str(params),
+                "--endpoints",
+                str(endpoints),
+                "--as-of",
+                "2026-10-15",
+            ]
+        )
+        != 0
+    )
+
+
+def test_b2_aa_profile_cli_uses_listed_cache(tmp_path: Path) -> None:
+    params = _write_json(tmp_path / "params.json", _params_ledger([_params_row()]))
+    endpoints = _write_json(
+        tmp_path / "endpoints.json",
+        _endpoint_ledger(
+            [_endpoint_row(price_in_per_m=0.8, price_out_per_m=4.0, price_cache_per_m=0.2)]
+        ),
+    )
+    out = tmp_path / "markup.json"
+    assert (
+        main(
+            [
+                "--profile",
+                "aa-7:2:1",
+                "--params",
+                str(params),
+                "--endpoints",
+                str(endpoints),
+                "--as-of",
+                "2026-10-15",
+                "--out",
+                str(out),
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["profile_id"] == "aa-7:2:1"
+    assert payload["models"][0]["providers"][0]["blended_per_m"] == (7 * 0.2 + 2 * 0.8 + 4.0) / 10
+
+
+@pytest.mark.parametrize(
+    "profile_id,cache,expected",
+    [
+        ("minibench-1:3", None, 3.2),
+        ("chat-3:1", None, (3.0 * 0.8 + 4.0) / 4.0),
+        ("output-only", None, 4.0),
+        ("openrouter-15:1", None, (15.0 * 0.8 + 4.0) / 16.0),
+        ("aa-7:2:1", None, (7.0 * 0.8 + 2.0 * 0.8 + 4.0) / 10.0),
+        ("aa-7:2:1", 0.2, (7.0 * 0.2 + 2.0 * 0.8 + 4.0) / 10.0),
+    ],
+)
+def test_non_default_blend_profiles(profile_id: str, cache: float | None, expected: float) -> None:
+    assert blended_price(0.8, 4.0, profile_id, cache) == expected
+    params = _params_ledger([_params_row()])
+    row = _endpoint_row(price_in_per_m=0.8, price_out_per_m=4.0)
+    if cache is not None:
+        row["price_cache_per_m"] = cache
+    index = compute_markup_index(
+        params, _endpoint_ledger([row]), profile_id=profile_id, as_of="2026-10-15"
+    )
+    assert index["models"][0]["providers"][0]["blended_per_m"] == expected
+    assert index["profile_id"] == profile_id
+
+
+@pytest.mark.parametrize(
+    "provider",
+    [
+        "host\x7f",
+        "host\u0085",
+        "host\u202e",
+    ],
+)
+def test_c2_rejects_del_c1_and_bidi_in_provider(tmp_path: Path, provider: str) -> None:
+    row = _endpoint_row(provider=provider)
+    path = _write_json(tmp_path / "endpoints.json", _endpoint_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(path)
+    _expect_reason(exc.value, "html_or_control_chars")
+
+
+def test_c2_rejects_control_or_html_in_source_url(tmp_path: Path) -> None:
+    row = _endpoint_row(price_source_url="https://x.com/\n<script>")
+    path = _write_json(tmp_path / "endpoints.json", _endpoint_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(path)
+    _expect_reason(exc.value, "html_or_control_chars")
+
+
+def test_c2_rejects_bare_https_without_host(tmp_path: Path) -> None:
+    row = _endpoint_row(price_source_url="https://")
+    path = _write_json(tmp_path / "endpoints.json", _endpoint_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(path)
+    _expect_reason(exc.value, "invalid_source_url")
+
+
+def test_c2_rejects_non_https_param_source_url(tmp_path: Path) -> None:
+    row = _params_row(params_source_url="http://example.com/params")
+    path = _write_json(tmp_path / "params.json", _params_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_param_ledger(path)
+    _expect_reason(exc.value, "invalid_source_url")
+
+
+def test_c2_rejects_overlong_source_url(tmp_path: Path) -> None:
+    row = _endpoint_row(price_source_url="https://example.com/" + ("a" * 2048))
+    path = _write_json(tmp_path / "endpoints.json", _endpoint_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(path)
+    _expect_reason(exc.value, "field_too_long")
+
+
+def test_unlisted_string_false_is_refused(tmp_path: Path) -> None:
+    row = _endpoint_row(unlisted="false")
+    path = _write_json(tmp_path / "endpoints.json", _endpoint_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(path)
+    _expect_reason(exc.value, "invalid_unlisted")
+
+
+def test_unlisted_row_must_leave_prices_null(tmp_path: Path) -> None:
+    row = _endpoint_row(unlisted=True, price_in_per_m=0.4, price_out_per_m=2.0)
+    path = _write_json(tmp_path / "endpoints.json", _endpoint_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(path)
+    _expect_reason(exc.value, "unlisted_price_unmarked")
+
+
+def test_live_true_ledger_is_refused(tmp_path: Path) -> None:
+    path = _write_json(tmp_path / "params.json", _params_ledger([_params_row()], live=True))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_param_ledger(path)
+    _expect_reason(exc.value, "live_label")
+
+
+def test_future_fetched_at_is_refused(tmp_path: Path) -> None:
+    row = _endpoint_row(fetched_at="2099-01-01")
+    path = _write_json(tmp_path / "endpoints.json", _endpoint_ledger([row]))
+    with pytest.raises(MarkupIndexError) as exc:
+        load_endpoint_ledger(path)
+    _expect_reason(exc.value, "invalid_fetched_at")
+
+
+def test_compute_impossible_fetched_at_cannot_be_baseline() -> None:
+    params = _params_ledger([_params_row()])
+    endpoints = _endpoint_ledger(
+        [
+            _endpoint_row(
+                provider="bogus-cheap",
+                fetched_at="2026-13-45",
+                price_in_per_m=0.01,
+                price_out_per_m=0.01,
+                price_source_url="https://example.com/synthetic/bogus",
+            ),
+            _endpoint_row(
+                provider="valid",
+                fetched_at="2026-10-15",
+                price_in_per_m=0.40,
+                price_out_per_m=0.40,
+                price_source_url="https://example.com/synthetic/valid",
+            ),
+        ]
+    )
+    index = compute_markup_index(params, endpoints, as_of="2026-10-15")
+    model = index["models"][0]
+    assert model["baseline_provider"] == "valid"
+    assert all(row["provider"] != "bogus-cheap" for row in model["providers"])
+
+
+def test_stale_row_never_becomes_baseline() -> None:
+    params = _params_ledger([_params_row()])
+    endpoints = _endpoint_ledger(
+        [
+            _endpoint_row(
+                provider="stale-cheap",
+                fetched_at="2026-07-16",
+                price_in_per_m=0.10,
+                price_out_per_m=0.10,
+                price_source_url="https://example.com/synthetic/stale-cheap",
+            ),
+            _endpoint_row(
+                provider="fresh-dear",
+                fetched_at="2026-10-15",
+                price_in_per_m=0.40,
+                price_out_per_m=0.40,
+                price_source_url="https://example.com/synthetic/fresh-dear",
+            ),
+        ]
+    )
+    index = compute_markup_index(params, endpoints, as_of="2026-10-15")
+    model = index["models"][0]
+    assert model["baseline_provider"] == "fresh-dear"
+    by_provider = {row["provider"]: row for row in model["providers"]}
+    assert "stale" in by_provider["stale-cheap"]["flags"]
+    assert by_provider["stale-cheap"]["in_default_ranking"] is True
+    assert by_provider["fresh-dear"]["markup"] == 1.0
+    assert by_provider["stale-cheap"]["markup"] == 0.25
+
+
+def test_only_stale_standard_row_is_missing_baseline() -> None:
+    params = _params_ledger([_params_row()])
+    endpoints = _endpoint_ledger(
+        [
+            _endpoint_row(
+                provider="stale-only",
+                fetched_at="2026-07-16",
+                price_in_per_m=0.10,
+                price_out_per_m=0.10,
+            )
+        ]
+    )
+    index = compute_markup_index(params, endpoints, as_of="2026-10-15")
+    assert index["models"] == []
+    assert index["refusals"][0]["reason"] == "missing_baseline"
+
+
+def test_excluded_row_never_counts_toward_range() -> None:
+    params = _params_ledger([_params_row()])
+    endpoints = _endpoint_ledger(
+        [
+            _endpoint_row(
+                provider="excluded-cheap",
+                fetched_at="2026-04-17",
+                price_in_per_m=0.05,
+                price_out_per_m=0.05,
+                price_source_url="https://example.com/synthetic/excluded",
+            ),
+            _endpoint_row(
+                provider="fresh-mid",
+                fetched_at="2026-10-15",
+                price_in_per_m=0.40,
+                price_out_per_m=0.40,
+                price_source_url="https://example.com/synthetic/fresh-mid",
+            ),
+            _endpoint_row(
+                provider="fresh-dear",
+                fetched_at="2026-10-15",
+                price_in_per_m=0.80,
+                price_out_per_m=0.80,
+                price_source_url="https://example.com/synthetic/fresh-dear",
+            ),
+        ]
+    )
+    index = compute_markup_index(params, endpoints, as_of="2026-10-15")
+    model = index["models"][0]
+    by_provider = {row["provider"]: row for row in model["providers"]}
+    assert "stale_excluded" in by_provider["excluded-cheap"]["flags"]
+    assert by_provider["excluded-cheap"]["in_default_ranking"] is False
+    assert model["baseline_provider"] == "fresh-mid"
+    assert model["markup_range"] == [1.0, 2.0]
+    assert by_provider["excluded-cheap"]["markup"] not in model["markup_range"]
+
+
+def test_stale_cutoff_edges() -> None:
+    params = _params_ledger([_params_row()])
+    endpoints = _endpoint_ledger(
+        [
+            _endpoint_row(
+                provider="fresh-baseline",
+                fetched_at="2026-10-15",
+                price_in_per_m=0.20,
+                price_out_per_m=0.20,
+                price_source_url="https://example.com/synthetic/fresh-baseline",
+            ),
+            _endpoint_row(
+                provider="age-90",
+                fetched_at="2026-07-17",
+                price_in_per_m=0.30,
+                price_out_per_m=0.30,
+                price_source_url="https://example.com/synthetic/age-90",
+            ),
+            _endpoint_row(
+                provider="age-91",
+                fetched_at="2026-07-16",
+                price_in_per_m=0.40,
+                price_out_per_m=0.40,
+                price_source_url="https://example.com/synthetic/age-91",
+            ),
+            _endpoint_row(
+                provider="age-180",
+                fetched_at="2026-04-18",
+                price_in_per_m=0.50,
+                price_out_per_m=0.50,
+                price_source_url="https://example.com/synthetic/age-180",
+            ),
+            _endpoint_row(
+                provider="age-181",
+                fetched_at="2026-04-17",
+                price_in_per_m=0.60,
+                price_out_per_m=0.60,
+                price_source_url="https://example.com/synthetic/age-181",
+            ),
+        ]
+    )
+    index = compute_markup_index(params, endpoints, as_of="2026-10-15")
+    by_provider = {row["provider"]: row for row in index["models"][0]["providers"]}
+    assert "stale" not in by_provider["age-90"]["flags"]
+    assert by_provider["age-90"]["in_default_ranking"] is True
+    assert "stale" in by_provider["age-91"]["flags"]
+    assert "stale_excluded" not in by_provider["age-91"]["flags"]
+    assert by_provider["age-91"]["in_default_ranking"] is True
+    assert "stale" in by_provider["age-180"]["flags"]
+    assert "stale_excluded" not in by_provider["age-180"]["flags"]
+    assert by_provider["age-180"]["in_default_ranking"] is True
+    assert "stale_excluded" in by_provider["age-181"]["flags"]
+    assert by_provider["age-181"]["in_default_ranking"] is False
+    assert index["models"][0]["baseline_provider"] == "fresh-baseline"
+    assert by_provider["age-181"]["markup"] not in index["models"][0]["markup_range"]

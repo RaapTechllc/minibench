@@ -6,9 +6,11 @@ import json
 import math
 import re
 import sys
+import unicodedata
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 PARAM_LEDGER_PATH = DATA_DIR / "param_ledger.json"
@@ -46,14 +48,17 @@ def _is_finite_amount(amount: object) -> bool:
     return isinstance(amount, (int, float)) and not isinstance(amount, bool) and math.isfinite(amount)
 
 
-def _parse_day(stamp: str) -> date:
+def _parse_day(stamp: object, *, reason: str) -> date:
     if not isinstance(stamp, str) or not DATE_RE.match(stamp):
-        raise MarkupIndexError("invalid_as_of", f"need YYYY-MM-DD, got {stamp!r}")
-    return datetime.strptime(stamp, "%Y-%m-%d").date()
+        raise MarkupIndexError(reason, f"need YYYY-MM-DD, got {stamp!r}")
+    try:
+        return datetime.strptime(stamp, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise MarkupIndexError(reason, f"need a real calendar day, got {stamp!r}") from exc
 
 
 def _has_control_or_html(text: str) -> bool:
-    if any(ord(char) < 32 for char in text):
+    if any(unicodedata.category(char) in {"Cc", "Cf"} for char in text):
         return True
     if "<" in text or ">" in text or HTML_RE.search(text):
         return True
@@ -74,6 +79,11 @@ def _check_https_url(url: object, *, missing_reason: str) -> str:
         or not url.startswith("https://")
     ):
         raise MarkupIndexError("invalid_source_url", "source URL must be https://")
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise MarkupIndexError("invalid_source_url", "source URL must be https:// with a host")
+    if _has_control_or_html(url):
+        raise MarkupIndexError("html_or_control_chars", "source URL has HTML or control chars")
     if len(url) > MAX_URL:
         raise MarkupIndexError("field_too_long", "source URL exceeds cap")
     return url
@@ -109,7 +119,7 @@ def _check_param_row(row: object) -> dict[str, Any]:
     if "as_of" not in row or row.get("as_of") in (None, ""):
         raise MarkupIndexError("missing_as_of", "as_of is required")
     _check_https_url(row["params_source_url"], missing_reason="missing_params_source_url")
-    _parse_day(str(row["as_of"]))
+    _parse_day(row["as_of"], reason="invalid_as_of")
     _check_name(row.get("model_id"), field="model_id", cap=MAX_MODEL_ID)
     convention = row.get("count_convention", "")
     if not isinstance(convention, str) or len(convention) > MAX_TEXT:
@@ -148,17 +158,27 @@ def _check_endpoint_row(row: object) -> dict[str, Any]:
     if "fetched_at" not in row or row.get("fetched_at") in (None, ""):
         raise MarkupIndexError("missing_fetched_at", "fetched_at is required")
     _check_https_url(row["price_source_url"], missing_reason="missing_price_source_url")
-    _parse_day(str(row["fetched_at"]))
+    fetched = _parse_day(row["fetched_at"], reason="invalid_fetched_at")
+    if fetched > date.today():
+        raise MarkupIndexError("invalid_fetched_at", "fetched_at cannot be in the future")
     _check_name(row.get("model_id"), field="model_id", cap=MAX_MODEL_ID)
     _check_name(row.get("provider"), field="provider", cap=MAX_PROVIDER)
     tier = row.get("tier", "")
     _check_name(tier, field="tier", cap=MAX_TIER)
     quant = row.get("quantization", "")
     _check_name(quant, field="quantization", cap=MAX_QUANT)
-    unlisted = bool(row.get("unlisted"))
+    if "unlisted" in row and not isinstance(row.get("unlisted"), bool):
+        raise MarkupIndexError("invalid_unlisted", "unlisted must be a JSON boolean")
+    unlisted = row.get("unlisted") is True
     _check_listed_amount(row.get("price_in_per_m"), allow_null=unlisted)
     _check_listed_amount(row.get("price_out_per_m"), allow_null=unlisted)
-    if unlisted and (row.get("price_in_per_m") is not None or row.get("price_out_per_m") is not None):
+    if "price_cache_per_m" in row:
+        _check_listed_amount(row.get("price_cache_per_m"), allow_null=True)
+    if unlisted and (
+        row.get("price_in_per_m") is not None
+        or row.get("price_out_per_m") is not None
+        or row.get("price_cache_per_m") is not None
+    ):
         raise MarkupIndexError("unlisted_price_unmarked", "unlisted rows must leave prices null")
     return row
 
@@ -289,10 +309,10 @@ def blended_price(
     if profile_id == "openrouter-15:1":
         return (15.0 * pin + pout) / 16.0
     if profile_id == "aa-7:2:1":
-        cache = pin if price_cache_per_m is None else float(price_cache_per_m)
-        if not _is_finite_amount(cache) or cache < 0:
-            raise MarkupIndexError("non_finite_price", "cache listed price must be finite and >= 0")
-        return (7.0 * cache + 2.0 * pin + pout) / 10.0
+        cache = pin if price_cache_per_m is None else _check_listed_amount(
+            price_cache_per_m, allow_null=False
+        )
+        return (7.0 * float(cache) + 2.0 * pin + pout) / 10.0
     raise MarkupIndexError("unknown_profile", f"unsupported profile_id {profile_id!r}")
 
 
@@ -312,7 +332,7 @@ def compute_markup_index(
     cache_assumption: str = "none",
 ) -> dict[str, Any]:
     as_of_stamp = as_of or date.today().isoformat()
-    as_of_day = _parse_day(as_of_stamp)
+    as_of_day = _parse_day(as_of_stamp, reason="invalid_as_of")
     models: list[dict[str, Any]] = []
     refusals: list[dict[str, str]] = []
     endpoint_rows = [row for row in (endpoints.get("rows") or []) if isinstance(row, dict)]
@@ -334,7 +354,7 @@ def compute_markup_index(
         for row in endpoint_rows:
             if row.get("model_id") != model_id:
                 continue
-            if row.get("unlisted"):
+            if row.get("unlisted") is True:
                 continue
             pin, pout = row.get("price_in_per_m"), row.get("price_out_per_m")
             if not _is_finite_amount(pin) or not _is_finite_amount(pout):
@@ -350,9 +370,12 @@ def compute_markup_index(
         for row in listed:
             fetched = str(row.get("fetched_at") or as_of_stamp)
             try:
-                age_days = (as_of_day - _parse_day(fetched)).days
+                fetched_day = _parse_day(row.get("fetched_at") or as_of_stamp, reason="invalid_fetched_at")
             except MarkupIndexError:
-                age_days = 0
+                continue
+            if fetched_day > date.today():
+                continue
+            age_days = (as_of_day - fetched_day).days
             flags: list[str] = []
             service_tier = str(row.get("tier") or "standard")
             if service_tier not in STANDARD_TIERS:
@@ -360,7 +383,8 @@ def compute_markup_index(
             quant = str(row.get("quantization") or "unknown")
             if quant == "unknown":
                 flags.append("quantization_unknown")
-            if age_days > STALE_BADGE_DAYS:
+            stale = age_days > STALE_BADGE_DAYS
+            if stale:
                 flags.append("stale")
             excluded = age_days > STALE_EXCLUDE_DAYS
             if excluded:
@@ -372,7 +396,7 @@ def compute_markup_index(
                 row.get("price_cache_per_m"),
             )
             in_ranking = not excluded
-            if in_ranking and service_tier in STANDARD_TIERS:
+            if in_ranking and not stale and service_tier in STANDARD_TIERS:
                 baseline_candidates.append((blend, str(row.get("provider")), service_tier))
             provider_rows.append(
                 {

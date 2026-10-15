@@ -17,8 +17,9 @@ For each open-weight model with a `disclosed` parameter count:
 
 Rows with `quantization: unknown` stay in the table and are flagged. Priority,
 fast, batch, and flex tiers are kept and flagged as non-standard; they do not
-set the baseline (D4 is still open). A row older than 90 days is badged stale;
-older than 180 days is dropped from the default ranking (D11).
+set the baseline (D4 is still open). A row older than 90 days is badged stale
+and does not set the baseline; older than 180 days is dropped from the default
+ranking and from the markup range (D11).
 
 ## What it is not
 
