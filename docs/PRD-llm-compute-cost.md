@@ -1,6 +1,6 @@
 # PRD: LLM true-compute-cost investigation (spec only)
 
-- **Status:** PROPOSED. Awaiting acceptance by Kyle Raap. No build until §11 GO gate clears.
+- **Status:** PROPOSED. GO gate cleared by Kyle Raap on 2026-10-15; decisions recorded in §10.1 as PROPOSED defaults. D4 remains open.
 - **Date:** 2026-10-02.
 - **Idea owner:** Kyle Raap (RaapTech). Proposed home: `RaapTechllc/minibench` (notes header).
 - **Single source of market facts:** [`docs/research/llm-compute-cost-research-notes-2026-10-02.md`](research/llm-compute-cost-research-notes-2026-10-02.md), frozen 2026-10-02. Cited below as `notes §n`. No price, parameter count, deal figure, or statistic in this document comes from anywhere else.
@@ -314,6 +314,23 @@ Decisions D1–D6 are the notes' §12 list. D7–D12 are raised by this PRD. Whe
 | **D12** | **Source for the throughput cross-check (M6)** | OpenRouter `/models` throughput sort (allowlisted, notes §1.6); none; defer | PROPOSED default: allowlisted catalog throughput only; no measurement runs. |
 
 **Total: 12 open decisions** (6 from notes §12, 6 raised by this PRD).
+
+### 10.1 Recorded decisions (2026-10-15)
+
+| # | Recorded choice |
+|---|---|
+| **D1** | PROPOSED default, accepted by Kyle 2026-10-15: yes. Estimated true cost is always shown as a range, never a point. |
+| **D2** | PROPOSED default, accepted by Kyle 2026-10-15: yes, hardware ownership is backed out as a variable. |
+| **D3** | PROPOSED default, accepted by Kyle 2026-10-15: the price basis is the lowest publicly listed per-million-token price, used as the baseline. |
+| **D4** | **Open.** Not decided; no default applied. |
+| **D5** | PROPOSED default, accepted by Kyle 2026-10-15: default workload profile is `minibench-1:3`. |
+| **D6** | PROPOSED default, accepted by Kyle 2026-10-15: minibench hosts the value-frontier view (D3); the true-cost estimation core lives in a separate research repo or notebook, with cited outputs republished into minibench. Per §11 item 3, minibench scope reduces to D1 and D3 plus a republishing path. |
+| **D7** | PROPOSED default, accepted by Kyle 2026-10-15: curated ledger first (AC-10), ADR later if D1 proves useful. |
+| **D8** | PROPOSED default, accepted by Kyle 2026-10-15: active for the curve; closed-model bands shown as reported with their basis labelled; no conversion. |
+| **D9** | PROPOSED default, accepted by Kyle 2026-10-15: IKP and Epoch bands as `estimated:<method>`; MEDEC excluded from ranges. |
+| **D10** | PROPOSED default, accepted by Kyle 2026-10-15: internal draft first; publication is a separately authorized step (`AGENTS.md`). |
+| **D11** | PROPOSED default, accepted by Kyle 2026-10-15: badge at 90 days / exclude at 180 days. |
+| **D12** | PROPOSED default, accepted by Kyle 2026-10-15: allowlisted catalog throughput only; no measurement runs. |
 
 ## 11. GO gate
 
