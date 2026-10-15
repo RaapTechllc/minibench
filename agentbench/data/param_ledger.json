@@ -1,0 +1,43 @@
+{
+  "ledger_version": "1",
+  "live": false,
+  "as_of": "2026-10-15",
+  "rows": [
+    {
+      "model_id": "deepseek-ai/DeepSeek-V3",
+      "total_params_b": 671,
+      "active_params_b": 37,
+      "count_convention": "Official card: 671B total / 37B activated per token. Hugging Face checkpoint 685B includes 14B MTP.",
+      "params_source_url": "https://github.com/deepseek-ai/DeepSeek-V3/blob/main/README.md",
+      "params_tier": "disclosed",
+      "as_of": "2026-10-15"
+    },
+    {
+      "model_id": "openai/gpt-oss-120b",
+      "total_params_b": 116.83,
+      "active_params_b": 5.13,
+      "count_convention": "Paper table 1: 116.83B total / 5.13B active. Unembedding counted as active; embeddings not.",
+      "params_source_url": "https://arxiv.org/html/2508.10925",
+      "params_tier": "disclosed",
+      "as_of": "2026-10-15"
+    },
+    {
+      "model_id": "xai/grok-1",
+      "total_params_b": 314,
+      "active_params_b": null,
+      "count_convention": "314B total; Mixture of 8 experts, 2 used per token. Numeric active count not disclosed on the cited page.",
+      "params_source_url": "https://github.com/xai-org/grok-1/blob/main/README.md",
+      "params_tier": "disclosed",
+      "as_of": "2026-10-15"
+    },
+    {
+      "model_id": "Qwen/Qwen3-30B-A3B",
+      "total_params_b": 30.5,
+      "active_params_b": 3.4,
+      "count_convention": "NightVision Appendix C config-derived 30.5B total / 3.4B active. Qwen card on the same weights states 30.5B total / 3.3B activated.",
+      "params_source_url": "https://arxiv.org/html/2607.01313",
+      "params_tier": "disclosed",
+      "as_of": "2026-10-15"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Open-weight parameter ledger",
+  "type": "object",
+  "required": ["ledger_version", "live", "as_of", "rows"],
+  "additionalProperties": true,
+  "properties": {
+    "ledger_version": { "type": "string", "maxLength": 32 },
+    "live": { "type": "boolean", "const": false },
+    "as_of": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "model_id",
+          "total_params_b",
+          "active_params_b",
+          "count_convention",
+          "params_source_url",
+          "params_tier",
+          "as_of"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "model_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "total_params_b": { "type": "number", "exclusiveMinimum": 0 },
+          "active_params_b": { "type": ["number", "null"], "minimum": 0 },
+          "count_convention": { "type": "string", "maxLength": 2000 },
+          "params_source_url": { "type": "string", "maxLength": 2048, "pattern": "^https://" },
+          "params_tier": { "type": "string", "enum": ["disclosed", "estimated", "unknown"] },
+          "as_of": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        }
+      }
+    }
+  }
+}
