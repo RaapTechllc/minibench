@@ -12,121 +12,26 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import JSON, Uuid
+from sqlalchemy.dialects.postgresql import JSONB
 import uuid
+from datetime import datetime, timezone
 
 from app.database import Base
 
 
-class Benchmark(Base):
-    __tablename__ = "benchmarks"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    submission_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False)
-    submitted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-
-    # Hardware
-    cpu_model = Column(String(128), nullable=False)
-    cpu_cores = Column(Integer)
-    cpu_threads = Column(Integer)
-    gpu_model = Column(String(128))
-    igpu_model = Column(String(128))
-    total_ram_gb = Column(Numeric(6, 1), nullable=False)
-    vram_gb = Column(Numeric(6, 1))  # Dedicated VRAM - distinguish from system RAM
-    memory_type = Column(String(32))
-    memory_bandwidth_gbs = Column(Numeric(8, 2))
-    system_type = Column(String(64))
-    hardware_price_usd = Column(Numeric(8, 2))
-
-    # Software
-    os = Column(String(64), nullable=False)
-    inference_engine = Column(String(64), nullable=False)
-    engine_version = Column(String(32))
-    model_name = Column(String(128), nullable=False)
-    model_params_b = Column(Numeric(6, 2))
-    quantization = Column(String(32), nullable=False)
-
-    # Performance
-    tokens_per_second = Column(Numeric(8, 2), nullable=False)
-    time_to_first_token = Column(Numeric(8, 4))
-    watts_per_token = Column(Numeric(8, 4))
-    total_power_watts = Column(Numeric(8, 2))
-    prompt_tokens = Column(Integer, nullable=False)
-    completion_tokens = Column(Integer, nullable=False)
-    test_duration_secs = Column(Numeric(8, 2), nullable=False)
-
-    # Quality (from lookup)
-    model_quality_score = Column(Numeric(6, 2))
-    quality_source = Column(String(32))
-
-    # Validation
-    fingerprint = Column(String(64))
-    client_version = Column(String(16))
-    ip_hash = Column(String(64))
-
-    # Thermal
-    thermal_setting = Column(String(32))
-    ambient_temp_c = Column(Numeric(4, 1))
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
-class HardwareSpec(Base):
-    __tablename__ = "hardware_specs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    system_name = Column(String(128), nullable=False, unique=True)
-    cpu_model = Column(String(128))
-    gpu_model = Column(String(128))
-    igpu_model = Column(String(128))
-    system_ram_gb = Column(Integer)  # System RAM
-    vram_gb = Column(Integer)       # Dedicated VRAM (NULL if none)
-    memory_type = Column(String(32))
-    max_memory_gb = Column(Integer)
-    memory_bandwidth_gbs = Column(Numeric(8, 2))
-    tdp_watts = Column(Integer)
-    msrp_usd = Column(Numeric(8, 2))
-    release_year = Column(Integer)
-    form_factor = Column(String(32))
+# Portable column types: native JSONB on PostgreSQL, JSON on SQLite, so the API
+# and its tests can run without a Postgres daemon.
+JSONCol = JSON().with_variant(JSONB(), "postgresql")
+# SQLite only autoincrements INTEGER PRIMARY KEY, never BIGINT.
+BigPK = BigInteger().with_variant(Integer(), "sqlite")
 
 
-class ReferenceProfile(Base):
-    """A canonical, pinned run configuration ("how we run models").
-
-    The pivot demotes hardware to a controlled variable: models are benchmarked
-    *on a profile*, so numbers are comparable. Each profile pins the engine,
-    quantization, context and decoding defaults; ``representative_system``
-    points at a ``hardware_specs.system_name`` row where applicable.
-    """
-
-    __tablename__ = "reference_profiles"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    profile_key = Column(String(64), nullable=False, unique=True)  # consumer-gpu-24gb
-    display_name = Column(String(128), nullable=False)
-    description = Column(Text)                    # why this is the official setting
-    engine = Column(String(64))                   # ollama, llama.cpp, MLX, vLLM; NULL = provider API
-    engine_version_min = Column(String(32))
-    quantization = Column(String(32))             # Q4_K_M default; NULL = provider-served
-    context_length = Column(Integer)
-    temperature = Column(Numeric(3, 2))
-    top_p = Column(Numeric(3, 2))
-    max_tokens = Column(Integer)
-    representative_system = Column(String(128))   # hardware_specs.system_name
-
-
-class ModelQuality(Base):
-    __tablename__ = "model_quality"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    model_family = Column(String(64), nullable=False)
-    model_variant = Column(String(128), nullable=False)
-    params_b = Column(Numeric(6, 2))
-    mmlu_score = Column(Numeric(5, 2))
-    lmsys_elo = Column(Integer)
-    source_url = Column(Text)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now())
-
-
-# ─── Agent-benchmark product (additive; separate from the hardware tables) ─────
+# ─── Agent-benchmark product ───────────────────────────────────────────────────
 
 
 class AgentRun(Base):
@@ -141,12 +46,12 @@ class AgentRun(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     # UNIQUE so agent_task_results.run_id can foreign-key it (a FK target must be
     # unique). This was the schema bug flagged in the brief's DDL sketch.
-    run_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True)
-    submitted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    run_id = Column(Uuid(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True)
+    submitted_at = Column(DateTime(timezone=True), default=_utcnow, server_default=func.now(), nullable=False)
 
     harness = Column(String(64))          # inspect-native, OpenClaw, Hermes-agent
     harness_version = Column(String(32))
-    moa_config = Column(JSONB)            # {name, self_moa, models[], ...}
+    moa_config = Column(JSONCol)            # {name, self_moa, models[], ...}
     benchmark_suite = Column(String(64), nullable=False)  # our-coding-v1, swe-live
     provider = Column(String(32))         # openrouter, ollama
     model_snapshot_date = Column(Date)
@@ -168,7 +73,7 @@ class AgentRun(Base):
     # comparable when grader_version, decoding and seed_sha256 all match; runs
     # with canary flags are contaminated and never ranked.
     grader_version = Column(String(8))
-    decoding = Column(JSONB)              # {temperature, top_p, max_tokens, system_prompt}
+    decoding = Column(JSONCol)              # {temperature, top_p, max_tokens, system_prompt}
     seed_sha256 = Column(String(64))      # proves same-sweep without revealing the seed
     generator_sha256 = Column(String(64))
     git_commit = Column(String(64))
@@ -185,8 +90,8 @@ class AgentTaskResult(Base):
 
     __tablename__ = "agent_task_results"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    run_id = Column(UUID(as_uuid=True), ForeignKey("agent_runs.run_id"), nullable=False)
+    id = Column(BigPK, primary_key=True, autoincrement=True)
+    run_id = Column(Uuid(as_uuid=True), ForeignKey("agent_runs.run_id"), nullable=False)
     task_id = Column(String(128), nullable=False)
     category = Column(String(64))
     scenario_type = Column(String(32))
@@ -236,8 +141,8 @@ class AgentCabinetRun(Base):
     __tablename__ = "agent_cabinet_runs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    run_id = Column(UUID(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True)
-    submitted_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    run_id = Column(Uuid(as_uuid=True), default=uuid.uuid4, nullable=False, unique=True)
+    submitted_at = Column(DateTime(timezone=True), default=_utcnow, server_default=func.now(), nullable=False)
 
     suite = Column(String(64), nullable=False)
     model_route = Column(String(256), nullable=False)
@@ -245,7 +150,7 @@ class AgentCabinetRun(Base):
     harness_version = Column(String(32), nullable=False)
     tool_contract_sha256 = Column(String(64), nullable=False)
     fixture_digest = Column(String(80), nullable=False)
-    budgets = Column(JSONB, nullable=False)
+    budgets = Column(JSONCol, nullable=False)
     budgets_canonical = Column(Text, nullable=False)
     grader_version = Column(String(32), nullable=False)
     private_split = Column(Boolean, nullable=False, default=False)
@@ -256,12 +161,12 @@ class AgentCabinetRun(Base):
     pass_rate = Column(Numeric(5, 2), nullable=False)
     cost_usd_per_task = Column(Numeric(10, 6))
     latency_p50_ms = Column(Integer)
-    category_completion = Column(JSONB, nullable=False)
+    category_completion = Column(JSONCol, nullable=False)
 
-    provenance = Column(JSONB, nullable=False)
-    summary = Column(JSONB, nullable=False)
-    artifact = Column(JSONB, nullable=False)
-    publication_receipt = Column(JSONB, nullable=False)
+    provenance = Column(JSONCol, nullable=False)
+    summary = Column(JSONCol, nullable=False)
+    artifact = Column(JSONCol, nullable=False)
+    publication_receipt = Column(JSONCol, nullable=False)
 
 
 class AgentCabinetTaskResult(Base):
@@ -269,11 +174,11 @@ class AgentCabinetTaskResult(Base):
 
     __tablename__ = "agent_cabinet_task_results"
 
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    run_id = Column(UUID(as_uuid=True), ForeignKey("agent_cabinet_runs.run_id"), nullable=False)
+    id = Column(BigPK, primary_key=True, autoincrement=True)
+    run_id = Column(Uuid(as_uuid=True), ForeignKey("agent_cabinet_runs.run_id"), nullable=False)
     task_id = Column(String(128), nullable=False)
     category = Column(String(64))
     trial = Column(Integer)
     passed = Column(Boolean, nullable=False)
     outcome = Column(String(64))
-    trial_payload = Column(JSONB)
+    trial_payload = Column(JSONCol)
