@@ -1,6 +1,6 @@
 # PRD: LLM true-compute-cost investigation (spec only)
 
-- **Status:** PROPOSED. GO gate cleared by Kyle Raap on 2026-10-15; decisions recorded in §10.1 as PROPOSED defaults. D4 remains open.
+- **Status:** ACCEPTED (Kyle, 2026-10-16). GO gate cleared by Kyle Raap on 2026-10-15; decisions recorded in §10.1 as PROPOSED defaults. D4 remains open.
 - **Date:** 2026-10-02.
 - **Idea owner:** Kyle Raap (RaapTech). Proposed home: `RaapTechllc/minibench` (notes header).
 - **Single source of market facts:** [`docs/research/llm-compute-cost-research-notes-2026-10-02.md`](research/llm-compute-cost-research-notes-2026-10-02.md), frozen 2026-10-02. Cited below as `notes §n`. No price, parameter count, deal figure, or statistic in this document comes from anywhere else.
