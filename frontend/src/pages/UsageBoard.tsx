@@ -63,7 +63,7 @@ export default function UsageBoard() {
     <div className="space-y-6">
       <PageHeader eyebrow="OpenRouter · CC BY 4.0" title="Usage Board">
         Daily-fresh usage, price, and official eval republished from the OpenRouter
-        Data API. Not the Mini PC hardware board and not a MiniBench cabinet score.
+        Data API. Market context, not a MiniBench cabinet score.
       </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2">
