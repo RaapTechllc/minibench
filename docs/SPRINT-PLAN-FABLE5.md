@@ -7,7 +7,7 @@
 **Repo:** `RaapTechllc/minibench`  
 **Baseline:** `main` @ `20e78f5`
 
-This document is a **handoff brief**, not a spec. Read the linked sources, form your own judgment, and propose sensible slices before large changes. Prefer small PRs with green CI over big-bang rewrites.
+This document is a **handoff brief**, not a spec. Read the linked sources, form your own judgment, and pick sensible slices; decide and proceed, noting assumptions in the PR. Prefer small PRs with green CI over big-bang rewrites.
 
 ---
 
@@ -118,7 +118,7 @@ Worth a quick design note in the PR if the shape differs from TSD.
 - After `--publish`, mark implicated model IDs as benchmarked.
 - Agents UI: the "new — not yet benchmarked" panel could gain a sync action or copy-paste run commands — keep it useful, not busy.
 
-**Open question for product:** OpenRouter prepaid credits vs BYOK affects how you interpret `usage.cost`. Check `.env.example` and brief §2.
+**Open question:** OpenRouter prepaid credits vs BYOK affects how you interpret `usage.cost`. Check `.env.example` and brief §2; decide and proceed, noting assumptions in the PR.
 
 ### Theme D — Benchmark credibility (agent tasks)
 
@@ -174,7 +174,7 @@ From `AGENT-BENCH-BRIEF.md`, paraphrased:
 ## Suggested working style for Fable 5
 
 1. **Read** `TSD.md`, audit state, and the files you'll touch.
-2. **Propose** a short plan (3–6 bullets) if the theme is large; confirm assumptions only when blocked.
+2. **Plan** briefly (3–6 bullets) if the theme is large; decide and proceed, noting assumptions in the PR.
 3. **Branch** `cursor/<short-description>-4ffb`, slice commits logically.
 4. **Test** the relevant suites — full CI before PR.
 5. **Document** non-obvious choices in PR description, not long inline comments.
@@ -196,7 +196,7 @@ python -m agentbench.run \
   --tasks agentbench/tasks/coding-v1.json \
   --trials 2 --dry-run
 
-# Publish (needs OPENROUTER_API_KEY in .env)
+# Publish (needs OPENROUTER_API_KEY in .env; paid live calls + publishing need owner authorization)
 python -m agentbench.run \
   --config agentbench/presets/moa-dev.yaml \
   --tasks agentbench/tasks/coding-v2.json \
@@ -206,7 +206,7 @@ python -m agentbench.run \
 
 ---
 
-## Open questions (resolve with product when blocked)
+## Open questions (decide and proceed; note assumptions in the PR)
 
 | Question | Why it matters |
 |----------|----------------|
