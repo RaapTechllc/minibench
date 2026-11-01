@@ -54,12 +54,6 @@ const SUITES: ReactRow[] = [
   [<Mono key="s">moa-lite-v1</Mono>, '4 categories', 'MoA-native disagreement slice: doc-conflict, constraint-pack, evidence-gap, proposal-arbitrate.'],
 ];
 
-const BANDS: { range: string; label: string; cls: string }[] = [
-  { range: '< 50 GB/s', label: 'Red', cls: 'text-fail bg-fail-soft' },
-  { range: '50–100 GB/s', label: 'Amber', cls: 'text-amber-600 bg-amber-50' },
-  { range: '100–200 GB/s', label: 'Green', cls: 'text-pass bg-pass-soft' },
-  { range: '200+ GB/s', label: 'Gold', cls: 'text-frontier bg-frontier-soft' },
-];
 
 const DEFENSES: ReactRow[] = [
   [
@@ -92,60 +86,71 @@ export default function Methodology() {
   return (
     <div className="space-y-8">
       <PageHeader eyebrow="How the numbers are made" title="Methodology">
-        Every MiniBench capability score is produced by an executable oracle — a grader that can
-        fail a deliberately wrong answer. No LLM judge scores the core suites, task suites are
-        procedurally generated with computed gold answers, and every published run carries a
-        reproducibility fingerprint. This page explains exactly what is measured and what is refused.
+        MiniBench separates measured capability from decision economics. Core scores come from
+        executable graders, while value recommendations combine those scores with charged task cost,
+        latency, uncertainty, and assumptions declared by the user. This page shows the contracts and formulas.
       </PageHeader>
 
-      {/* ── Hardware benchmarks ─────────────────────────────────────────── */}
+      {/* ── Decision economics ───────────────────────────────────────────── */}
       <Card className="animate-rise rise-1">
         <CardHeader
-          title="Hardware benchmarks"
-          sub="Crowdsourced local-inference throughput on Mini-PC-class hardware, via the MiniBench CLI."
+          title="Value Intelligence formulas"
+          sub="Transparent unit economics instead of a magic composite score."
         />
         <div className="space-y-4 px-5 pb-5 text-[14px] leading-relaxed text-ink-2">
           <p>
-            The CLI runs a standardized test against a local model: 3 warmup prompts (discarded),
-            then 5 fixed test prompts (~200 tokens each), reporting the median and p95
-            tokens-per-second plus time-to-first-token. Memory bandwidth, price, memory type, and
-            system name are resolved from a curated lookup table keyed by the detected CPU — the
-            headline metric can&rsquo;t be read reliably at runtime, so it is looked up rather than
-            guessed (and can be overridden explicitly).
+            For measured success probability <Mono>p</Mono>, charged cost per attempt <Mono>c</Mono>,
+            p50 latency in milliseconds <Mono>l</Mono>, declared failure loss <Mono>Cf</Mono>, and
+            time value in dollars per hour <Mono>Ct</Mono>:
           </p>
-          <p>
-            Results roll up into the <span className="font-medium text-ink">Hardware Efficiency Index</span>:
-          </p>
-          <div className="rounded-lg bg-surface-2 px-4 py-3 font-mono text-[13px] text-ink">
-            HEI = (tokens/sec × model_quality) / price
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="border border-line bg-surface-2 px-4 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">Cost per successful task</div>
+              <div className="tnum mt-2 text-[13px] text-ink">CPS = c / p</div>
+            </div>
+            <div className="border border-line bg-surface-2 px-4 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">Expected economic cost per task</div>
+              <div className="tnum mt-2 text-[13px] text-ink">E[C] = c + (l / 3,600,000) × Ct + (1 − p) × Cf</div>
+            </div>
+            <div className="border border-line bg-surface-2 px-4 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">Expected monthly successes</div>
+              <div className="tnum mt-2 text-[13px] text-ink">E[S] = task volume × p</div>
+            </div>
+            <div className="border border-line bg-surface-2 px-4 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3">Break-even failure cost · A → B</div>
+              <div className="tnum mt-2 text-[13px] text-ink">Cf* = [cB − cA + (lB − lA)Ct / 3,600,000] / (pB − pA)</div>
+            </div>
           </div>
           <p>
-            — value per dollar, where model quality comes from an MMLU / normalized-Elo lookup.
-            The site&rsquo;s central hardware thesis:{' '}
-            <span className="font-medium text-ink">memory bandwidth is the critical metric</span> —
-            for memory-bound local inference, throughput tracks bandwidth almost linearly, which the
-            bandwidth-vs-throughput chart on the{' '}
-            <Link to="/" className="font-medium text-accent hover:text-accent-strong">Overview</Link>{' '}
-            makes visible. Bandwidth is color-coded everywhere:
+            The break-even formula is an incremental cost-effectiveness ratio: it prices the quality
+            premium directly. If <Mono>pB ≤ pA</Mono>, there is no measured uplift to price. If
+            confidence intervals overlap, the interface labels the runs statistically indistinguishable
+            even when a declared scenario produces an economic preference.
           </p>
-          <div className="flex flex-wrap gap-2">
-            {BANDS.map((b) => (
-              <span key={b.range} className={`tnum inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${b.cls}`}>
-                {b.range} · {b.label}
-              </span>
-            ))}
-          </div>
-          <div>
-            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3">
-              Submission validation
-            </h3>
-            <ul className="list-disc space-y-1 pl-5">
-              <li><Mono>tokens_per_second</Mono> must be in 0.1–500; <Mono>test_duration_secs</Mono> ≥ 10; prompt + completion tokens ≥ 100.</li>
-              <li>Rate limit: 10 submissions per IP per hour.</li>
-              <li>Fingerprint = SHA256 of CPU + GPU + RAM + OS + engine + model + quantization; a duplicate fingerprint within 1 hour is rejected.</li>
-              <li>Client IP is hashed, never stored raw.</li>
-            </ul>
-          </div>
+          <p>
+            Apply the formulas on the <Link to="/" className="font-medium text-accent hover:text-accent-strong">Value desk</Link>{' '}
+            or inspect one pair in <Link to="/compare" className="font-medium text-accent hover:text-accent-strong">upgrade analysis</Link>.
+          </p>
+        </div>
+      </Card>
+
+      <Card className="animate-rise rise-1">
+        <CardHeader
+          title="External benchmark evidence"
+          sub="Primary sources inform coverage and validation; MiniBench does not scrape them into an undocumented blend."
+        />
+        <div className="space-y-4 px-5 pb-5 text-[14px] leading-relaxed text-ink-2">
+          <p>
+            Methodological reference points include Artificial Analysis for intelligence/speed/price,
+            LMArena for preference evidence, LiveBench for contamination-resistant objective tasks,
+            SWE-bench for repository-level coding, and OpenRouter for provider availability and pricing metadata.
+          </p>
+          <ul className="list-disc space-y-2 pl-5">
+            <li>External scores remain source-specific and dated; they are never treated as interchangeable percentages.</li>
+            <li>Charged run cost is preferred over catalog pricing. Any pricing snapshot records model identity and effective date.</li>
+            <li>A future composite must publish source, version, normalization, weight, and missing-data policy per component.</li>
+            <li>Where redistribution or API terms are unclear, MiniBench links to the primary source instead of copying its leaderboard.</li>
+          </ul>
         </div>
       </Card>
 
@@ -248,8 +253,10 @@ export default function Methodology() {
               must never shadow an official score.
             </li>
             <li>
-              <span className="font-medium text-ink">Cost per task and the Pareto frontier.</span>{' '}
-              Every run carries real cost accounting; the accuracy-vs-cost chart marks the frontier
+              <span className="font-medium text-ink">Cost per attempt and the Pareto frontier.</span>{' '}
+              Every run carries real cost accounting. Operational comparisons use mean charged cost
+              per scored attempt; the benchmark-item total across repeated trials remains available for
+              protocol accounting. The accuracy-vs-cost chart marks the frontier
               of runs no other run dominates (cost ≤ and pass rate ≥, one strictly better). Runs
               without cost data are excluded from the frontier.
             </li>
@@ -257,6 +264,11 @@ export default function Methodology() {
               <span className="font-medium text-ink">Uncertainty shown, not hidden.</span> Pass
               rates render with their 95% CI, so overlapping models read as what they are:
               statistically indistinguishable.
+            </li>
+            <li>
+              <span className="font-medium text-ink">Decision economics.</span> Cost per successful
+              task, expected economic cost, expected monthly success, and upgrade break-even are
+              derived from measured run fields plus assumptions visible in the interface.
             </li>
           </ul>
         </div>
@@ -289,6 +301,15 @@ export default function Methodology() {
               outlier gets flagged — an asterisk, never a score edit — and runs are never re-graded,
               re-seeded, or selectively rerun to move one model. Items are pruned by statistical
               discrimination only; expected orderings are checked last, as a sanity signal.
+            </li>
+            <li>
+              <span className="font-medium text-ink">No theoretical hardware winner.</span> Static
+              RAM, bandwidth, price, or TDP fields do not prove tokens per second, task quality, or
+              total cost of ownership. Hardware remains deployment context until a pinned profile has measured evidence.
+            </li>
+            <li>
+              <span className="font-medium text-ink">No mystery blended index.</span> MiniBench does
+              not mix Elo, benchmark percentages, prices, and internal evals under arbitrary hidden weights.
             </li>
           </ul>
         </div>

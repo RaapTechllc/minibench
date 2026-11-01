@@ -196,7 +196,23 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    let active = true;
+    Promise.all([api.getBenchmarks(), api.getStats()])
+      .then(([b, s]) => {
+        if (active) {
+          setBenchmarks(b);
+          setStats(s);
+        }
+      })
+      .catch(() => {
+        if (active) setError(true);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   if (loading) {
     return (

@@ -1,195 +1,511 @@
 @import "tailwindcss";
 
-/* ─────────────────────────────────────────────────────────────────────────
-   MiniBench design tokens — "precision instrument, in daylight".
-   Apple-light: airy, exact, one blue accent, soft depth. Data is the hero:
-   labels in the system sans, every measured number in a tabular monospace.
-   Single light theme, token-driven so a dark mode is a later token swap.
-   ───────────────────────────────────────────────────────────────────────── */
+/* MiniBench Value Terminal — financial research in daylight. */
 @theme {
-  /* Surfaces — a cool precise paper, not cream */
-  --color-paper: #f5f5f7;      /* app background */
-  --color-surface: #ffffff;    /* cards, tables */
-  --color-surface-2: #fafafd;  /* zebra rows, insets */
-
-  /* Ink */
-  --color-ink: #1d1d1f;        /* primary text */
-  --color-ink-2: #6e6e73;      /* secondary */
-  --color-ink-3: #9a9aa0;      /* tertiary / captions */
-
-  /* Hairlines — the structural motif */
-  --color-line: #e8e8ed;
-  --color-line-strong: #d2d2d7;
-
-  /* Single accent: a confident, slightly deep azure */
-  --color-accent: #0a6cff;
-  --color-accent-strong: #0047c4;
-  --color-accent-soft: #eaf1ff;
-
-  /* Semantics */
-  --color-pass: #1a9e4b;
-  --color-pass-soft: #e6f6ec;
-  --color-fail: #d63a2f;
+  --color-paper: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef1f4;
+  --color-ink: #101820;
+  --color-ink-2: #3d4d5c;
+  --color-ink-3: #667788;
+  --color-line: #d8e0e7;
+  --color-line-strong: #aebbc7;
+  --color-accent: #0b5cad;
+  --color-accent-strong: #07457f;
+  --color-accent-soft: #e8f1fa;
+  --color-positive: #147d55;
+  --color-positive-soft: #e7f4ee;
+  --color-pass: #147d55;
+  --color-pass-soft: #e7f4ee;
+  --color-fail: #b42318;
   --color-fail-soft: #fdecea;
-  --color-frontier: #b8860b;   /* Pareto gold, muted for daylight */
-  --color-frontier-soft: #fbf3dc;
-
-  /* Arcade chrome — Solo / Multiplayer cabinets (scoped via .arcade-cabinet) */
-  --color-arcade-bg: #0b0f1a;
-  --color-arcade-surface: #12182a;
-  --color-arcade-surface-2: #1a2238;
-  --color-arcade-line: #2a3555;
-  --color-arcade-ink: #e8ecf8;
-  --color-arcade-ink-2: #9aa3c0;
-  --color-arcade-ink-3: #6b7594;
-  --color-arcade-neon: #39f3ff;
-  --color-arcade-neon-2: #ff4fd8;
-  --color-arcade-gold: #ffd166;
-  --color-arcade-pass: #3dff9a;
-  --color-arcade-fail: #ff6b6b;
-
-  /* Type roles */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
-               Roboto, system-ui, sans-serif;
-  --font-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", "Roboto Mono",
-               ui-monospace, monospace;
-  --font-arcade: "Press Start 2P", "VT323", ui-monospace, monospace;
-
-  /* Radii — Apple-soft */
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-
-  /* Soft, layered depth (never harsh) */
-  --shadow-card: 0 1px 2px rgba(20, 20, 43, 0.04), 0 4px 16px rgba(20, 20, 43, 0.05);
-  --shadow-pop: 0 8px 30px rgba(20, 20, 43, 0.12);
-  --shadow-arcade: 0 0 0 1px rgba(57, 243, 255, 0.12), 0 12px 40px rgba(0, 0, 0, 0.45);
+  --color-frontier: #9a6700;
+  --color-frontier-soft: #fff4d6;
+  --font-sans: "IBM Plex Sans", "Segoe UI", Inter, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Code", "SFMono-Regular", ui-monospace, monospace;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --shadow-card: none;
+  --shadow-pop: 0 12px 32px rgba(16, 24, 32, 0.16);
 }
 
 @layer base {
-  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
   body {
     background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
     font-feature-settings: "cv01", "ss01";
+    line-height: 1.5;
   }
-  /* Every measured number lines up: tabular monospace figures. */
-  .tnum { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-  /* Visible keyboard focus everywhere (quality floor). */
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
   :focus-visible {
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
     border-radius: 4px;
   }
-  ::selection { background: var(--color-accent-soft); }
+
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+
+  .tnum {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 @layer components {
-  /* Arcade cabinet shell — dark/neon high-score board. Scoped so daylight
-     pages stay untouched; Multiplayer can reuse the same class later. */
-  .arcade-cabinet {
-    --color-paper: var(--color-arcade-bg);
-    --color-surface: var(--color-arcade-surface);
-    --color-surface-2: var(--color-arcade-surface-2);
-    --color-ink: var(--color-arcade-ink);
-    --color-ink-2: var(--color-arcade-ink-2);
-    --color-ink-3: var(--color-arcade-ink-3);
-    --color-line: var(--color-arcade-line);
-    --color-line-strong: #3a4668;
-    --color-accent: var(--color-arcade-neon);
-    --color-accent-strong: #7af7ff;
-    --color-accent-soft: rgba(57, 243, 255, 0.12);
-    --color-pass: var(--color-arcade-pass);
-    --color-pass-soft: rgba(61, 255, 154, 0.12);
-    --color-fail: var(--color-arcade-fail);
-    --color-fail-soft: rgba(255, 107, 107, 0.12);
-    --color-frontier: var(--color-arcade-gold);
-    --color-frontier-soft: rgba(255, 209, 102, 0.14);
-    --shadow-card: var(--shadow-arcade);
+  .skip-link {
+    position: fixed;
+    left: 1rem;
+    top: -4rem;
+    z-index: 100;
+    border-radius: 4px;
+    background: var(--color-ink);
+    color: white;
+    padding: 0.65rem 0.9rem;
+  }
 
+  .skip-link:focus {
+    top: 0.75rem;
+  }
+
+  .scenario-panel,
+  .decision-card,
+  .upgrade-panel,
+  .research-table-wrap,
+  .source-ledger {
+    border: 1px solid var(--color-line);
+    border-radius: 6px;
+    background: var(--color-surface);
+  }
+
+  .scenario-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .value-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .value-field > span {
+    color: var(--color-ink-3);
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  .value-field input,
+  .value-field select,
+  .upgrade-controls select {
+    width: 100%;
+    min-height: 2.5rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 4px;
+    background: white;
     color: var(--color-ink);
-    background:
-      linear-gradient(180deg, rgba(57, 243, 255, 0.04), transparent 28%),
-      repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(255, 255, 255, 0.015) 2px,
-        rgba(255, 255, 255, 0.015) 3px
-      ),
-      var(--color-arcade-bg);
-    border-radius: var(--radius-xl);
-    padding: 1.25rem 1.25rem 1.5rem;
-    box-shadow: var(--shadow-arcade);
+    font-size: 0.82rem;
+    padding: 0.45rem 0.6rem;
   }
 
-  .arcade-cabinet :focus-visible {
-    outline-color: var(--color-arcade-neon);
+  .quality-input {
+    position: relative;
   }
 
-  .arcade-cabinet ::selection {
-    background: rgba(57, 243, 255, 0.28);
+  .quality-input input {
+    padding-right: 2rem;
   }
 
-  /* Display font for tier · score only — body stays readable sans. */
-  .arcade-score {
-    font-family: var(--font-arcade);
+  .quality-input span {
+    position: absolute;
+    right: 0.65rem;
+    top: 50%;
+    color: var(--color-ink-3);
+    font-size: 0.8rem;
+    transform: translateY(-50%);
+  }
+
+  .decision-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 2rem;
+    border: 1px solid #b7d8c8;
+    border-left: 4px solid var(--color-positive);
+    border-radius: 6px;
+    background: var(--color-positive-soft);
+    padding: 1.25rem 1.5rem;
+  }
+
+  .decision-number {
+    min-width: 11rem;
+    border-left: 1px solid #b7d8c8;
+    padding-left: 1.5rem;
+    text-align: right;
+  }
+
+  .decision-number span,
+  .decision-number small {
+    display: block;
+    color: var(--color-ink-3);
+    font-size: 0.72rem;
+  }
+
+  .decision-number strong {
+    display: block;
+    margin: 0.15rem 0;
+    color: var(--color-ink);
+    font: 600 1.5rem/1.2 var(--font-mono);
+  }
+
+  .section-heading-row {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .section-heading-row h2 {
+    color: var(--color-ink);
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  .section-heading-row p {
+    margin-top: 0.15rem;
+    color: var(--color-ink-3);
+    font-size: 0.8rem;
+  }
+
+  .decision-card {
+    padding: 1.1rem 1.15rem;
+  }
+
+  .decision-card-label {
+    color: var(--color-accent);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 1px solid var(--color-line);
+  }
+
+  .metric-grid > div {
+    padding: 0.7rem 0;
+  }
+
+  .metric-grid > div:nth-child(even) {
+    border-left: 1px solid var(--color-line);
+    padding-left: 0.8rem;
+  }
+
+  .metric-grid > div:nth-child(-n+2) {
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .metric-grid dt,
+  .upgrade-metrics dt {
+    color: var(--color-ink-3);
     font-size: 0.68rem;
+  }
+
+  .metric-grid dd,
+  .upgrade-metrics dd {
+    margin-top: 0.15rem;
+    color: var(--color-ink);
+    font: 500 0.9rem/1.3 var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .evidence-pill {
+    display: inline-flex;
+    border-radius: 999px;
+    font-size: 0.64rem;
+    font-weight: 600;
+    padding: 0.2rem 0.45rem;
+    white-space: nowrap;
+  }
+
+  .evidence-official {
+    background: var(--color-positive-soft);
+    color: var(--color-positive);
+  }
+
+  .evidence-development {
+    background: var(--color-frontier-soft);
+    color: var(--color-frontier);
+  }
+
+  .evidence-incomplete {
+    background: var(--color-surface-2);
+    color: var(--color-ink-3);
+  }
+
+  .upgrade-panel {
+    display: grid;
+    grid-template-columns: 18rem minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .upgrade-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    border-right: 1px solid var(--color-line);
+    background: var(--color-surface-2);
+    padding: 1.25rem;
+  }
+
+  .upgrade-controls select {
+    margin-top: 0.35rem;
+  }
+
+  .upgrade-conclusion {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .upgrade-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1.1rem;
+    border-top: 1px solid var(--color-line);
+    padding-top: 1rem;
+  }
+
+  .research-table-wrap {
+    overflow-x: auto;
+  }
+
+  .research-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.76rem;
+  }
+
+  .research-table th {
+    background: var(--color-surface-2);
+    color: var(--color-ink-3);
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .research-table th:first-child,
+  .research-table td:first-child {
+    text-align: left;
+  }
+
+  .research-table th,
+  .research-table td {
+    border-bottom: 1px solid var(--color-line);
+    padding: 0.7rem 0.75rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .research-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .research-table tbody tr:hover {
+    background: #f8fafb;
+  }
+
+  .research-table .frontier-row {
+    box-shadow: inset 3px 0 0 var(--color-positive);
+  }
+
+  .mobile-research-row {
+    border: 1px solid var(--color-line);
+    border-radius: 6px;
+    background: var(--color-surface);
+    padding: 1rem;
+  }
+
+  .mobile-research-row dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    border-top: 1px solid var(--color-line);
+    padding-top: 0.75rem;
+  }
+
+  .mobile-research-row dt {
+    color: var(--color-ink-3);
+    font-size: 0.65rem;
+  }
+
+  .mobile-research-row dd {
+    margin-top: 0.15rem;
+    color: var(--color-ink);
+    font: 500 0.76rem/1.3 var(--font-mono);
+  }
+
+  .source-ledger {
+    padding: 1.15rem;
+  }
+
+  .source-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    border: 1px solid var(--color-line);
+    border-bottom: 0;
+  }
+
+  .source-item {
+    min-width: 0;
+    border-right: 1px solid var(--color-line);
+    color: var(--color-ink);
+    padding: 0.9rem;
+  }
+
+  .source-item:last-child {
+    border-right: 0;
+  }
+
+  .source-item:hover {
+    background: var(--color-accent-soft);
+  }
+
+  .source-item strong,
+  .source-item span {
+    display: block;
+  }
+
+  .source-item strong {
+    font-size: 0.78rem;
+  }
+
+  .source-item span {
+    margin-top: 0.25rem;
+    color: var(--color-ink-3);
+    font-size: 0.68rem;
+    line-height: 1.4;
+  }
+
+  .method-note {
+    border: 1px solid var(--color-line);
+    background: var(--color-surface-2);
+    color: var(--color-ink-2);
+    font-size: 0.76rem;
     line-height: 1.55;
-    letter-spacing: 0.02em;
-    color: var(--color-arcade-neon);
-    text-shadow: 0 0 12px rgba(57, 243, 255, 0.35);
+    padding: 0.8rem 0.9rem;
   }
 
-  .arcade-highscore-table thead tr {
-    border-bottom: 1px solid var(--color-arcade-line);
-  }
-
-  .arcade-highscore-table tbody tr {
-    border-bottom: 1px solid rgba(42, 53, 85, 0.7);
-    transition: background-color 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  .arcade-highscore-table tbody tr:nth-child(even) {
-    background: rgba(26, 34, 56, 0.45);
-  }
-
-  .arcade-highscore-table tbody tr:hover {
-    background: rgba(57, 243, 255, 0.06);
-    box-shadow: inset 3px 0 0 var(--color-arcade-neon);
-  }
-
-  .arcade-highscore-table tbody tr:first-child .arcade-rank {
-    color: var(--color-arcade-gold);
-  }
-
-  /* Tier accent via class — label text remains the primary signal. */
-  .arcade-tier-insert-coin { color: var(--color-arcade-ink-3); text-shadow: none; }
-  .arcade-tier-warm-up { color: #8ec8ff; }
-  .arcade-tier-high-score { color: var(--color-arcade-neon); }
-  .arcade-tier-boss-beaten { color: var(--color-arcade-neon-2); text-shadow: 0 0 12px rgba(255, 79, 216, 0.35); }
-  .arcade-tier-credits-rolling { color: var(--color-arcade-gold); text-shadow: 0 0 12px rgba(255, 209, 102, 0.4); }
 }
 
 @layer utilities {
-  /* Entrance: a small, quiet rise on mount. One motion, used sparingly. */
-  @keyframes rise {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
+  .animate-rise {
+    animation: none;
   }
-  .animate-rise { animation: rise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
-  .rise-1 { animation-delay: 0.04s; }
-  .rise-2 { animation-delay: 0.10s; }
-  .rise-3 { animation-delay: 0.16s; }
 
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    *,
+    *::before,
+    *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
-    .animate-rise { animation: none; }
+  }
+}
+
+@media (max-width: 1100px) {
+  .scenario-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .source-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .source-item:nth-child(3) {
+    border-right: 0;
+  }
+
+  .source-item:nth-child(-n+3) {
+    border-bottom: 1px solid var(--color-line);
+  }
+}
+
+@media (max-width: 767px) {
+  .scenario-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .decision-summary {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .decision-number {
+    border-top: 1px solid #b7d8c8;
+    border-left: 0;
+    padding: 0.9rem 0 0;
+    text-align: left;
+  }
+
+  .upgrade-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .upgrade-controls {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .upgrade-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .source-item,
+  .source-item:nth-child(3) {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .section-heading-row {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 430px) {
+  .scenario-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-research-row dl {
+    grid-template-columns: 1fr 1fr;
   }
 }

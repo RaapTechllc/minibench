@@ -2,17 +2,18 @@ import { test, expect } from '@playwright/test';
 import { snap, waitForAppReady, withErrorCapture } from './helpers';
 
 const NAV_ROUTES = [
-  { path: '/', title: /Overview|Dashboard|Efficiency|frontier|bandwidth/i, heading: undefined },
-  { path: '/models', title: /Solo Cabinet|Model scorecard|Season/i },
-  { path: '/agents', title: /Multiplayer Cabinet|MoA scorecards/i },
+  { path: '/', title: /Choose the model that earns its keep/i },
+  { path: '/models', title: /Model evidence|Hard v1|v2/i },
+  { path: '/agents', title: /Agent and MoA evidence/i },
+  { path: '/compare', title: /stronger model worth the premium/i },
   { path: '/moa-calculator', title: /MoA Cost Calculator/i },
-  { path: '/hardware', title: /Test Rigs/i },
-  { path: '/methodology', title: /Methodology|How the numbers/i },
+  { path: '/hardware', title: /Hardware is context/i },
+  { path: '/methodology', title: /Methodology/i },
 ] as const;
 
 const LEGACY_ROUTES = [
   { path: '/submit', title: /Submit throughput/i },
-  { path: '/compare', title: /Compare submissions/i },
+  { path: '/legacy-overview', title: /Overview|Dashboard|Efficiency|frontier|bandwidth/i },
   { path: '/leaderboard', expectRedirect: '/models' },
 ] as const;
 
@@ -26,22 +27,6 @@ test.describe('Navigation & routes', () => {
       await snap(page, '00-dashboard');
 
       for (const route of NAV_ROUTES) {
-        const link = page.locator('header nav.lg\\:flex, header nav').getByRole('link', {
-          name: new RegExp(
-            route.path === '/'
-              ? 'Overview'
-              : route.path === '/models'
-                ? 'Models'
-                : route.path === '/agents'
-                  ? 'Agents'
-                  : route.path === '/moa-calculator'
-                    ? 'MoA Calculator'
-                    : route.path === '/hardware'
-                      ? 'Test Rigs'
-                      : 'Methodology',
-          ),
-        }).first();
-
         // Prefer direct goto for reliability, then verify nav aria-current
         await page.goto(route.path);
         await waitForAppReady(page);
@@ -52,7 +37,7 @@ test.describe('Navigation & routes', () => {
       // Click each desktop nav link in order
       await page.goto('/');
       await waitForAppReady(page);
-      const labels = ['Overview', 'Models', 'Agents', 'MoA Calculator', 'Test Rigs', 'Methodology'];
+      const labels = ['Value', 'Models', 'Configurations', 'Compare', 'Cost planner', 'Deployment', 'Evidence'];
       const desktopNav = page.locator('header nav').first();
       for (const label of labels) {
         await desktopNav.getByRole('link', { name: label }).click();

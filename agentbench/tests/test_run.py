@@ -67,6 +67,41 @@ def test_to_agent_run_submit_scales_percentages():
     assert len(payload["results"]) == len(results)
 
 
+def test_cost_contract_separates_benchmark_task_from_single_attempt():
+    config = single_model_config("openrouter/x/y")
+    results = [
+        TrialResult("t1", "reasoning", 1, True, 1.0, 0.01, 100, 1, 1, "pass"),
+        TrialResult("t1", "reasoning", 2, True, 1.0, 0.02, 100, 1, 1, "pass"),
+        TrialResult("t2", "reasoning", 1, True, 1.0, 0.03, 100, 1, 1, "pass"),
+        TrialResult("t2", "reasoning", 2, False, 0.0, 0.04, 100, 1, 1, "fail"),
+    ]
+
+    summary = summarize(config, "minibench-core-v1", 2, results)
+    payload = to_agent_run_submit(summary, results, provider="openrouter")
+
+    assert summary["cost_usd_total"] == 0.1
+    assert summary["cost_usd_per_task"] == 0.05
+    assert summary["cost_usd_per_attempt"] == 0.025
+    assert payload["cost_usd_per_attempt"] == 0.025
+
+
+def test_incomplete_cost_accounting_is_not_published_as_attempt_cost():
+    config = single_model_config("openrouter/x/y")
+    results = [
+        TrialResult("t1", "reasoning", 1, True, 1.0, 0.01, 100, 1, 1, "pass"),
+        TrialResult("t1", "reasoning", 2, False, 0.0, None, 100, 1, 1, "fail"),
+    ]
+
+    summary = summarize(config, "minibench-core-v1", 2, results)
+    payload = to_agent_run_submit(summary, results, provider="openrouter")
+
+    assert summary["cost_accounting_complete"] is False
+    assert summary["cost_usd_total"] is None
+    assert summary["cost_usd_per_task"] is None
+    assert summary["cost_usd_per_attempt"] is None
+    assert payload["cost_usd_per_attempt"] is None
+
+
 def test_live_run_without_key_errors_cleanly(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setattr("agentbench.run._load_env_files", lambda: None)

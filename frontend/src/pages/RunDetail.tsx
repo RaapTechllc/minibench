@@ -8,7 +8,7 @@ import {
   Skeleton, EmptyState, ErrorState, CIBar,
 } from '../components/ui';
 import { fmtPct, fmtCost } from '../components/chart';
-import { categoryDisplayName, formatScorecard, orderCategoryKeys } from '../lib/scorecard.js';
+import { categoryDisplayName, orderCategoryKeys } from '../lib/scorecard.js';
 
 function fmtDate(value: string | null): string {
   if (!value) return '—';
@@ -32,9 +32,9 @@ const SCENARIO_LABELS: Record<ScenarioKind, string> = {
 };
 
 const SCENARIO_CLASSES: Record<ScenarioKind, string> = {
-  spreadsheet: 'border-cyan-400/40 bg-cyan-400/10 text-cyan-200',
-  cursor: 'border-violet-400/40 bg-violet-400/10 text-violet-200',
-  slack: 'border-amber-400/40 bg-amber-400/10 text-amber-200',
+  spreadsheet: 'border-line bg-surface-2 text-ink-2',
+  cursor: 'border-accent/30 bg-accent-soft text-accent-strong',
+  slack: 'border-frontier/30 bg-frontier-soft text-frontier',
 };
 
 function groupByCategory(results: AgentTaskResult[]): Map<string, AgentTaskResult[]> {
@@ -168,12 +168,12 @@ function capabilityMetric(source: unknown): string | null {
   return optionalMetric(source, CAPABILITY_KEYS);
 }
 
-function TechReadout({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function DiagnosticReadout({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-emerald-400/20 bg-black/30 p-3">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400/70">{label}</div>
-      <div className="tnum mt-1 text-lg font-semibold text-emerald-100">{value}</div>
-      {sub && <div className="mt-1 text-[11px] text-emerald-200/60">{sub}</div>}
+    <div className="border border-line bg-surface-2 p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3">{label}</div>
+      <div className="tnum mt-1 text-lg font-semibold text-ink">{value}</div>
+      {sub && <div className="mt-1 text-[11px] text-ink-3">{sub}</div>}
     </div>
   );
 }
@@ -189,9 +189,18 @@ function CategoryPassRate({ results }: { results: AgentTaskResult[] }) {
   );
 }
 
+function costPerAttempt(run: AgentRunDetail): number | null {
+  if (run.cost_usd_per_attempt != null) return Number(run.cost_usd_per_attempt);
+  const benchmarkItemCost = run.cost_usd_per_task == null ? null : Number(run.cost_usd_per_task);
+  const trials = Number(run.n_trials);
+  return benchmarkItemCost != null && Number.isFinite(trials) && trials > 0
+    ? benchmarkItemCost / trials
+    : null;
+}
+
 const BackLink = ({ run }: { run?: AgentRunDetail | null }) => {
   const to = run ? (run.moa_config ? '/agents' : '/models') : '/agents';
-  const label = run ? (run.moa_config ? 'Back to Multiplayer Cabinet' : 'Back to Solo Cabinet') : 'Back to leaderboard';
+  const label = run ? (run.moa_config ? 'Back to configurations' : 'Back to models') : 'Back to research';
   return (
     <Link to={to} className="inline-flex items-center gap-1.5 text-accent hover:text-accent-strong text-sm">
       <ArrowLeft className="w-4 h-4" /> {label}
@@ -199,7 +208,7 @@ const BackLink = ({ run }: { run?: AgentRunDetail | null }) => {
   );
 };
 
-function TechnicianPanel({ run }: { run: AgentRunDetail }) {
+function DiagnosticsPanel({ run }: { run: AgentRunDetail }) {
   const hasCI = run.ci95_low != null && run.ci95_high != null;
   const runFormat = formatMetric(run);
   const runCapability = capabilityMetric(run);
@@ -213,28 +222,28 @@ function TechnicianPanel({ run }: { run: AgentRunDetail }) {
     .filter((row) => row.format !== null || row.capability !== null);
 
   return (
-    <Card className="border-emerald-400/30 bg-slate-950 p-5 font-mono text-emerald-100 shadow-none">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-emerald-400/20 pb-3">
+    <Card className="border-line bg-surface p-5 shadow-none">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400">Technician mode</div>
-          <div className="mt-1 text-[12px] text-emerald-200/70">Backstage scoring diagnostics for aggregate score checks.</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-3">Scoring diagnostics</div>
+          <div className="mt-1 text-[12px] text-ink-2">Aggregate intervals, consistency, and task-level scoring checks.</div>
         </div>
         {run.grader_version && (
-          <span className="rounded border border-emerald-400/30 px-2 py-1 text-[11px] text-emerald-200">
+          <span className="border border-line px-2 py-1 font-mono text-[11px] text-ink-2">
             grader {run.grader_version}
           </span>
         )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <TechReadout
+        <DiagnosticReadout
           label="95% CI"
           value={hasCI ? `${Number(run.ci95_low).toFixed(1)}-${Number(run.ci95_high).toFixed(1)}%` : '—'}
           sub={hasCI ? 'Wilson interval around score' : 'not included in payload'}
         />
-        <TechReadout label="Pass^k" value={run.pass_hat_k != null ? fmtPct(run.pass_hat_k) : '—'} />
-        <TechReadout label="Trial grid" value={`${run.n_tasks} tasks x ${run.n_trials} trials`} />
-        <TechReadout
+        <DiagnosticReadout label="Pass^k" value={run.pass_hat_k != null ? fmtPct(run.pass_hat_k) : '—'} />
+        <DiagnosticReadout label="Trial grid" value={`${run.n_tasks} tasks x ${run.n_trials} trials`} />
+        <DiagnosticReadout
           label="Format / capability"
           value={runFormat || runCapability ? `${runFormat ?? '—'} / ${runCapability ?? '—'}` : '—'}
           sub={runFormat || runCapability ? 'strict format vs extractable answer' : 'not included in payload'}
@@ -242,16 +251,16 @@ function TechnicianPanel({ run }: { run: AgentRunDetail }) {
       </div>
 
       {hasCI && (
-        <div className="mt-4 rounded-lg border border-emerald-400/20 bg-black/20 p-3">
-          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400/70">Score interval</div>
+        <div className="mt-4 border border-line bg-surface-2 p-3">
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-3">Score interval</div>
           <CIBar value={Number(run.pass_rate)} lo={Number(run.ci95_low)} hi={Number(run.ci95_high)} />
         </div>
       )}
 
       {resultMetrics.length > 0 && (
-        <div className="mt-4 overflow-x-auto rounded-lg border border-emerald-400/20">
+        <div className="mt-4 overflow-x-auto border border-line">
           <table className="w-full text-left text-[12px]">
-            <thead className="border-b border-emerald-400/20 text-[10px] uppercase tracking-[0.14em] text-emerald-400/70">
+            <thead className="border-b border-line text-[10px] uppercase tracking-[0.12em] text-ink-3">
               <tr>
                 <th className="px-3 py-2 font-semibold">Task</th>
                 <th className="px-3 py-2 font-semibold">Format</th>
@@ -260,10 +269,10 @@ function TechnicianPanel({ run }: { run: AgentRunDetail }) {
             </thead>
             <tbody>
               {resultMetrics.map(({ result, index, format, capability }) => (
-                <tr key={`${result.task_id}-${result.trial ?? index}`} className="border-t border-emerald-400/10">
-                  <td className="px-3 py-2 text-emerald-100">{taskDisplayName(result, index)}</td>
-                  <td className="tnum px-3 py-2 text-emerald-200/80">{format ?? '—'}</td>
-                  <td className="tnum px-3 py-2 text-emerald-200/80">{capability ?? '—'}</td>
+                <tr key={`${result.task_id}-${result.trial ?? index}`} className="border-t border-line">
+                  <td className="px-3 py-2 text-ink">{taskDisplayName(result, index)}</td>
+                  <td className="tnum px-3 py-2 text-ink-2">{format ?? '—'}</td>
+                  <td className="tnum px-3 py-2 text-ink-2">{capability ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -347,7 +356,12 @@ export default function RunDetail() {
   const categories = orderCategoryKeys([...groups.keys()])
     .map((category) => [category, groups.get(category) ?? []] as const)
     .filter(([, results]) => results.length > 0);
-  const scorecard = formatScorecard(run.pass_rate);
+  const attemptCost = costPerAttempt(run);
+  const attemptCostSource = run.cost_usd_per_attempt != null
+    ? 'recorded mean attempt cost'
+    : attemptCost != null
+      ? 'derived from benchmark item cost ÷ trials'
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -370,12 +384,14 @@ export default function RunDetail() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 animate-rise rise-1">
         <Stat
-          label="Scorecard"
+          label="Measured success"
           accent
-          value={`${scorecard.tier} · ${scorecard.score}`}
-          sub="overall run score"
+          value={fmtPct(run.pass_rate)}
+          sub={run.ci95_low != null && run.ci95_high != null
+            ? `95% CI ${Number(run.ci95_low).toFixed(1)}–${Number(run.ci95_high).toFixed(1)}%`
+            : 'confidence interval unavailable'}
         />
-        <Stat label="Cost / task" value={fmtCost(run.cost_usd_per_task)} />
+        <Stat label="Cost / attempt" value={fmtCost(attemptCost)} sub={attemptCostSource} />
         <Stat
           label="Latency p50 / p95"
           value={run.latency_p50_ms != null && run.latency_p95_ms != null
@@ -390,20 +406,20 @@ export default function RunDetail() {
           type="button"
           aria-pressed={technicianMode}
           onClick={() => setTechnicianMode((value) => !value)}
-          className="rounded-lg border border-ink-3/30 bg-slate-950 px-4 py-2 font-mono text-[12px] font-semibold uppercase tracking-[0.16em] text-emerald-300 transition hover:border-emerald-400/60 hover:text-emerald-100"
+          className="border border-line bg-surface px-4 py-2 text-[12px] font-semibold text-ink-2 transition hover:border-line-strong hover:text-ink"
         >
-          {technicianMode ? 'RELEASE START to hide Technician mode' : 'HOLD START for Technician mode'}
+          {technicianMode ? 'Hide diagnostics' : 'Show diagnostics'}
         </button>
       </div>
 
-      {technicianMode && <TechnicianPanel run={run} />}
+      {technicianMode && <DiagnosticsPanel run={run} />}
 
       {/* Task-by-task breakdown, grouped by category — the drill-down every
           comparable leaderboard (LiveBench, PinchBench) treats as core. */}
       <div className="space-y-4 animate-rise rise-2">
         <div>
-          <h2 className="text-lg font-semibold text-ink">Arcade manual</h2>
-          <p className="text-[13px] text-ink-2">Per-task pass/fail grouped into the displayed scorecard categories.</p>
+          <h2 className="text-lg font-semibold text-ink">Task evidence</h2>
+          <p className="text-[13px] text-ink-2">Per-task outcomes grouped by the published evaluation categories.</p>
         </div>
         {run.results.length === 0 ? (
           <EmptyState title="No per-task results">

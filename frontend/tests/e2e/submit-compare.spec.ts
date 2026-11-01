@@ -22,7 +22,7 @@ const VALID_SUBMIT = {
   test_duration_secs: '15',
 };
 
-test.describe('Submit & Compare (legacy)', () => {
+test.describe('Submit legacy route and model comparison', () => {
   test('submit form validates required fields then accepts a valid run', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'desktop');
 
@@ -81,15 +81,15 @@ test.describe('Submit & Compare (legacy)', () => {
     expect(hardFails).toEqual([]);
   });
 
-  test('compare page selects two benchmarks', async ({ page }, testInfo) => {
+  test('compare page selects two measured model runs', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'desktop');
 
     const { failedRequests, pageErrors } = await withErrorCapture(page, async () => {
-      await gotoAndWaitForApi(page, '/compare', '/api/v1/benchmarks');
+      await gotoAndWaitForApi(page, '/compare', '/api/v1/agents/models/leaderboard');
       await snap(page, 'compare-default');
 
-      const selectA = page.getByLabel('A');
-      const selectB = page.getByLabel('B');
+      const selectA = page.locator('#compare-baseline');
+      const selectB = page.locator('#compare-challenger');
       await expect(selectA).toBeVisible();
       await expect(selectB).toBeVisible();
 
@@ -97,20 +97,17 @@ test.describe('Submit & Compare (legacy)', () => {
         opts.map((o) => (o as HTMLOptionElement).value),
       );
       if (aOpts.length >= 2) {
-        // Page auto-loads compare for first two; force a different pairing.
-        const wait = page.waitForResponse((r) => r.url().includes('/api/v1/compare') && r.ok());
         await selectA.selectOption(aOpts[aOpts.length - 1]);
         await selectB.selectOption(aOpts[0]);
-        await wait;
-        await expect(page.getByText('Metric comparison')).toBeVisible();
+        await expect(page.getByText('Incremental measure')).toBeVisible();
         await snap(page, 'compare-side-by-side');
       } else {
-        await expect(page.getByText(/Pick two systems|Metric comparison/i)).toBeVisible();
+        await expect(page.getByText(/needs at least two runs|Incremental measure/i)).toBeVisible();
       }
 
       // Cross-links
-      await page.getByRole('link', { name: 'Models' }).first().click();
-      await expect(page).toHaveURL(/\/models/);
+      await page.getByRole('link', { name: 'Value desk' }).first().click();
+      await expect(page).toHaveURL('/');
     });
 
     expect(pageErrors).toEqual([]);

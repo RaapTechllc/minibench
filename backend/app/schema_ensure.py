@@ -27,6 +27,7 @@ _AGENT_RUN_COLUMNS: list[tuple[str, str]] = [
     ("n_canary_flags", "integer NOT NULL DEFAULT 0"),
     ("calibration_brier", "numeric(6,4)"),
     ("robustness_correct", "numeric(6,4)"),
+    ("cost_usd_per_attempt", "numeric(14,8)"),
 ]
 
 _KNOWN_MODEL_COLUMNS: list[tuple[str, str]] = [
@@ -50,4 +51,13 @@ def ensure_schema(connection) -> list[str]:
         stmt = f"ALTER TABLE known_models ADD COLUMN IF NOT EXISTS {col} {typ}"
         connection.execute(text(stmt))
         applied.append(stmt)
+    # Existing rows used cost_usd_per_task for the full repeated benchmark
+    # item. Preserve them while deriving the production-attempt estimate.
+    backfill = (
+        "UPDATE agent_runs "
+        "SET cost_usd_per_attempt = cost_usd_per_task / NULLIF(n_trials, 0) "
+        "WHERE cost_usd_per_attempt IS NULL AND cost_usd_per_task IS NOT NULL"
+    )
+    connection.execute(text(backfill))
+    applied.append(backfill)
     return applied

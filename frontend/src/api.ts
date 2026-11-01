@@ -104,6 +104,7 @@ export interface AgentLeaderboardEntry {
   ci95_low: number | null;
   ci95_high: number | null;
   cost_usd_per_task: number | null;
+  cost_usd_per_attempt: number | null;
   latency_p50_ms: number | null;
   latency_p95_ms: number | null;
   on_pareto_frontier: boolean;
@@ -136,6 +137,7 @@ export interface AgentRunDetail {
   ci95_low: number | null;
   ci95_high: number | null;
   cost_usd_per_task: number | null;
+  cost_usd_per_attempt: number | null;
   latency_p50_ms: number | null;
   latency_p95_ms: number | null;
   tokens_in: number | null;
@@ -180,6 +182,7 @@ export interface ModelLeaderboardEntry {
   ci95_low: number | null;
   ci95_high: number | null;
   cost_usd_per_task: number | null;
+  cost_usd_per_attempt: number | null;
   latency_p50_ms: number | null;
   latency_p95_ms: number | null;
   submitted_at: string;

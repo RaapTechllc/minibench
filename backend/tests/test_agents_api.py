@@ -34,11 +34,37 @@ def test_submit_run_returns_run_id_and_persists(client):
     assert body["run_id"]
     assert body["benchmark_suite"] == "our-coding-v1"
     assert float(body["pass_rate"]) == 75.0
+    assert float(body["cost_usd_per_attempt"]) == 0.04
 
     # Detail endpoint returns the child task results.
     detail = client.get(f"/api/v1/agents/runs/{body['run_id']}").json()
     assert len(detail["results"]) == 2
     assert detail["results"][0]["task_id"] == "code-two-sum"
+
+
+def test_submit_preserves_explicit_attempt_cost(client):
+    resp = client.post(
+        "/api/v1/agents/runs",
+        json=_run_payload(cost_usd_per_attempt=0.01234567),
+    )
+    assert resp.status_code == 200
+    assert float(resp.json()["cost_usd_per_attempt"]) == 0.01234567
+
+
+def test_submit_rejects_negative_costs(client):
+    aggregate = client.post(
+        "/api/v1/agents/runs",
+        json=_run_payload(cost_usd_per_attempt=-0.01),
+    )
+    assert aggregate.status_code == 422
+
+    result = client.post(
+        "/api/v1/agents/runs",
+        json=_run_payload(results=[
+            {"task_id": "t1", "passed": True, "cost_usd": -0.01},
+        ]),
+    )
+    assert result.status_code == 422
 
 
 def test_missing_run_returns_404(client):
@@ -75,6 +101,29 @@ def test_leaderboard_sort_by_cost_ascending(client):
         moa_config={"name": "budget"}, cost_usd_per_task=0.02))
     board = client.get("/api/v1/agents/leaderboard?sort_by=cost_usd_per_task").json()
     assert [e["config_name"] for e in board] == ["budget", "pricey"]
+
+
+def test_leaderboard_cost_sort_honors_selected_unit(client):
+    client.post("/api/v1/agents/runs", json=_run_payload(
+        moa_config={"name": "task-cheap"},
+        cost_usd_per_task=0.06,
+        cost_usd_per_attempt=0.02,
+    ))
+    client.post("/api/v1/agents/runs", json=_run_payload(
+        moa_config={"name": "attempt-cheap"},
+        cost_usd_per_task=0.12,
+        cost_usd_per_attempt=0.01,
+    ))
+
+    by_task = client.get(
+        "/api/v1/agents/leaderboard?sort_by=cost_usd_per_task"
+    ).json()
+    by_attempt = client.get(
+        "/api/v1/agents/leaderboard?sort_by=cost_usd_per_attempt"
+    ).json()
+
+    assert [entry["config_name"] for entry in by_task] == ["task-cheap", "attempt-cheap"]
+    assert [entry["config_name"] for entry in by_attempt] == ["attempt-cheap", "task-cheap"]
 
 
 def test_leaderboard_filters_by_suite(client):
@@ -119,6 +168,7 @@ def test_model_leaderboard_best_run_per_model_with_catalog_join(client):
     assert entry["license"] == "open"
     assert entry["category_pass_rates"] == {"reasoning": 100.0, "coding": 100.0}
     assert entry["on_pareto_frontier"] is True
+    assert float(entry["cost_usd_per_attempt"]) == 0.01
 
 
 def test_publish_flips_benchmarked_flag(client):

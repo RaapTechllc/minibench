@@ -270,7 +270,10 @@ def summarize(config: MoAConfig, suite: str, trials: int, results: list[TrialRes
     n_all_tasks = len({r.task_id for r in scored})
     latencies = [float(r.latency_ms) for r in scored]
     costs = [r.cost_usd for r in scored if r.cost_usd is not None]
-    total_cost = sum(costs) if costs else None
+    cost_accounting_complete = bool(scored) and len(costs) == len(scored)
+    # A partial sum is not a defensible total: missing usage most often occurs
+    # on failed calls, exactly where dropping cost would bias value upward.
+    total_cost = sum(costs) if cost_accounting_complete else None
     ci_lo, ci_hi = wilson_ci(passes, total)
     boot_lo, boot_hi = bootstrap_ci_by_task(per_task_fracs)
     # Infra-excluded trials can leave a task with fewer than `trials` scored
@@ -311,8 +314,17 @@ def summarize(config: MoAConfig, suite: str, trials: int, results: list[TrialRes
         # Wilson interval is too narrow — this one is honest about ranking noise.
         "pass_rate_ci95_boot": [round(boot_lo, 4), round(boot_hi, 4)],
         "pass_hat_k": round(pass_hat_k(per_task_passes, per_task_trials, k=effective_k), 4),
+        "cost_accounting_complete": cost_accounting_complete,
         "cost_usd_total": round(total_cost, 6) if total_cost is not None else None,
         "cost_usd_per_task": round(total_cost / n_all_tasks, 6) if total_cost is not None and n_all_tasks else None,
+        # One production attempt, not the full repeated benchmark task.  The
+        # older per-task field includes every trial and is retained for
+        # backward-compatible benchmark budget reporting.
+        "cost_usd_per_attempt": (
+            round(total_cost / len(costs), 8)
+            if total_cost is not None and costs
+            else None
+        ),
         "latency_p50_ms": round(percentile(latencies, 50), 1),
         "latency_p95_ms": round(percentile(latencies, 95), 1),
     }
@@ -340,6 +352,16 @@ def to_agent_run_submit(
 
     tokens_in = sum(r.tokens_in for r in trials)
     tokens_out = sum(r.tokens_out for r in trials)
+    cost_per_attempt = summary.get("cost_usd_per_attempt")
+    if cost_per_attempt is None and "cost_accounting_complete" not in summary:
+        # Legacy committed artifacts predate the explicit field. Reconstruct it
+        # from the charged calls rather than dividing a rounded aggregate.
+        attempt_costs = [
+            r.cost_usd for r in trials
+            if r.cost_usd is not None and not r.infra_error
+        ]
+        if attempt_costs:
+            cost_per_attempt = round(sum(attempt_costs) / len(attempt_costs), 8)
 
     return {
         "harness": harness,
@@ -359,6 +381,7 @@ def to_agent_run_submit(
         "ci95_low": pct(ci[0]),
         "ci95_high": pct(ci[1]),
         "cost_usd_per_task": summary.get("cost_usd_per_task"),
+        "cost_usd_per_attempt": cost_per_attempt,
         "latency_p50_ms": int(summary["latency_p50_ms"]) if summary.get("latency_p50_ms") is not None else None,
         "latency_p95_ms": int(summary["latency_p95_ms"]) if summary.get("latency_p95_ms") is not None else None,
         # Novel pro axes (None unless the run had those items). robustness_correct

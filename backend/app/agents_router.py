@@ -34,6 +34,15 @@ def _rankable(run: AgentRun) -> bool:
     return not (run.n_canary_flags or 0) and not (run.n_infra_errors or 0)
 
 
+def _attempt_cost(run: AgentRun) -> Optional[Decimal]:
+    """Production cost of one attempt, with a legacy-row fallback."""
+    if run.cost_usd_per_attempt is not None:
+        return run.cost_usd_per_attempt
+    if run.cost_usd_per_task is not None and run.n_trials:
+        return run.cost_usd_per_task / Decimal(run.n_trials)
+    return None
+
+
 def _pareto_frontier(points: list[tuple[int, Optional[Decimal], Decimal]]) -> set[int]:
     """Indices on the accuracy-vs-cost Pareto frontier.
 
@@ -76,6 +85,15 @@ async def submit_agent_run(data: AgentRunSubmit, db: AsyncSession = Depends(get_
         ci95_low=data.ci95_low,
         ci95_high=data.ci95_high,
         cost_usd_per_task=data.cost_usd_per_task,
+        cost_usd_per_attempt=(
+            data.cost_usd_per_attempt
+            if data.cost_usd_per_attempt is not None
+            else (
+                data.cost_usd_per_task / data.n_trials
+                if data.cost_usd_per_task is not None and data.n_trials
+                else None
+            )
+        ),
         latency_p50_ms=data.latency_p50_ms,
         latency_p95_ms=data.latency_p95_ms,
         tokens_in=data.tokens_in,
@@ -138,7 +156,10 @@ async def submit_agent_run(data: AgentRunSubmit, db: AsyncSession = Depends(get_
 async def agent_leaderboard(
     suite: Optional[str] = None,
     provider: Optional[str] = None,
-    sort_by: str = Query("pass_rate", pattern="^(pass_rate|cost_usd_per_task|pass_hat_k)$"),
+    sort_by: str = Query(
+        "pass_rate",
+        pattern="^(pass_rate|cost_usd_per_task|cost_usd_per_attempt|pass_hat_k)$",
+    ),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ):
@@ -152,14 +173,22 @@ async def agent_leaderboard(
     runs = [r for r in result.scalars().all() if _rankable(r)]
 
     # Pareto frontier is computed over the filtered set (cost vs pass rate).
-    points = [(idx, r.cost_usd_per_task, r.pass_rate) for idx, r in enumerate(runs)]
+    points = [(idx, _attempt_cost(r), r.pass_rate) for idx, r in enumerate(runs)]
     frontier = _pareto_frontier(points)
 
     # Sort: pass_rate/pass_hat_k desc (higher better), cost asc (lower better).
     if sort_by == "cost_usd_per_task":
         runs_sorted = sorted(
             enumerate(runs),
-            key=lambda t: (t[1].cost_usd_per_task is None, t[1].cost_usd_per_task or 0),
+            key=lambda t: (
+                t[1].cost_usd_per_task is None,
+                t[1].cost_usd_per_task or Decimal(0),
+            ),
+        )
+    elif sort_by == "cost_usd_per_attempt":
+        runs_sorted = sorted(
+            enumerate(runs),
+            key=lambda t: (_attempt_cost(t[1]) is None, _attempt_cost(t[1]) or 0),
         )
     else:
         runs_sorted = sorted(
@@ -188,6 +217,7 @@ async def agent_leaderboard(
                 ci95_low=r.ci95_low,
                 ci95_high=r.ci95_high,
                 cost_usd_per_task=r.cost_usd_per_task,
+                cost_usd_per_attempt=_attempt_cost(r),
                 latency_p50_ms=r.latency_p50_ms,
                 latency_p95_ms=r.latency_p95_ms,
                 on_pareto_frontier=idx in frontier,
@@ -221,7 +251,7 @@ async def model_leaderboard(
         # Private-split runs ALWAYS supersede dev-slice runs for the same model:
         # the dev slice is public (contamination-prone) and must never shadow an
         # official private score, even a lower one.
-        return (bool(r.is_private_split), r.pass_rate, -(r.cost_usd_per_task or Decimal(0)))
+        return (bool(r.is_private_split), r.pass_rate, -(_attempt_cost(r) or Decimal(0)))
 
     for r in single_runs:
         key = r.moa_config["models"][0]
@@ -251,10 +281,10 @@ async def model_leaderboard(
 
     ordered = sorted(
         best.items(),
-        key=lambda kv: (kv[1].pass_rate, -(kv[1].cost_usd_per_task or Decimal(0))),
+        key=lambda kv: (kv[1].pass_rate, -(_attempt_cost(kv[1]) or Decimal(0))),
         reverse=True,
     )[:limit]
-    points = [(i, r.cost_usd_per_task, r.pass_rate) for i, (_, r) in enumerate(ordered)]
+    points = [(i, _attempt_cost(r), r.pass_rate) for i, (_, r) in enumerate(ordered)]
     frontier = _pareto_frontier(points)
 
     entries = []
@@ -279,6 +309,7 @@ async def model_leaderboard(
                 ci95_low=r.ci95_low,
                 ci95_high=r.ci95_high,
                 cost_usd_per_task=r.cost_usd_per_task,
+                cost_usd_per_attempt=_attempt_cost(r),
                 latency_p50_ms=r.latency_p50_ms,
                 latency_p95_ms=r.latency_p95_ms,
                 submitted_at=r.submitted_at,

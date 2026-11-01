@@ -10,8 +10,10 @@ import argparse
 import hashlib
 import json
 import multiprocessing
+import queue
 import shutil
 import tempfile
+import threading
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -265,7 +267,10 @@ class OfflineTextEnvironment:
         try:
             workspace.mkdir(parents=True, exist_ok=False)
             fixture = workspace / "service.conf"
-            fixture.write_text(_INITIAL_CONTENT, encoding="utf-8")
+            # Write canonical LF bytes so the declared digest is identical on
+            # Windows and POSIX. ``Path.write_text`` applies platform newline
+            # translation and turns this fixture into CRLF on Windows.
+            fixture.write_bytes(_INITIAL_CONTENT.encode("utf-8"))
             digest = "sha256:" + hashlib.sha256(fixture.read_bytes()).hexdigest()
             if digest != manifest.fixture.digest:
                 raise RuntimeError("prepared fixture does not match its declared digest")
@@ -283,22 +288,18 @@ class OfflineTextEnvironment:
         prompt: str,
         budget: AgentBudget,
     ) -> AgentResult:
-        parent, child = multiprocessing.get_context("fork").Pipe(duplex=False)
-        process = multiprocessing.get_context("fork").Process(
-            target=_execute_agent_child,
-            args=(child, agent, prompt, handle.workspace, budget),
-            daemon=True,
-        )
-        process.start()
-        child.close()
-        if not parent.poll(budget.wall_time_seconds):
-            process.terminate()
-            process.join()
-            parent.close()
-            raise TimeoutError("wall-time budget exceeded")
-        kind, payload = parent.recv()
-        parent.close()
-        process.join()
+        # ``fork`` gives POSIX a hard-kill boundary. Windows has no fork and
+        # spawn cannot serialize locally-defined adapters used by the harness,
+        # so use a daemon thread there while preserving the same result
+        # contract and wall-clock deadline.
+        if "fork" in multiprocessing.get_all_start_methods():
+            kind, payload = _execute_agent_forked(
+                agent, prompt, handle.workspace, budget
+            )
+        else:
+            kind, payload = _execute_agent_threaded(
+                agent, prompt, handle.workspace, budget
+            )
         if kind == "timeout":
             raise TimeoutError("agent reported timeout")
         if kind == "error":
@@ -349,6 +350,48 @@ def _execute_agent_child(connection, agent, prompt, workspace, budget) -> None:
         connection.send(("error", None))
     finally:
         connection.close()
+
+
+def _execute_agent_forked(agent, prompt, workspace, budget) -> tuple[str, Any]:
+    context = multiprocessing.get_context("fork")
+    parent, child = context.Pipe(duplex=False)
+    process = context.Process(
+        target=_execute_agent_child,
+        args=(child, agent, prompt, workspace, budget),
+        daemon=True,
+    )
+    process.start()
+    child.close()
+    if not parent.poll(budget.wall_time_seconds):
+        process.terminate()
+        process.join()
+        parent.close()
+        raise TimeoutError("wall-time budget exceeded")
+    kind, payload = parent.recv()
+    parent.close()
+    process.join()
+    return kind, payload
+
+
+def _execute_agent_threaded(agent, prompt, workspace, budget) -> tuple[str, Any]:
+    result_queue: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
+
+    def invoke() -> None:
+        try:
+            result_queue.put(
+                ("result", agent.execute(prompt, workspace, AgentBudgetGuard(budget)))
+            )
+        except TimeoutError:
+            result_queue.put(("timeout", None))
+        except BaseException:
+            result_queue.put(("error", None))
+
+    worker = threading.Thread(target=invoke, daemon=True)
+    worker.start()
+    try:
+        return result_queue.get(timeout=budget.wall_time_seconds)
+    except queue.Empty as exc:
+        raise TimeoutError("wall-time budget exceeded") from exc
 
 
 def _valid_agent_result(result: Any) -> bool:
@@ -472,7 +515,8 @@ def build_agent_artifact(
     ci_low, ci_high = wilson_ci(passes, count)
     boot_low, boot_high = bootstrap_ci_by_task([rate] if scored else [])
     costs = [trial.cost_usd for trial in scored if trial.cost_usd is not None]
-    total_cost = sum(costs) if costs else None
+    cost_accounting_complete = bool(scored) and len(costs) == len(scored)
+    total_cost = sum(costs) if cost_accounting_complete else None
     latencies = [float(trial.wall_time_ms) for trial in scored]
     effective_k = count
     return {
@@ -517,8 +561,14 @@ def build_agent_artifact(
             ),
             "n_infra_errors": len(trials) - len(scored),
             "n_canary_flags": 0,
+            "cost_accounting_complete": cost_accounting_complete,
             "cost_usd_total": round(total_cost, 6) if total_cost is not None else None,
             "cost_usd_per_task": round(total_cost, 6) if total_cost is not None else None,
+            "cost_usd_per_attempt": (
+                round(total_cost / len(costs), 8)
+                if total_cost is not None and costs
+                else None
+            ),
             "latency_p50_ms": round(percentile(latencies, 50), 1),
             "latency_p95_ms": round(percentile(latencies, 95), 1),
             "evaluation_type": "agent_harness",

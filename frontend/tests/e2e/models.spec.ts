@@ -7,8 +7,8 @@ import {
   withErrorCapture,
 } from './helpers';
 
-test.describe('Models page (Solo Cabinet)', () => {
-  test('loads leaderboard, cabinet/chart selects, and sortable headers', async ({ page }, testInfo) => {
+test.describe('Models page', () => {
+  test('loads leaderboard, suite/chart selects, and sortable headers', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'chromium-desktop', 'desktop interactions');
 
     const { failedRequests, pageErrors } = await withErrorCapture(page, async () => {
@@ -18,24 +18,24 @@ test.describe('Models page (Solo Cabinet)', () => {
 
       await expect(page.locator('h1').first()).toBeVisible();
       // Table or empty state should appear
-      const table = page.locator('table.arcade-highscore-table');
+      const table = page.locator('table').last();
       const empty = page.getByText(/No published runs/i);
       await expect(table.or(empty).first()).toBeVisible({ timeout: 20_000 });
 
-      const cabinet = page.getByLabel('Cabinet');
-      await expect(cabinet).toBeVisible();
-      const options = await cabinet.locator('option').allTextContents();
+      const suite = page.getByLabel('Evaluation suite');
+      await expect(suite).toBeVisible();
+      const options = await suite.locator('option').allTextContents();
       expect(options.length).toBeGreaterThan(1);
 
-      // Cycle cabinet options
-      for (const value of await cabinet.locator('option').evaluateAll((opts) =>
+      // Cycle suite options
+      for (const value of await suite.locator('option').evaluateAll((opts) =>
         opts.map((o) => (o as HTMLOptionElement).value),
       )) {
-        await cabinet.selectOption(value);
+        await suite.selectOption(value);
         await page.waitForResponse((r) => r.url().includes('/api/v1/agents/models/leaderboard') && r.ok());
         await page.waitForTimeout(200);
       }
-      await snap(page, 'models-after-cabinet-cycle');
+      await snap(page, 'models-after-suite-cycle');
 
       // Chart Y-axis select
       const chart = page.getByLabel('Chart Y-axis');

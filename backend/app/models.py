@@ -158,6 +158,10 @@ class AgentRun(Base):
     ci95_low = Column(Numeric(5, 2))
     ci95_high = Column(Numeric(5, 2))
     cost_usd_per_task = Column(Numeric(10, 4))
+    # Mean charged cost for one scored trial. Unlike cost_usd_per_task, this
+    # excludes the benchmark's repeated-trial multiplier and is the correct
+    # production-economics input.
+    cost_usd_per_attempt = Column(Numeric(14, 8))
     latency_p50_ms = Column(Integer)
     latency_p95_ms = Column(Integer)
     tokens_in = Column(BigInteger)

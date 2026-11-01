@@ -13,34 +13,44 @@ import {
 } from '../components/ui';
 import { axisProps, fmtPct, TooltipCard } from '../components/chart';
 import {
-  CABINET_OPTIONS,
-  CREDITS_ROLLING_MIN,
-  DEFAULT_CABINET_SUITE,
+  BENCHMARK_SUITE_OPTIONS,
+  DEFAULT_FEATURED_SUITE,
   SATURATION_THRESHOLD,
   categoryDisplayName,
   evaluateSaturation,
-  formatScorecard,
-  formatScorecardLabel,
-  cabinetForSuite,
+  suiteMetadata,
   orderCategoryKeys,
-  tierChromeClass,
 } from '../lib/scorecard.js';
 
 const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
-const fmtCost = (c: number | null) => (c == null ? '—' : c < 0.01 ? `$${c.toFixed(4)}` : `$${c.toFixed(3)}`);
-const MANUAL_CABINET_OVERRIDE_KEY = 'minibench.cabinet.override';
+const fmtCost = (c: number | null) => {
+  if (c == null) return '—';
+  if (c === 0) return '$0';
+  if (c < 0.0001) return `$${c.toFixed(6)}`;
+  if (c < 0.01) return `$${c.toFixed(4)}`;
+  return `$${c.toFixed(2)}`;
+};
+const attemptCost = (entry: ModelLeaderboardEntry): number | null => {
+  if (entry.cost_usd_per_attempt != null) return Number(entry.cost_usd_per_attempt);
+  const benchmarkItemCost = num(entry.cost_usd_per_task);
+  const trials = Number(entry.n_trials);
+  return benchmarkItemCost != null && Number.isFinite(trials) && trials > 0
+    ? benchmarkItemCost / trials
+    : null;
+};
+const MANUAL_SUITE_OVERRIDE_KEY = 'minibench.suite.override';
 const SEASON_2_SUITE = 'minibench-v2';
 
-/** Chart palette for the Solo Cabinet — neon on dark, not daylight blue. */
-const ARCADE_CHART = {
-  accent: '#39f3ff',
-  frontier: '#ffd166',
-  line: '#2a3555',
-  ink3: '#6b7594',
-  grid: '#1a2238',
+/** High-contrast chart palette for the daylight research surface. */
+const CHART = {
+  accent: '#0b5cad',
+  frontier: '#147d55',
+  line: '#aebbc7',
+  ink3: '#667788',
+  grid: '#e5eaee',
 };
 
-function ArcadeFrontierDot(props: {
+function FrontierDot(props: {
   cx?: number; cy?: number; payload?: { on_pareto_frontier?: boolean };
 }) {
   const { cx, cy, payload } = props;
@@ -48,46 +58,46 @@ function ArcadeFrontierDot(props: {
   const on = payload?.on_pareto_frontier;
   return on ? (
     <g>
-      <circle cx={cx} cy={cy} r={7} fill={ARCADE_CHART.frontier} fillOpacity={0.2} />
-      <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.frontier} stroke="#12182a" strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={7} fill={CHART.frontier} fillOpacity={0.2} />
+      <circle cx={cx} cy={cy} r={4} fill={CHART.frontier} stroke="#ffffff" strokeWidth={1.5} />
     </g>
   ) : (
-    <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.accent} fillOpacity={0.9} stroke="#12182a" strokeWidth={1.5} />
+    <circle cx={cx} cy={cy} r={4} fill={CHART.accent} fillOpacity={0.9} stroke="#ffffff" strokeWidth={1.5} />
   );
 }
 
-type CabinetOption = (typeof CABINET_OPTIONS)[number];
+type SuiteOption = (typeof BENCHMARK_SUITE_OPTIONS)[number];
 
-const cabinetOptionLabel = (cabinet: CabinetOption) => {
-  if (cabinet.suite === 'minibench-core-v1') {
-    return `${cabinet.label} · ${cabinet.season} · optional`;
+const suiteOptionLabel = (suiteOption: SuiteOption) => {
+  if (suiteOption.suite === 'minibench-core-v1') {
+    return `${suiteOption.label} · ${suiteOption.season} · optional`;
   }
-  if (cabinet.label === cabinet.season) return cabinet.label;
-  return `${cabinet.label} · ${cabinet.season}`;
+  if (suiteOption.label === suiteOption.season) return suiteOption.label;
+  return `${suiteOption.label} · ${suiteOption.season}`;
 };
 
-const readManualCabinetOverride = () => {
+const readManualSuiteOverride = () => {
   if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(MANUAL_CABINET_OVERRIDE_KEY);
+  return window.localStorage.getItem(MANUAL_SUITE_OVERRIDE_KEY);
 };
 
-const initialCabinetSuite = () => readManualCabinetOverride() ?? DEFAULT_CABINET_SUITE;
+const initialSuite = () => readManualSuiteOverride() ?? DEFAULT_FEATURED_SUITE;
 
 const SUITE_OPTIONS = [
-  ...CABINET_OPTIONS.map((c) => ({
+  ...BENCHMARK_SUITE_OPTIONS.map((c) => ({
     value: c.suite,
-    label: cabinetOptionLabel(c),
+    label: suiteOptionLabel(c),
   })),
-  { value: '', label: 'All cabinets' },
+  { value: '', label: 'All suites' },
 ] as const;
 
-type SortKey = 'pass_rate' | 'pass_hat_k' | 'cost_usd_per_task' | string;
+type SortKey = 'pass_rate' | 'pass_hat_k' | 'cost_usd_per_attempt' | string;
 type SortDir = 'asc' | 'desc';
 
 function sortValue(e: ModelLeaderboardEntry, key: SortKey): number {
   if (key === 'pass_rate') return Number(e.pass_rate);
   if (key === 'pass_hat_k') return Number(e.pass_hat_k ?? -1);
-  if (key === 'cost_usd_per_task') return Number(e.cost_usd_per_task ?? Number.POSITIVE_INFINITY);
+  if (key === 'cost_usd_per_attempt') return attemptCost(e) ?? Number.POSITIVE_INFINITY;
   if (key === 'composite') return compositeScore(e.category_pass_rates) ?? -1;
   return e.category_pass_rates[key] ?? -1;
 }
@@ -116,13 +126,13 @@ interface Point {
 export default function Models() {
   const [entries, setEntries] = useState<ModelLeaderboardEntry[]>([]);
   const [newModels, setNewModels] = useState<KnownModel[]>([]);
-  const [suite, setSuite] = useState(initialCabinetSuite);
-  const [hasManualCabinetOverride, setHasManualCabinetOverride] = useState(
-    () => readManualCabinetOverride() !== null,
+  const [suite, setSuite] = useState(initialSuite);
+  const [hasManualSuiteOverride, setHasManualSuiteOverride] = useState(
+    () => readManualSuiteOverride() !== null,
   );
-  const [seasonUnlocked, setSeasonUnlocked] = useState(false);
-  // One-shot: if the default cabinet has no published runs yet, widen to all
-  // cabinets instead of opening on an empty page. A ref (read at response time,
+  const [advancedSuiteAvailable, setAdvancedSuiteAvailable] = useState(false);
+  // One-shot: if the default suite has no published runs yet, widen to all
+  // suites instead of opening on an empty page. A ref (read at response time,
   // set synchronously on any user choice or prior widen) rather than state,
   // so a stale in-flight response can never override the user's selection.
   const suitePinned = useRef(false);
@@ -141,10 +151,10 @@ export default function Models() {
     if (suite) params.suite = suite;
     Promise.all([
       api.getModelLeaderboard(params).then((list) => {
-        // Covers both the default cabinet and a season auto-promote landing on
-        // a board with no published runs yet — widen to all cabinets rather
-        // than open empty. Never fires over a user's own cabinet choice.
-        if (list.length === 0 && !suitePinned.current && !hasManualCabinetOverride) {
+        // Covers both the default suite and an automatic promotion landing on
+        // a board with no published runs yet — widen to all suites rather
+        // than open empty. Never fires over a user's own suite choice.
+        if (list.length === 0 && !suitePinned.current && !hasManualSuiteOverride) {
           suitePinned.current = true;
           setSuite('');
           return;
@@ -153,7 +163,7 @@ export default function Models() {
       }),
       api.getNewModels().then(setNewModels).catch(() => setNewModels([])),
     ]).catch((e) => setError(e.message)).finally(() => setLoading(false));
-  }, [suite, hasManualCabinetOverride]);
+  }, [suite, hasManualSuiteOverride]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -163,20 +173,20 @@ export default function Models() {
   const saturationState = evaluateSaturation(entries);
 
   useEffect(() => {
-    if (suite !== DEFAULT_CABINET_SUITE || saturationState !== 'promote') return;
+    if (suite !== DEFAULT_FEATURED_SUITE || saturationState !== 'promote') return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSeasonUnlocked(true);
-    if (!hasManualCabinetOverride) {
+    setAdvancedSuiteAvailable(true);
+    if (!hasManualSuiteOverride) {
       setSuite(SEASON_2_SUITE);
     }
-  }, [hasManualCabinetOverride, saturationState, suite]);
+  }, [hasManualSuiteOverride, saturationState, suite]);
 
   const categories = useMemo(
     () => orderCategoryKeys(entries.flatMap((e) => Object.keys(e.category_pass_rates))),
     [entries],
   );
 
-  const activeCabinet = cabinetForSuite(suite);
+  const activeSuite = suiteMetadata(suite);
 
   const sortedEntries = useMemo(() => {
     const copy = [...entries];
@@ -191,7 +201,7 @@ export default function Models() {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else {
       setSortKey(key);
-      setSortDir(key === 'cost_usd_per_task' ? 'asc' : 'desc');
+      setSortDir(key === 'cost_usd_per_attempt' ? 'asc' : 'desc');
     }
   };
 
@@ -201,11 +211,11 @@ export default function Models() {
       : (e.category_pass_rates[chartMetric] ?? 0);
 
   const points: Point[] = sortedEntries
-    .filter((e) => e.cost_usd_per_task != null)
+    .filter((e) => attemptCost(e) != null)
     .map((e) => ({
       name: e.display_name ?? e.model_string,
       family: e.family,
-      cost: Number(e.cost_usd_per_task),
+      cost: attemptCost(e)!,
       pass: chartPass(e),
       on_pareto_frontier: e.on_pareto_frontier,
     }));
@@ -213,31 +223,31 @@ export default function Models() {
   const isPro = entries.some((e) => e.benchmark_suite?.includes('pro'));
   const hasCalib = entries.some((e) => e.calibration_brier != null);
   const hasRobust = entries.some((e) => e.robustness_correct != null);
+  const officialCount = entries.filter((e) => e.is_private_split).length;
 
-  const showSaturation = seasonUnlocked || (suite === DEFAULT_CABINET_SUITE && saturationState === 'promote');
-  const handleCabinetChange = (value: string) => {
+  const showSaturation = advancedSuiteAvailable || (suite === DEFAULT_FEATURED_SUITE && saturationState === 'promote');
+  const handleSuiteChange = (value: string) => {
     suitePinned.current = true;
     setSuite(value);
-    setHasManualCabinetOverride(true);
-    window.localStorage.setItem(MANUAL_CABINET_OVERRIDE_KEY, value);
+    setHasManualSuiteOverride(true);
+    window.localStorage.setItem(MANUAL_SUITE_OVERRIDE_KEY, value);
   };
 
   const chartMetricLabel =
-    chartMetric === 'pass_rate' ? 'Score' : categoryDisplayName(chartMetric);
+    chartMetric === 'pass_rate' ? 'Measured success' : categoryDisplayName(chartMetric);
 
   return (
-    <div className="arcade-cabinet space-y-8">
+    <div className="space-y-8">
       <PageHeader
-        eyebrow="Solo Cabinet"
-        title={activeCabinet
-          ? (activeCabinet.label === activeCabinet.season
-            ? activeCabinet.label
-            : `${activeCabinet.label} · ${activeCabinet.season}`)
-          : 'Model scorecard'}
+        eyebrow="Model research"
+        title={activeSuite
+          ? (activeSuite.label === activeSuite.season
+            ? activeSuite.label
+            : `${activeSuite.label} · ${activeSuite.season}`)
+          : 'Model evidence'}
       >
-        Scores that spread models apart on work you&apos;d actually do — and if everyone&apos;s Credits
-        Rolling, we&apos;re on the wrong board. Tier · score rides on the active cabinet, with 95% CI
-        bars underneath. When two bars overlap, it&apos;s a tie, not a winner.
+        Measured task success, cost, latency, and uncertainty on pinned evaluation lanes. Confidence
+        intervals are evidence—not decoration. When intervals overlap, MiniBench does not claim a winner.
       </PageHeader>
 
       {legacyNotice && (
@@ -246,7 +256,7 @@ export default function Models() {
             The hardware throughput leaderboard has been retired — too many uncontrolled variables
             (machine × engine × quantization × model) made rows incomparable. Model capability
             scores on pinned reference profiles are now the primary ranking. Reference rig docs
-            live on <Link to="/hardware" className="text-accent hover:text-accent-strong font-medium">Test Rigs</Link>.
+            live under <Link to="/hardware" className="text-accent hover:text-accent-strong font-medium">Deployment evidence</Link>.
           </p>
           <button
             type="button"
@@ -259,13 +269,13 @@ export default function Models() {
       )}
 
       <div className="flex flex-wrap items-end gap-4">
-        <Select label="Cabinet" value={suite} onChange={(e) => handleCabinetChange(e.target.value)}>
+        <Select label="Evaluation suite" value={suite} onChange={(e) => handleSuiteChange(e.target.value)}>
           {SUITE_OPTIONS.map((o) => (
             <option key={o.value || 'all'} value={o.value}>{o.label}</option>
           ))}
         </Select>
         <Select label="Chart Y-axis" value={chartMetric} onChange={(e) => setChartMetric(e.target.value)}>
-          <option value="pass_rate">Score</option>
+          <option value="pass_rate">Measured success</option>
           {categories.map((c) => (
             <option key={c} value={c}>{categoryDisplayName(c)}</option>
           ))}
@@ -275,10 +285,18 @@ export default function Models() {
       {showSaturation && (
         <Card className="border-frontier/40 bg-frontier-soft/30 px-5 py-4">
           <p className="text-[13px] text-ink">
-            <span className="font-semibold text-frontier">Season 1 cleared — Season 2 unlocked</span>
-            {' '}because more than {Math.round(SATURATION_THRESHOLD * 100)}% of Season 1 models
-            reached Credits Rolling ({CREDITS_ROLLING_MIN}+). New visitors now start on{' '}
-            <strong>minibench-v2</strong>; your cabinet picker stays in charge once you choose a board.
+            <span className="font-semibold text-frontier">The current suite is saturated.</span>
+            {' '}More than {Math.round(SATURATION_THRESHOLD * 100)}% of measured models cleared the
+            saturation threshold, so new visitors now start on <strong>minibench-v2</strong>. You can
+            still select any historical suite for regression research.
+          </p>
+        </Card>
+      )}
+
+      {!loading && !error && entries.length > 0 && officialCount === 0 && (
+        <Card className="border-frontier/30 bg-frontier-soft/20 px-5 py-4">
+          <p className="text-[13px] text-ink">
+            <strong>Development evidence only.</strong> This suite currently contains public dev-slice runs and no private-split official run. Use the rows to inspect coverage and economics, not to make a formal winner claim.
           </p>
         </Card>
       )}
@@ -290,8 +308,8 @@ export default function Models() {
       ) : entries.length === 0 ? (
         <EmptyState title="No published runs for this suite yet">
           {suite === 'minibench-v2'
-            ? 'Publish Season 2 runs with agentbench.run --tasks agentbench/tasks/minibench-v2.json to populate the cabinet.'
-            : 'Score a model and publish it, then it appears here on the Solo Cabinet leaderboard.'}
+            ? 'Publish v2 runs with agentbench.run --tasks agentbench/tasks/minibench-v2.json to populate this lane.'
+            : 'Score and publish a model on this pinned suite to add comparable evidence.'}
         </EmptyState>
       ) : (
         <>
@@ -299,29 +317,29 @@ export default function Models() {
             <CardHeader
               title="Capability vs. cost"
               sub={`Each point is a model. Up is higher ${chartMetricLabel}; left is cheaper.`}
-              right={<Badge tone="frontier">Gold = Pareto-optimal</Badge>}
+              right={<Badge tone="frontier">Highlighted = Pareto frontier</Badge>}
             />
             <div className="px-2 pb-4">
               <ResponsiveContainer width="100%" height={380}>
                 <ScatterChart margin={{ top: 16, right: 32, bottom: 36, left: 8 }}>
-                  <CartesianGrid stroke={ARCADE_CHART.grid} />
+                  <CartesianGrid stroke={CHART.grid} />
                   <XAxis
-                    dataKey="cost" name="Cost/task" type="number"
+                    dataKey="cost" name="Cost/attempt" type="number"
                     {...axisProps}
-                    stroke={ARCADE_CHART.ink3}
-                    tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
+                    stroke={CHART.ink3}
+                    tick={{ fill: CHART.ink3, fontSize: 11 }}
                     tickFormatter={(v: number) => `$${v}`}
-                    label={{ value: 'Cost per task (USD)', position: 'insideBottom', offset: -18, fill: ARCADE_CHART.ink3, fontSize: 12 }}
+                    label={{ value: 'Cost per attempt (USD)', position: 'insideBottom', offset: -18, fill: CHART.ink3, fontSize: 12 }}
                   />
                   <YAxis
                     dataKey="pass" name="Pass rate" type="number" domain={[0, 100]}
                     {...axisProps}
-                    stroke={ARCADE_CHART.ink3}
-                    tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
-                    label={{ value: `${chartMetricLabel} (%)`, angle: -90, position: 'insideLeft', offset: 16, fill: ARCADE_CHART.ink3, fontSize: 12 }}
+                    stroke={CHART.ink3}
+                    tick={{ fill: CHART.ink3, fontSize: 11 }}
+                    label={{ value: `${chartMetricLabel} (%)`, angle: -90, position: 'insideLeft', offset: 16, fill: CHART.ink3, fontSize: 12 }}
                   />
                   <Tooltip
-                    cursor={{ stroke: ARCADE_CHART.line, strokeDasharray: '4 4' }}
+                    cursor={{ stroke: CHART.line, strokeDasharray: '4 4' }}
                     content={({ payload }) => {
                       if (!payload?.length) return null;
                       const d = payload[0].payload as Point;
@@ -330,13 +348,13 @@ export default function Models() {
                           <div className="font-semibold text-ink">{d.name}</div>
                           {d.family && <div className="text-ink-3">{d.family}</div>}
                           <div className="tnum mt-1 text-accent-strong">{fmtPct(d.pass)} {chartMetricLabel}</div>
-                          <div className="tnum text-ink-2">{fmtCost(d.cost)}/task</div>
+                          <div className="tnum text-ink-2">{fmtCost(d.cost)}/attempt</div>
                           {d.on_pareto_frontier && <div className="mt-1 text-[11px] text-frontier">On Pareto frontier</div>}
                         </TooltipCard>
                       );
                     }}
                   />
-                  <Scatter data={points} shape={ArcadeFrontierDot} isAnimationActive={false} />
+                  <Scatter data={points} shape={FrontierDot} isAnimationActive={false} />
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
@@ -344,7 +362,7 @@ export default function Models() {
 
           <Card className="animate-rise rise-2 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="arcade-highscore-table w-full text-left text-[13px]">
+              <table className="w-full text-left text-[13px]">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wider">
                     <th className="py-3 pl-5 pr-2 font-semibold text-ink-3">#</th>
@@ -384,10 +402,10 @@ export default function Models() {
                       />
                     ))}
                     <SortableTh
-                      label="Cost/task"
-                      active={sortKey === 'cost_usd_per_task'}
+                      label="Cost/attempt"
+                      active={sortKey === 'cost_usd_per_attempt'}
                       dir={sortDir}
-                      onClick={() => toggleSort('cost_usd_per_task')}
+                      onClick={() => toggleSort('cost_usd_per_attempt')}
                       className="px-2 py-3"
                     />
                     <th className="px-2 py-3 font-semibold text-ink-3">Validity</th>
@@ -395,24 +413,21 @@ export default function Models() {
                 </thead>
                 <tbody>
                   {sortedEntries.map((e) => {
-                    const card = formatScorecard(e.pass_rate);
                     return (
                       <tr key={e.model_string}>
-                        <td className="arcade-rank tnum py-3 pl-5 pr-2 text-ink-3">{e.rank}</td>
+                        <td className="tnum py-3 pl-5 pr-2 text-ink-3">{e.rank}</td>
                         <td className="px-2 py-3">
                           <div className="flex items-center gap-2">
                             <Link to={`/agents/runs/${e.run_id}`} className="font-medium text-ink hover:text-accent">
                               {e.display_name ?? e.model_string}
                             </Link>
-                            {e.on_pareto_frontier && <span className="text-frontier" title="Pareto-optimal">★</span>}
+                            {e.on_pareto_frontier && <Badge tone="frontier">Pareto</Badge>}
                             <LicenseBadge license={e.license} />
                           </div>
                           {e.family && <div className="text-[12px] text-ink-3">{e.family}</div>}
                         </td>
                         <td className="px-2 py-3 min-w-[200px]">
-                          <div className={`arcade-score ${tierChromeClass(card.tierId)}`}>
-                            {formatScorecardLabel(e.pass_rate)}
-                          </div>
+                          <div className="tnum text-[13px] font-semibold text-ink">{fmtPct(e.pass_rate)} measured success</div>
                           <CIBar value={Number(e.pass_rate)} lo={num(e.ci95_low)} hi={num(e.ci95_high)} />
                         </td>
                         <td className="tnum px-2 py-3 text-ink-2">{e.pass_hat_k != null ? fmtPct(e.pass_hat_k) : '—'}</td>
@@ -450,7 +465,7 @@ export default function Models() {
                             </td>
                           );
                         })}
-                        <td className="tnum px-2 py-3 text-ink-2">{fmtCost(num(e.cost_usd_per_task))}</td>
+                        <td className="tnum px-2 py-3 text-ink-2">{fmtCost(attemptCost(e))}</td>
                         <td className="px-2 py-3"><ValidityBadge isPrivate={e.is_private_split} /></td>
                       </tr>
                     );
@@ -486,7 +501,7 @@ export default function Models() {
 
       {!loading && newModels.length > 0 && (
         <Card className="p-6">
-          <h2 className="text-[15px] font-semibold text-ink">New — not yet benchmarked</h2>
+          <h2 className="text-[15px] font-semibold text-ink">Coverage gaps</h2>
           <p className="mt-1 text-[13px] text-ink-2">
             Tracked in the master catalog (pinned OpenRouter ids) but without a published run yet.
           </p>

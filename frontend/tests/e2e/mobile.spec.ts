@@ -16,7 +16,7 @@ test.describe('Mobile navigation', () => {
       await expect(page.getByRole('button', { name: /Close menu/i })).toBeVisible();
       await snap(page, 'mobile-menu-open');
 
-      const mobileNav = page.locator('header nav').filter({ hasText: 'Methodology' });
+      const mobileNav = page.getByRole('navigation', { name: 'Mobile navigation' });
       await mobileNav.getByRole('link', { name: 'Models' }).click();
       await waitForAppReady(page);
       await expect(page).toHaveURL(/\/models/);
@@ -25,23 +25,23 @@ test.describe('Mobile navigation', () => {
       await snap(page, 'mobile-models');
 
       await page.getByRole('button', { name: /Open menu/i }).click();
-      await mobileNav.getByRole('link', { name: 'Agents' }).click();
+      await mobileNav.getByRole('link', { name: 'Configurations' }).click();
       await expect(page).toHaveURL(/\/agents/);
 
       await page.getByRole('button', { name: /Open menu/i }).click();
-      await mobileNav.getByRole('link', { name: 'MoA Calculator' }).click();
+      await mobileNav.getByRole('link', { name: 'Cost planner' }).click();
       await expect(page).toHaveURL(/\/moa-calculator/);
 
       await page.getByRole('button', { name: /Open menu/i }).click();
-      await mobileNav.getByRole('link', { name: 'Test Rigs' }).click();
+      await mobileNav.getByRole('link', { name: 'Deployment' }).click();
       await expect(page).toHaveURL(/\/hardware/);
 
       await page.getByRole('button', { name: /Open menu/i }).click();
-      await mobileNav.getByRole('link', { name: 'Methodology' }).click();
+      await mobileNav.getByRole('link', { name: 'Evidence' }).click();
       await expect(page).toHaveURL(/\/methodology/);
 
       await page.getByRole('button', { name: /Open menu/i }).click();
-      await mobileNav.getByRole('link', { name: 'Overview' }).click();
+      await mobileNav.getByRole('link', { name: 'Value' }).click();
       await expect(page).toHaveURL('/');
       await snap(page, 'mobile-back-home');
     });

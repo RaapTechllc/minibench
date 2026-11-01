@@ -10,21 +10,33 @@ import {
   Card, CardHeader, PageHeader, Badge, Select, Skeleton, EmptyState, ErrorState, CIBar,
 } from '../components/ui';
 import { TooltipCard, axisProps, fmtPct } from '../components/chart';
-import {
-  formatScorecard,
-  formatScorecardLabel,
-  tierChromeClass,
-} from '../lib/scorecard.js';
+
 
 const num = (v: number | string | null | undefined) => (v === null || v === undefined ? null : Number(v));
+const SUITES = [
+  ['minibench-core-v1', 'Core v1 · broad coverage'],
+  ['minibench-hard-v1', 'Hard v1 · stronger separation'],
+  ['minibench-v2', 'v2 · current'],
+  ['minibench-pro-v1', 'Pro v1 · calibration + robustness'],
+  ['moa-lite-v1', 'MoA Lite v1'],
+  ['our-coding-v2', 'Coding v2'],
+] as const;
+const attemptCost = (entry: AgentLeaderboardEntry): number | null => {
+  if (entry.cost_usd_per_attempt != null) return Number(entry.cost_usd_per_attempt);
+  const benchmarkItemCost = num(entry.cost_usd_per_task);
+  const trials = Number(entry.n_trials);
+  return benchmarkItemCost != null && Number.isFinite(trials) && trials > 0
+    ? benchmarkItemCost / trials
+    : null;
+};
 
-/** Chart palette for the Multiplayer Cabinet — mirrors Solo Cabinet chrome. */
-const ARCADE_CHART = {
-  accent: '#39f3ff',
-  frontier: '#ffd166',
-  line: '#2a3555',
-  ink3: '#6b7594',
-  grid: '#1a2238',
+/** High-contrast chart palette for the daylight research surface. */
+const CHART = {
+  accent: '#0b5cad',
+  frontier: '#147d55',
+  line: '#aebbc7',
+  ink3: '#667788',
+  grid: '#e5eaee',
 };
 
 // Cost display keeps sub-cent precision for near-free configs, otherwise 3 dp.
@@ -33,10 +45,13 @@ function fmtCost(v: number | null): string {
   // Decimal fields serialize as JSON strings (pydantic), not numbers — coerce
   // before formatting or .toFixed() throws on a string at render time.
   const n = Number(v);
-  return n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(3)}`;
+  if (n === 0) return '$0';
+  if (n < 0.0001) return `$${n.toFixed(6)}`;
+  if (n < 0.01) return `$${n.toFixed(4)}`;
+  return `$${n.toFixed(2)}`;
 }
 
-function ArcadeFrontierDot(props: {
+function FrontierDot(props: {
   cx?: number; cy?: number; payload?: { on_pareto_frontier?: boolean };
 }) {
   const { cx, cy, payload } = props;
@@ -44,15 +59,15 @@ function ArcadeFrontierDot(props: {
   const on = payload?.on_pareto_frontier;
   return on ? (
     <g>
-      <circle cx={cx} cy={cy} r={7} fill={ARCADE_CHART.frontier} fillOpacity={0.2} />
-      <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.frontier} stroke="#12182a" strokeWidth={1.5} />
+      <circle cx={cx} cy={cy} r={7} fill={CHART.frontier} fillOpacity={0.2} />
+      <circle cx={cx} cy={cy} r={4} fill={CHART.frontier} stroke="#ffffff" strokeWidth={1.5} />
     </g>
   ) : (
-    <circle cx={cx} cy={cy} r={4} fill={ARCADE_CHART.accent} fillOpacity={0.9} stroke="#12182a" strokeWidth={1.5} />
+    <circle cx={cx} cy={cy} r={4} fill={CHART.accent} fillOpacity={0.9} stroke="#ffffff" strokeWidth={1.5} />
   );
 }
 
-// Cost-vs-score scatter point. Arcade dot chrome keys off on_pareto_frontier.
+// Cost-vs-score scatter point.
 interface ParetoPoint {
   cost: number;
   pass: number;
@@ -74,14 +89,14 @@ interface QuickPick {
 
 function computeQuickPicks(entries: AgentLeaderboardEntry[]): QuickPick[] {
   if (entries.length === 0) return [];
-  const priced = entries.filter(e => e.cost_usd_per_task != null);
+  const priced = entries.filter(e => attemptCost(e) != null);
   const picks: QuickPick[] = [];
 
   const mostAccurate = [...entries].sort((a, b) => Number(b.pass_rate) - Number(a.pass_rate))[0];
   picks.push({
     label: 'Top score',
     entry: mostAccurate,
-    detail: formatScorecardLabel(mostAccurate.pass_rate),
+    detail: `${fmtPct(mostAccurate.pass_rate)} measured success`,
     icon: Trophy,
     tint: 'text-accent bg-accent-soft',
   });
@@ -99,11 +114,11 @@ function computeQuickPicks(entries: AgentLeaderboardEntry[]): QuickPick[] {
   }
 
   if (priced.length > 0) {
-    const cheapest = [...priced].sort((a, b) => (a.cost_usd_per_task ?? 0) - (b.cost_usd_per_task ?? 0))[0];
+    const cheapest = [...priced].sort((a, b) => attemptCost(a)! - attemptCost(b)!)[0];
     picks.push({
       label: 'Cheapest',
       entry: cheapest,
-      detail: fmtCost(cheapest.cost_usd_per_task),
+      detail: `${fmtCost(attemptCost(cheapest))}/attempt`,
       icon: DollarSign,
       tint: 'text-pass bg-pass-soft',
     });
@@ -111,14 +126,14 @@ function computeQuickPicks(entries: AgentLeaderboardEntry[]): QuickPick[] {
     // Value = accuracy per dollar. Guards against a free/near-zero-cost entry
     // dominating by division blow-up.
     const bestValue = [...priced].sort((a, b) => {
-      const va = Number(a.pass_rate) / Math.max(Number(a.cost_usd_per_task), 1e-6);
-      const vb = Number(b.pass_rate) / Math.max(Number(b.cost_usd_per_task), 1e-6);
+      const va = Number(a.pass_rate) / Math.max(attemptCost(a)!, 1e-6);
+      const vb = Number(b.pass_rate) / Math.max(attemptCost(b)!, 1e-6);
       return vb - va;
     })[0];
     picks.push({
       label: 'Best value',
       entry: bestValue,
-      detail: `${formatScorecardLabel(bestValue.pass_rate)} @ ${fmtCost(bestValue.cost_usd_per_task)}`,
+      detail: `${fmtPct(bestValue.pass_rate)} @ ${fmtCost(attemptCost(bestValue))}/attempt`,
       icon: Gem,
       tint: 'text-accent-strong bg-accent-soft',
     });
@@ -130,6 +145,7 @@ function computeQuickPicks(entries: AgentLeaderboardEntry[]): QuickPick[] {
 export default function Agents() {
   const [entries, setEntries] = useState<AgentLeaderboardEntry[]>([]);
   const [newModels, setNewModels] = useState<KnownModel[]>([]);
+  const [suite, setSuite] = useState('minibench-core-v1');
   const [sortBy, setSortBy] = useState('pass_rate');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,11 +153,11 @@ export default function Agents() {
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    api.getAgentLeaderboard({ sort_by: sortBy })
+    api.getAgentLeaderboard({ suite, sort_by: sortBy })
       .then(setEntries)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [sortBy]);
+  }, [sortBy, suite]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -153,9 +169,9 @@ export default function Agents() {
   }, []);
 
   const paretoData: ParetoPoint[] = entries
-    .filter(e => e.cost_usd_per_task != null)
+    .filter(e => attemptCost(e) != null)
     .map(e => ({
-      cost: Number(e.cost_usd_per_task),
+      cost: attemptCost(e)!,
       pass: Number(e.pass_rate),
       name: e.config_name ?? e.run_id.slice(0, 8),
       on_pareto_frontier: e.on_pareto_frontier,
@@ -165,11 +181,10 @@ export default function Agents() {
   const quickPicks = computeQuickPicks(entries);
 
   return (
-    <div className="arcade-cabinet space-y-8">
-      <PageHeader eyebrow="Multiplayer Cabinet" title="MoA scorecards, on the frontier">
-        Multi-agent and agentic configs ranked by tier · score on contamination-resistant tasks.
-        Confidence bars stay underneath for receipts; the gold Pareto frontier still marks the
-        configs that earn their quarters.
+    <div className="space-y-8">
+      <PageHeader eyebrow="Configuration research" title="Agent and MoA evidence">
+        Agentic configurations ranked by measured task success, cost, latency, and uncertainty.
+        Confidence intervals limit winner claims; the Pareto frontier marks non-dominated setups.
       </PageHeader>
 
       {newModels.length > 0 && (
@@ -221,9 +236,9 @@ export default function Agents() {
           {/* Signature chart: Cost vs Accuracy Pareto frontier. */}
           <Card className="animate-rise rise-2">
             <CardHeader
-              title="Score vs. $/quarter"
-              sub="Tier score vs. cost per task. Up is stronger; left is cheaper."
-              right={<Badge tone="frontier">Gold = Pareto-optimal</Badge>}
+              title="Success vs. cost per attempt"
+              sub="Measured success versus mean charged attempt cost. Up is stronger; left is cheaper."
+              right={<Badge tone="frontier">Highlighted = Pareto frontier</Badge>}
             />
             <div className="px-2 pb-4">
               {paretoData.length === 0 ? (
@@ -234,22 +249,22 @@ export default function Agents() {
               ) : (
                 <ResponsiveContainer width="100%" height={380}>
                   <ScatterChart margin={{ top: 16, right: 32, bottom: 36, left: 8 }}>
-                    <CartesianGrid stroke={ARCADE_CHART.grid} />
+                    <CartesianGrid stroke={CHART.grid} />
                     <XAxis
-                      dataKey="cost" name="$/quarter" type="number" {...axisProps}
-                      stroke={ARCADE_CHART.ink3}
-                      tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
+                      dataKey="cost" name="Cost per attempt" type="number" {...axisProps}
+                      stroke={CHART.ink3}
+                      tick={{ fill: CHART.ink3, fontSize: 11 }}
                       tickFormatter={(v: number) => `$${v}`}
-                      label={{ value: '$/quarter (USD)', position: 'insideBottom', offset: -18, fill: ARCADE_CHART.ink3, fontSize: 12 }}
+                      label={{ value: 'Cost per attempt (USD)', position: 'insideBottom', offset: -18, fill: CHART.ink3, fontSize: 12 }}
                     />
                     <YAxis
                       dataKey="pass" name="Score" type="number" domain={[0, 100]} {...axisProps}
-                      stroke={ARCADE_CHART.ink3}
-                      tick={{ fill: ARCADE_CHART.ink3, fontSize: 11 }}
-                      label={{ value: 'Score', angle: -90, position: 'insideLeft', offset: 16, fill: ARCADE_CHART.ink3, fontSize: 12 }}
+                      stroke={CHART.ink3}
+                      tick={{ fill: CHART.ink3, fontSize: 11 }}
+                      label={{ value: 'Score', angle: -90, position: 'insideLeft', offset: 16, fill: CHART.ink3, fontSize: 12 }}
                     />
                     <Tooltip
-                      cursor={{ stroke: ARCADE_CHART.line, strokeDasharray: '4 4' }}
+                      cursor={{ stroke: CHART.line, strokeDasharray: '4 4' }}
                       content={({ payload }) => {
                         if (!payload?.length) return null;
                         const d = payload[0].payload as ParetoPoint;
@@ -259,14 +274,14 @@ export default function Agents() {
                               {d.name}
                               {d.self_moa && <span className="ml-1 text-[11px] text-accent-strong">(Self-MoA)</span>}
                             </div>
-                            <div className="tnum mt-1 text-accent-strong">{formatScorecardLabel(d.pass)}</div>
-                            <div className="tnum text-ink-2">{fmtCost(d.cost)}/quarter</div>
+                            <div className="tnum mt-1 text-accent-strong">{fmtPct(d.pass)} measured success</div>
+                            <div className="tnum text-ink-2">{fmtCost(d.cost)}/attempt</div>
                             {d.on_pareto_frontier && <div className="mt-1 text-[11px] text-frontier">On Pareto frontier</div>}
                           </TooltipCard>
                         );
                       }}
                     />
-                    <Scatter data={paretoData} shape={ArcadeFrontierDot} isAnimationActive={false} />
+                    <Scatter data={paretoData} shape={FrontierDot} isAnimationActive={false} />
                   </ScatterChart>
                 </ResponsiveContainer>
               )}
@@ -278,13 +293,13 @@ export default function Agents() {
             <Select label="Sort" value={sortBy} onChange={e => setSortBy(e.target.value)}>
               <option value="pass_rate">Pass rate</option>
               <option value="pass_hat_k">Pass^k (consistency)</option>
-              <option value="cost_usd_per_task">$/quarter</option>
+              <option value="cost_usd_per_attempt">Cost per attempt</option>
             </Select>
           </div>
 
           <Card className="animate-rise rise-3 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="arcade-highscore-table w-full text-left text-[13px]">
+              <table className="w-full text-left text-[13px]">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-wider">
                     <th className="py-3 pl-5 pr-2 font-semibold whitespace-nowrap text-ink-3">#</th>
@@ -293,17 +308,16 @@ export default function Agents() {
                     <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Provider</th>
                     <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Score · 95% CI</th>
                     <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Pass^k</th>
-                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">$/quarter</th>
+                    <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Cost/attempt</th>
                     <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Latency p50/p95</th>
                     <th className="px-2 py-3 font-semibold whitespace-nowrap text-ink-3">Trials</th>
                   </tr>
                 </thead>
                 <tbody>
                   {entries.map((e) => {
-                    const card = formatScorecard(e.pass_rate);
                     return (
                       <tr key={e.run_id}>
-                        <td className="arcade-rank tnum py-3 pl-5 pr-2 text-ink-3">#{e.rank}</td>
+                        <td className="tnum py-3 pl-5 pr-2 text-ink-3">#{e.rank}</td>
                         <td className="px-2 py-3">
                           <div className="flex flex-wrap items-center gap-2">
                             <Link
@@ -326,13 +340,11 @@ export default function Agents() {
                         <td className="px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">{e.benchmark_suite}</td>
                         <td className="px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">{e.provider ?? '—'}</td>
                         <td className="px-2 py-3 min-w-[200px]">
-                          <div className={`arcade-score ${tierChromeClass(card.tierId)}`}>
-                            {formatScorecardLabel(e.pass_rate)}
-                          </div>
+                          <div className="tnum text-[13px] font-semibold text-ink">{fmtPct(e.pass_rate)} measured success</div>
                           <CIBar value={Number(e.pass_rate)} lo={num(e.ci95_low)} hi={num(e.ci95_high)} />
                         </td>
                         <td className="tnum px-2 py-3 text-ink-2 whitespace-nowrap">{fmtPct(e.pass_hat_k)}</td>
-                        <td className="tnum px-2 py-3 text-ink-2 whitespace-nowrap">{fmtCost(e.cost_usd_per_task)}</td>
+                        <td className="tnum px-2 py-3 text-ink-2 whitespace-nowrap">{fmtCost(attemptCost(e))}</td>
                         <td className="tnum px-2 py-3 text-[12px] text-ink-2 whitespace-nowrap">
                           {e.latency_p50_ms != null && e.latency_p95_ms != null
                             ? `${e.latency_p50_ms} / ${e.latency_p95_ms}ms`

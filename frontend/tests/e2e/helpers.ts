@@ -1,6 +1,6 @@
 import { expect, type Page, type Response } from '@playwright/test';
-import fs from 'node:fs';
-import path from 'node:path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 export const ARTIFACTS = path.resolve('artifacts/e2e');
 

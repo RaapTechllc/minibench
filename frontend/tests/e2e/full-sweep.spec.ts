@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import fs from 'node:fs';
-import path from 'node:path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   ARTIFACTS,
   dismissLegacyNoticeIfPresent,
@@ -129,15 +129,15 @@ test.describe('Full interactive sweep', () => {
     }
 
     // Error-state retry button: force by visiting with API blocked briefly
-    await page.route('**/api/v1/hardware', (route) => route.abort());
+    await page.route('**/api/v1/profiles', (route) => route.abort());
     await page.goto('/hardware');
     await waitForAppReady(page);
     const retry = page.getByRole('button', { name: /Try again/i });
     if (await retry.isVisible({ timeout: 5000 }).catch(() => false)) {
       await snap(page, 'hardware-error-state');
-      await page.unroute('**/api/v1/hardware');
+      await page.unroute('**/api/v1/profiles');
       await retry.click();
-      await page.waitForResponse((r) => r.url().includes('/api/v1/hardware') && r.ok());
+      await page.waitForResponse((r) => r.url().includes('/api/v1/profiles') && r.ok());
       await snap(page, 'hardware-error-recovered');
       findings.push({
         route: '/hardware (error+retry)',
@@ -148,7 +148,7 @@ test.describe('Full interactive sweep', () => {
         failedRequests: [],
       });
     } else {
-      await page.unroute('**/api/v1/hardware');
+      await page.unroute('**/api/v1/profiles');
       findings.push({
         route: '/hardware (error+retry)',
         status: 'warn',

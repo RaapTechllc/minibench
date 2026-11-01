@@ -172,7 +172,7 @@ class AgentTaskResultSubmit(BaseModel):
     trial: Optional[int] = None
     passed: bool
     score: Optional[Decimal] = None
-    cost_usd: Optional[Decimal] = None
+    cost_usd: Optional[Decimal] = Field(None, ge=0)
     latency_ms: Optional[int] = None
     tokens_in: Optional[int] = None
     tokens_out: Optional[int] = None
@@ -192,7 +192,8 @@ class AgentRunSubmit(BaseModel):
     pass_hat_k: Optional[Decimal] = Field(None, ge=0, le=100)
     ci95_low: Optional[Decimal] = None
     ci95_high: Optional[Decimal] = None
-    cost_usd_per_task: Optional[Decimal] = None
+    cost_usd_per_task: Optional[Decimal] = Field(None, ge=0)
+    cost_usd_per_attempt: Optional[Decimal] = Field(None, ge=0)
     latency_p50_ms: Optional[int] = None
     latency_p95_ms: Optional[int] = None
     tokens_in: Optional[int] = None
@@ -231,6 +232,7 @@ class AgentRunResponse(BaseModel):
     ci95_low: Optional[Decimal] = None
     ci95_high: Optional[Decimal] = None
     cost_usd_per_task: Optional[Decimal] = None
+    cost_usd_per_attempt: Optional[Decimal] = None
     latency_p50_ms: Optional[int] = None
     latency_p95_ms: Optional[int] = None
     tokens_in: Optional[int] = None
@@ -265,6 +267,7 @@ class AgentLeaderboardEntry(BaseModel):
     ci95_low: Optional[Decimal] = None
     ci95_high: Optional[Decimal] = None
     cost_usd_per_task: Optional[Decimal] = None
+    cost_usd_per_attempt: Optional[Decimal] = None
     latency_p50_ms: Optional[int] = None
     latency_p95_ms: Optional[int] = None
     on_pareto_frontier: bool = False
@@ -294,6 +297,7 @@ class ModelLeaderboardEntry(BaseModel):
     ci95_low: Optional[Decimal] = None
     ci95_high: Optional[Decimal] = None
     cost_usd_per_task: Optional[Decimal] = None
+    cost_usd_per_attempt: Optional[Decimal] = None
     latency_p50_ms: Optional[int] = None
     latency_p95_ms: Optional[int] = None
     submitted_at: datetime
