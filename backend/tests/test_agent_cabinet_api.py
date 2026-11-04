@@ -1,11 +1,9 @@
 """Hop A API tests for Real-Work Agent Cabinet (A1–A6)."""
 from __future__ import annotations
 
-import os
 from copy import deepcopy
 from uuid import UUID
 
-import psycopg2
 import pytest
 
 from agentbench.agent_cabinet import (
@@ -20,7 +18,7 @@ from agentbench.agent_cabinet import (
 )
 from agentbench.stats import bootstrap_ci_by_task, pass_hat_k, percentile, wilson_ci
 from agentbench.tests.test_import_results import _legacy_artifact
-from tests.conftest import PG_HOST, PG_PASS, PG_PORT, PG_USER, TEST_DB
+from tests.conftest import table_count as _table_count
 
 from app.agent_cabinet_present import (
     category_completion_from_trials,
@@ -127,22 +125,6 @@ def _artifact(**provenance_overrides) -> dict:
         )
     assert publication_receipt(artifact)["publishable"] is True
     return artifact
-
-
-def _table_count(table: str) -> int:
-    conn = psycopg2.connect(
-        host=os.environ.get("MINIBENCH_TEST_PG_HOST", PG_HOST),
-        port=os.environ.get("MINIBENCH_TEST_PG_PORT", PG_PORT),
-        user=os.environ.get("MINIBENCH_TEST_PG_USER", PG_USER),
-        password=os.environ.get("MINIBENCH_TEST_PG_PASSWORD", PG_PASS),
-        dbname=os.environ.get("MINIBENCH_TEST_PG_DB", TEST_DB),
-    )
-    try:
-        with conn.cursor() as cur:
-            cur.execute(f"SELECT count(*) FROM {table}")
-            return cur.fetchone()[0]
-    finally:
-        conn.close()
 
 
 def _post(client, artifact):
@@ -270,12 +252,11 @@ def test_a1_list_uses_latest_valid_run_per_exact_identity_not_best_completion(cl
         assert key in detail["technician"]
 
 
-# ─── A2: isolation from Solo / MoA / hardware; no composite ───────────────────
+# ─── A2: isolation from Solo / MoA; no composite ──────────────────────────────
 
 
 def test_a2_cabinet_does_not_touch_other_leaderboards_or_add_composite(client):
     before_runs = _table_count("agent_runs")
-    before_hardware = _table_count("benchmarks")
     posted = _post(client, _artifact())
     assert posted.status_code == 200
     body = posted.json()
@@ -284,13 +265,11 @@ def test_a2_cabinet_does_not_touch_other_leaderboards_or_add_composite(client):
 
     assert _table_count("agent_runs") == before_runs
     assert _table_count("agent_cabinet_runs") == 1
-    assert _table_count("benchmarks") == before_hardware
 
     assert client.get("/api/v1/agents/leaderboard").json() == []
     assert client.get("/api/v1/agents/models/leaderboard").json() == []
-    hardware = client.get("/api/v1/leaderboard").json()
-    assert all("run_id" not in row for row in hardware)
-    assert all(row.get("id") != body["run_id"] for row in hardware)
+    # The Era 1 hardware leaderboard is gone; the cabinet must not resurrect it.
+    assert client.get("/api/v1/leaderboard").status_code == 404
 
     listed = client.get("/api/v1/agent-cabinet/runs").json()
     assert "composite" not in listed[0]

@@ -1,8 +1,7 @@
-"""Agent-benchmark API — the second product, kept on its own router.
+"""Solo / Multiplayer cabinet API and model catalog, on its own router.
 
-Additive to the hardware endpoints: separate router mounted under
-``/api/v1/agents/*`` so the two leaderboards share one app without entangling
-their tables or query logic.
+Mounted under ``/api/v1/agents/*``; kept separate from the Real-Work Agent
+Cabinet router so the boards never entangle their tables or query logic.
 """
 from decimal import Decimal
 from typing import Optional
